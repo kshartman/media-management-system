@@ -28,7 +28,7 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
           )}
           
           {/* Download Icon Overlay */}
-          <a 
+          <a
             href={documentCopy}
             download
             target="_blank"
@@ -41,6 +41,24 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
               </svg>
             </div>
           </a>
+
+          {/* Metadata Overlay */}
+          {props.fileMetadata && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-2 text-[0.65rem] flex justify-between font-medium">
+              <div>
+                {props.fileMetadata.fileSize &&
+                  `${props.fileMetadata.fileSize < 102400
+                    ? `${(props.fileMetadata.fileSize / 1024).toFixed(1)}kb`
+                    : `${(props.fileMetadata.fileSize / (1024 * 1024)).toFixed(1)}mb`}`
+                }
+              </div>
+              <div>
+                {props.fileMetadata.date &&
+                  new Date(props.fileMetadata.date).toISOString().split('T')[0]
+                }
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </BaseCard>

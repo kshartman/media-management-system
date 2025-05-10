@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const sharp = require('sharp');
+const sizeOf = require('image-size');
 const { connectToDatabase } = require('./db/connection');
 const { Card, User, Tag } = require('./models');
 require('dotenv').config();
@@ -117,7 +119,7 @@ const sampleCards = [
 const sampleUsers = [
   {
     username: 'admin',
-    password: 'admin123', // In production, use hashed passwords
+    password: 'HealthyGuts4Me!', // In production, use hashed passwords
     role: 'admin',
   },
 ];
@@ -188,6 +190,52 @@ const authMiddleware = (req, res, next) => {
 // Helper functions
 const getBaseUrl = (req) => {
   return `${req.protocol}://${req.get('host')}`;
+};
+
+// Utility function to extract metadata from uploaded files
+const extractFileMetadata = async (filePath, providedDate = null) => {
+  try {
+    const fullPath = path.join(__dirname, filePath);
+    const stats = fs.statSync(fullPath);
+    const fileSize = stats.size; // File size in bytes
+    const date = providedDate || new Date();
+    let width = null;
+    let height = null;
+
+    // Get image dimensions for image files
+    const extension = path.extname(filePath).toLowerCase();
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+
+    if (imageExtensions.includes(extension)) {
+      try {
+        // Use image-size to get dimensions
+        const dimensions = sizeOf(fullPath);
+        width = dimensions.width;
+        height = dimensions.height;
+      } catch (err) {
+        console.error('Error getting image dimensions:', err);
+      }
+    } else if (extension === '.mp4' || extension === '.mov' || extension === '.avi' || extension === '.webm') {
+      // For video files, we could use something like ffprobe here
+      // But we'll leave this for a future enhancement
+      // For now, we'll rely on sharp's metadata extraction capabilities for images only
+    }
+
+    return {
+      date,
+      width,
+      height,
+      fileSize
+    };
+  } catch (error) {
+    console.error('Error extracting file metadata:', error);
+    return {
+      date: providedDate || new Date(),
+      width: null,
+      height: null,
+      fileSize: null
+    };
+  }
 };
 
 const getAllTags = async () => {
@@ -487,6 +535,9 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
     console.log('[TAG DEBUG SERVER] Processed tags array for POST:', tags);
 
+    // Extract date if provided in the form
+    let date = req.body.date ? new Date(req.body.date) : new Date();
+
     if (!type || !description) {
       return res.status(400).json({ error: 'Type and description are required' });
     }
@@ -504,6 +555,12 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       type,
       tags,
       description,
+      fileMetadata: {
+        date: date,
+        width: null,
+        height: null,
+        fileSize: null
+      }
     };
 
     // Handle different card types
@@ -516,8 +573,26 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       }
       if (req.files.preview && req.files.preview.length > 0) {
         newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+        // Extract metadata for preview image
+        const previewMetadata = await extractFileMetadata(newCard.preview, date);
+        // Only update dimensions and file size if they're not already set
+        if (!newCard.fileMetadata.width && previewMetadata.width) {
+          newCard.fileMetadata.width = previewMetadata.width;
+        }
+        if (!newCard.fileMetadata.height && previewMetadata.height) {
+          newCard.fileMetadata.height = previewMetadata.height;
+        }
+        if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
+          newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+        }
       }
       newCard.download = `/uploads/${req.files.download[0].filename}`;
+      // Extract metadata for download image
+      const downloadMetadata = await extractFileMetadata(newCard.download, date);
+      // Always use the downloadable image metadata over the preview
+      newCard.fileMetadata.width = downloadMetadata.width || newCard.fileMetadata.width;
+      newCard.fileMetadata.height = downloadMetadata.height || newCard.fileMetadata.height;
+      newCard.fileMetadata.fileSize = downloadMetadata.fileSize || newCard.fileMetadata.fileSize;
     } else if (type === 'social') {
       const validation = validateFiles(req.files, ['documentCopy']);
       if (!validation.valid) {
@@ -527,8 +602,24 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       }
       if (req.files.preview && req.files.preview.length > 0) {
         newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+        // Extract metadata for preview image
+        const previewMetadata = await extractFileMetadata(newCard.preview, date);
+        // Only update dimensions and file size if they're not already set
+        if (!newCard.fileMetadata.width && previewMetadata.width) {
+          newCard.fileMetadata.width = previewMetadata.width;
+        }
+        if (!newCard.fileMetadata.height && previewMetadata.height) {
+          newCard.fileMetadata.height = previewMetadata.height;
+        }
+        if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
+          newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+        }
       }
       newCard.documentCopy = `/uploads/${req.files.documentCopy[0].filename}`;
+      // Extract metadata for document copy
+      const documentMetadata = await extractFileMetadata(newCard.documentCopy, date);
+      // For documents, we mainly care about file size
+      newCard.fileMetadata.fileSize = documentMetadata.fileSize || newCard.fileMetadata.fileSize;
     } else if (type === 'reel') {
       const validation = validateFiles(req.files, ['movie', 'transcript']);
       if (!validation.valid) {
@@ -538,28 +629,47 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       }
       if (req.files.preview && req.files.preview.length > 0) {
         newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+        // Extract metadata for preview image
+        const previewMetadata = await extractFileMetadata(newCard.preview, date);
+        // Only update dimensions and file size if they're not already set
+        if (!newCard.fileMetadata.width && previewMetadata.width) {
+          newCard.fileMetadata.width = previewMetadata.width;
+        }
+        if (!newCard.fileMetadata.height && previewMetadata.height) {
+          newCard.fileMetadata.height = previewMetadata.height;
+        }
+        if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
+          newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+        }
       }
       newCard.movie = `/uploads/${req.files.movie[0].filename}`;
+      // Extract metadata for movie file
+      const movieMetadata = await extractFileMetadata(newCard.movie, date);
+      // For videos, we want dimensions and file size
+      newCard.fileMetadata.width = movieMetadata.width || newCard.fileMetadata.width;
+      newCard.fileMetadata.height = movieMetadata.height || newCard.fileMetadata.height;
+      newCard.fileMetadata.fileSize = movieMetadata.fileSize || newCard.fileMetadata.fileSize;
+
       newCard.transcript = `/uploads/${req.files.transcript[0].filename}`;
     } else {
       return res.status(400).json({ error: 'Invalid card type' });
     }
-    
+
     // Save to database
     const card = new Card(newCard);
     await card.save();
-    
+
     // Convert relative URLs to absolute URLs for response
     const baseUrl = getBaseUrl(req);
     const response = card.toObject();
-    
+
     Object.keys(response).forEach(key => {
-      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' && 
-          key !== 'createdAt' && key !== 'updatedAt' && response[key]) {
+      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' &&
+          key !== 'metadata' && key !== 'date' && key !== 'createdAt' && key !== 'updatedAt' && response[key]) {
         response[key] = baseUrl + response[key];
       }
     });
-    
+
     res.status(201).json(response);
   } catch (error) {
     console.error('Error creating card:', error);
@@ -585,6 +695,10 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
     console.log('[TAG DEBUG SERVER] Processed tags array for PUT:', tags);
     console.log('[TAG DEBUG SERVER] Existing card tags before update:', card.tags);
+
+    // Extract date if provided in the form, otherwise use existing or create new
+    let date = req.body.date ? new Date(req.body.date) : (card.fileMetadata?.date || new Date());
+    console.log('Update date value:', date);
 
     if (!type || !description) {
       return res.status(400).json({ error: 'Type and description are required' });
@@ -615,20 +729,40 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       type,
       tags,
       description,
+      fileMetadata: {
+        ...(card.fileMetadata || {}), // Preserve existing metadata
+        date: date // Update the date in fileMetadata
+      }
     };
 
     // Handle file removal and update flags
-    const handleFileField = (field, currentValue) => {
+    const handleFileField = async (field, currentValue) => {
       const removeFlag = req.body[`remove_${field}`] === 'true';
 
       if (removeFlag) {
         console.log(`Removing ${field}`);
+        // We don't remove fileMetadata as it's a single object for the whole card
+        // But we could reset specific fields if needed
         return undefined;
       } else if (req.files && req.files[field] && req.files[field].length > 0) {
         console.log(`Updating ${field} with new file: ${req.files[field][0].filename}`);
-        return `/uploads/${req.files[field][0].filename}`;
+        const newPath = `/uploads/${req.files[field][0].filename}`;
+
+        // Extract metadata for the new file
+        const metadata = await extractFileMetadata(newPath, date);
+        if (!updatedCard.fileMetadata) {
+          updatedCard.fileMetadata = {};
+        }
+
+        // Update width, height and fileSize but keep the date we set earlier
+        if (metadata.width) updatedCard.fileMetadata.width = metadata.width;
+        if (metadata.height) updatedCard.fileMetadata.height = metadata.height;
+        if (metadata.fileSize) updatedCard.fileMetadata.fileSize = metadata.fileSize;
+
+        return newPath;
       } else if (currentValue) {
         console.log(`Keeping existing ${field}: ${currentValue}`);
+        // Keep existing metadata for this field
         return currentValue;
       }
 
@@ -638,10 +772,10 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     // Update files if new ones are uploaded
     if (type === 'image') {
       // Handle preview field (optional)
-      updatedCard.preview = handleFileField('preview', card.preview);
+      updatedCard.preview = await handleFileField('preview', card.preview);
 
       // Handle download field (required for image cards)
-      updatedCard.download = handleFileField('download', card.download);
+      updatedCard.download = await handleFileField('download', card.download);
 
       // Ensure download field is present for image cards
       if (!updatedCard.download) {
@@ -651,10 +785,10 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       }
     } else if (type === 'social') {
       // Handle preview field (optional)
-      updatedCard.preview = handleFileField('preview', card.preview);
+      updatedCard.preview = await handleFileField('preview', card.preview);
 
       // Handle documentCopy field (required for social cards)
-      updatedCard.documentCopy = handleFileField('documentCopy', card.documentCopy);
+      updatedCard.documentCopy = await handleFileField('documentCopy', card.documentCopy);
 
       // Ensure documentCopy field is present for social cards
       if (!updatedCard.documentCopy) {
@@ -664,13 +798,13 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       }
     } else if (type === 'reel') {
       // Handle preview field (optional)
-      updatedCard.preview = handleFileField('preview', card.preview);
+      updatedCard.preview = await handleFileField('preview', card.preview);
 
       // Handle movie field (required for reel cards)
-      updatedCard.movie = handleFileField('movie', card.movie);
+      updatedCard.movie = await handleFileField('movie', card.movie);
 
       // Handle transcript field (required for reel cards)
-      updatedCard.transcript = handleFileField('transcript', card.transcript);
+      updatedCard.transcript = await handleFileField('transcript', card.transcript);
 
       // Ensure required fields are present for reel cards
       if (!updatedCard.movie || !updatedCard.transcript) {
@@ -679,21 +813,21 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         });
       }
     }
-    
+
     // Update the card in the database
     const updated = await Card.findByIdAndUpdate(cardId, updatedCard, { new: true });
-    
+
     // Convert relative URLs to absolute URLs for response
     const baseUrl = getBaseUrl(req);
     const response = updated.toObject();
-    
+
     Object.keys(response).forEach(key => {
-      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' && 
-          key !== 'createdAt' && key !== 'updatedAt' && response[key]) {
+      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' &&
+          key !== 'metadata' && key !== 'date' && key !== 'createdAt' && key !== 'updatedAt' && response[key]) {
         response[key] = baseUrl + response[key];
       }
     });
-    
+
     res.json(response);
   } catch (error) {
     console.error('Error updating card:', error);

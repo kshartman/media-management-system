@@ -2,7 +2,7 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata = {
-  title: 'Media Management System',
+  title: 'Affiliate Resources',
   description: 'A system for managing and browsing digital media assets',
 };
 

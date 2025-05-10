@@ -22,10 +22,8 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
     headers,
   };
 
-  console.log(`API Request to ${API_URL}${endpoint}`, config);
 
   try {
-    console.log(`Requesting ${API_URL}${endpoint}`);
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...config,
       mode: 'cors', // Explicitly set CORS mode
@@ -38,7 +36,6 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
     }
 
     const data = await response.json();
-    console.log(`API Response from ${endpoint}:`, data);
     return data;
   } catch (error) {
     console.error(`API Error for ${endpoint}:`, error);

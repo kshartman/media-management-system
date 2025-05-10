@@ -47,7 +47,18 @@ const MobileFilterDrawer: React.FC<MobileFilterDrawerProps> = ({ tags, onFilterC
 
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
-          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={toggleDrawer}></div>
+          <div
+            className="absolute inset-0 bg-black bg-opacity-50"
+            onClick={toggleDrawer}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                toggleDrawer();
+              }
+            }}
+            aria-label="Close filters"
+          ></div>
           
           <div className="absolute inset-y-0 left-0 max-w-full flex">
             <div className="relative w-screen max-w-xs">

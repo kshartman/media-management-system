@@ -22,12 +22,11 @@ const Layout: React.FC<LayoutProps> = ({
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-md">
         <div className="mx-auto max-w-screen-xl px-4 py-4 flex items-center justify-between">
-          <a
-            href="#"
+          <div
             className="text-xl font-bold text-gray-900"
           >
             {title}
-          </a>
+          </div>
           
           <div className="flex items-center gap-4">
             {isAdmin ? (

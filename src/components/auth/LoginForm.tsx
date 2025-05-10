@@ -22,7 +22,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     try {
       await login(username, password);
       onLoginSuccess();
-    } catch (error) {
+    } catch {
       setError('Invalid username or password');
     } finally {
       setLoading(false);

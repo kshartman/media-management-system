@@ -12,14 +12,17 @@ interface CardFormProps {
 }
 
 const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, availableTags = [] }) => {
-  console.log('[FORM DEBUG] CardForm initializing with initialData:', initialData);
-  console.log('[FORM DEBUG] Card tags when form initializes:', initialData?.tags || []);
 
   // Card type is fixed and cannot be changed after creation
   const type = initialData?.type || 'image';
   const [description, setDescription] = useState(initialData?.description || '');
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
   const [newTag, setNewTag] = useState('');
+  const [date, setDate] = useState<string>(
+    initialData?.fileMetadata?.date
+      ? new Date(initialData.fileMetadata.date).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+  );
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File | null | boolean>>({
     preview: null,
     download: null,
@@ -104,7 +107,6 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
       }
 
       // Display the selected filename
-      console.log(`Selected file for ${field}: ${file.name} (${file.type})`);
     }
   };
 
@@ -114,12 +116,9 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
     const initializeTags = async () => {
       try {
         if (availableTags && availableTags.length > 0) {
-          console.log('[TAG DEBUG] Using tags from props:', availableTags);
           setAllAvailableTags(availableTags);
         } else {
-          console.log('[TAG DEBUG] Fetching tags from API');
           const tags = await getAllTags();
-          console.log('[TAG DEBUG] Tags fetched from API:', tags);
           setAllAvailableTags(tags);
         }
       } catch (error) {
@@ -132,10 +131,6 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
 
   // Filter tags when input changes - PREFIX MATCHES ONLY
   useEffect(() => {
-    console.log('[TAG DEBUG] Filter effect triggered');
-    console.log('[TAG DEBUG] Current input:', newTag);
-    console.log('[TAG DEBUG] All available tags stored in state:', allAvailableTags);
-    console.log('[TAG DEBUG] Currently selected tags:', tags);
 
     if (newTag.trim() === '') {
       // If no input but dropdown is open, show all available tags not already selected
@@ -145,10 +140,8 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
           .filter(tag => tag && !tags.includes(tag))
           .sort((a, b) => a.localeCompare(b));
 
-        console.log('[TAG DEBUG] No input, dropdown open, showing all available tags:', availableTags);
         setFilteredTags(availableTags);
       } else {
-        console.log('[TAG DEBUG] No input, dropdown closed, showing no tags');
         setFilteredTags([]);
       }
       return;
@@ -163,7 +156,6 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
       .filter(tag => tag.toLowerCase().startsWith(input))
       .sort((a, b) => a.localeCompare(b)); // Sort alphabetically
 
-    console.log(`[TAG DEBUG] Prefix matches for "${input}":`, prefixMatches);
     setFilteredTags(prefixMatches);
   }, [newTag, allAvailableTags, tags, isTagsDropdownOpen]);
 
@@ -174,13 +166,9 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
 
   const handleTagAdd = (tagToAdd?: string) => {
     const tagValue = tagToAdd || newTag.trim();
-    console.log('[TAG DEBUG] Attempting to add tag:', tagValue);
-    console.log('[TAG DEBUG] Current tags before add:', tags);
 
     if (tagValue && !tags.includes(tagValue)) {
-      console.log('[TAG DEBUG] Tag is unique, adding to selected tags');
       const updatedTags = [...tags, tagValue];
-      console.log('[TAG DEBUG] New tags list after add:', updatedTags);
       setTags(updatedTags);
       setNewTag('');
       setIsTagsDropdownOpen(false);
@@ -198,16 +186,11 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
       if (tagInputRef.current) {
         tagInputRef.current.focus();
       }
-    } else if (tagValue) {
-      console.log('[TAG DEBUG] Tag already exists in selected tags, not adding duplicate');
     }
   };
 
   const handleTagDelete = (tagToDelete: string) => {
-    console.log('[TAG DEBUG] Deleting tag:', tagToDelete);
-    console.log('[TAG DEBUG] Tags before delete:', tags);
     const updatedTags = tags.filter(tag => tag !== tagToDelete);
-    console.log('[TAG DEBUG] Tags after delete:', updatedTags);
     setTags(updatedTags);
   };
 
@@ -238,8 +221,7 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
       const formData = new FormData();
       formData.append('type', type);
       formData.append('description', description);
-      console.log('[TAG DEBUG] Tags being submitted:', tags);
-      console.log('[TAG DEBUG] Tags joined for submission:', tags.join(','));
+      formData.append('date', date);
       formData.append('tags', tags.join(','));
 
       // Append files if they exist
@@ -432,6 +414,21 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
             </div>
           </div>
         )}
+
+        {/* Date Picker */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1" htmlFor="date">
+            Date
+          </label>
+          <input
+            id="date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2 border rounded text-sm border-gray-300"
+          />
+          <p className="text-xs text-gray-500 mt-1">Date will be displayed in the metadata overlay</p>
+        </div>
         
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" htmlFor="description">
@@ -488,7 +485,6 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
                     id="tags-dropdown"
                     className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
                   >
-                    {console.log('[TAG DEBUG] Rendering dropdown with filtered tags:', filteredTags)}
                     {filteredTags.length > 0 ? (
                       filteredTags.map((tag) => {
                         // Only highlight the prefix (since we're only doing prefix matching)

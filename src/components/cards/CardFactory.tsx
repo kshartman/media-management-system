@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { CardProps, ImageCardProps, SocialCardProps, ReelCardProps, BaseCardProps } from '../../types';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { ImageCardProps, SocialCardProps, ReelCardProps, BaseCardProps } from '../../types';
 import ImageCard from './ImageCard';
 import SocialCard from './SocialCard';
 import ReelCard from './ReelCard';
@@ -35,10 +36,13 @@ const CardFactory = (props: AnyCardProps) => {
     } else if (props.type === 'reel') {
       return <ReelCard {...props as ReelCardProps} />;
     } else {
-      // Cast to any to handle unexpected types
-      const anyProps = props as any;
-      console.warn(`Unknown card type: ${anyProps.type}`);
-      return <FallbackCard description={anyProps.description || 'No description'} cardType={anyProps.type} />;
+      // Handle unexpected types with a specific unknown type pattern
+      const unknownProps = props as unknown as { type?: string; description?: string };
+      console.warn(`Unknown card type: ${unknownProps.type}`);
+      return <FallbackCard
+        description={unknownProps.description || 'No description'}
+        cardType={unknownProps.type}
+      />;
     }
   } catch (error) {
     console.error('Error rendering card:', error);

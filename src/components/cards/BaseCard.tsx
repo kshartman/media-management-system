@@ -7,6 +7,9 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   id,
   tags,
   description,
+  // fileMetadata is coming from props but we don't use it here
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  fileMetadata: _fileMetadata,
   children,
   onEdit,
   onDelete,

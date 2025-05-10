@@ -16,6 +16,11 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
   // Card type is fixed and cannot be changed after creation
   const type = initialData?.type || 'image';
   const [description, setDescription] = useState(initialData?.description || '');
+  const [date, setDate] = useState<string>(
+    initialData?.fileMetadata?.date
+      ? new Date(initialData.fileMetadata.date).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+  );
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
   const [newTag, setNewTag] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File | null | boolean>>({
@@ -34,6 +39,26 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
   const [filteredTags, setFilteredTags] = useState<string[]>([]);
   const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Connect the save button in the modal header to the form submit
+  useEffect(() => {
+    const saveButton = document.getElementById('modal-submit-button');
+    const handleSaveClick = () => {
+      if (formRef.current) {
+        // Trigger form submission
+        const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
+        formRef.current.dispatchEvent(submitEvent);
+      }
+    };
+
+    if (saveButton) {
+      saveButton.addEventListener('click', handleSaveClick);
+      return () => {
+        saveButton.removeEventListener('click', handleSaveClick);
+      };
+    }
+  }, []);
 
   // Fetch available tags if not provided
   useEffect(() => {
@@ -200,11 +225,14 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
     }
 
     setIsSubmitting(true);
+    // Dispatch event for the modal to show loading state
+    document.dispatchEvent(new Event('form-submit-start'));
 
     try {
       const formData = new FormData();
       formData.append('type', type);
       formData.append('description', description);
+      formData.append('date', date);
       formData.append('tags', tags.join(','));
 
       // Append files if they exist
@@ -227,6 +255,8 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
       }));
     } finally {
       setIsSubmitting(false);
+      // Dispatch event for the modal to hide loading state
+      document.dispatchEvent(new Event('form-submit-end'));
     }
   };
 
@@ -260,7 +290,7 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
     return (
       <div className="mb-4">
         <div className="font-medium mb-1 text-sm">
-          {label} {isOptional && <span className="text-gray-500 text-xs">(Optional)</span>}
+          {label.replace('Preview ', '').replace('Downloadable ', '').replace('Thumbnail ', '').replace('Video ', '').replace('Document ', '')} {isOptional && <span className="text-gray-500 text-xs">(Optional)</span>}
         </div>
         <div className="flex flex-col">
           {/* Hidden file input for native file dialog */}
@@ -283,10 +313,10 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <span>Browse files...</span>
+              <span>Browse</span>
             </button>
 
-            {hasSelectedFile && (
+            {hasSelectedFile ? (
               <div className="ml-3 flex items-center gap-2">
                 <span className="text-sm text-blue-600 font-medium truncate max-w-xs">
                   {selectedFileName}
@@ -300,6 +330,27 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                   ✕
                 </button>
               </div>
+            ) : (
+              initialData && initialData[field as keyof CardProps] && (
+                <div className="ml-3 flex items-center gap-2">
+                  <span className="text-sm text-blue-600 font-medium truncate max-w-xs">
+                    {typeof initialData[field as keyof CardProps] === 'string' ?
+                      (initialData[field as keyof CardProps] as string).split('/').pop() :
+                      'File'
+                    }
+                  </span>
+                  {isOptional && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile(field)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Remove file"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )
             )}
           </div>
 
@@ -312,25 +363,6 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
             }
           </small>
         </div>
-        {initialData && initialData[field as keyof CardProps] && !hasSelectedFile && (
-          <div className="mt-1 flex items-center">
-            <span className="text-sm text-gray-600">
-              Current file: {typeof initialData[field as keyof CardProps] === 'string' ?
-                (initialData[field as keyof CardProps] as string).split('/').pop() :
-                'File'
-              }
-            </span>
-            {isOptional && (
-              <button
-                type="button"
-                onClick={handleRemoveFile(field)}
-                className="ml-2 text-xs text-red-600 hover:text-red-800"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        )}
         {errors[field] && (
           <div className="mt-1 text-sm text-red-500">
             {errors[field]}
@@ -377,7 +409,7 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
+      <form ref={formRef} onSubmit={handleSubmit}>
         {!initialData && (
           <div className="mb-4">
             <h3 className="text-base font-medium mb-2">Card Type</h3>
@@ -414,6 +446,19 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
               {errors.description}
             </div>
           )}
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1" htmlFor="date">
+            Date
+          </label>
+          <input
+            type="date"
+            id="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+          />
         </div>
         
         <div className="mb-4">
@@ -533,9 +578,9 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
             <p className="text-xs text-gray-500 mt-1">Add at least one tag to categorize this card</p>
           )}
         </div>
-        
+
         {renderCardTypeFields()}
-        
+
         <div className="flex justify-end gap-3 mt-6">
           <button
             type="button"

@@ -1,8 +1,16 @@
+export interface FileMetadata {
+  date: string | Date;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+}
+
 export interface BaseCardProps {
   id: string;
   type: "image" | "social" | "reel";
   tags: string[];
   description: string;
+  fileMetadata?: FileMetadata;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   isAdmin?: boolean;

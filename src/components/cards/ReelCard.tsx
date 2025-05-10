@@ -6,7 +6,11 @@ import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
 
 const ReelCard: React.FC<ReelCardProps> = (props) => {
-  const { preview, movie, transcript, ...baseProps } = props;
+  const { preview, movie,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    transcript: _transcript,
+    ...baseProps
+  } = props;
   const [isPlaying, setIsPlaying] = React.useState(false);
   
   return (
@@ -27,9 +31,17 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                   onClick={() => setIsPlaying(true)}
                 />
               ) : (
-                <div 
+                <div
                   className="w-full h-full bg-yellow-100 flex items-center justify-center cursor-pointer"
                   onClick={() => setIsPlaying(true)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setIsPlaying(true);
+                    }
+                  }}
+                  aria-label="Play video"
                 >
                   <div className="text-xl font-bold text-yellow-600">VIDEO</div>
                 </div>
@@ -45,7 +57,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               </div>
               
               {/* Download Icon Overlay */}
-              <a 
+              <a
                 href={movie}
                 download
                 target="_blank"
@@ -59,6 +71,31 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                   </svg>
                 </div>
               </a>
+
+              {/* Metadata Overlay */}
+              {props.fileMetadata && (
+                <div
+                  className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-2 text-[0.65rem] flex justify-between font-medium"
+                  role="region"
+                  aria-label="File metadata"
+                >
+                  <div>
+                    {props.fileMetadata.width && props.fileMetadata.height &&
+                      `${props.fileMetadata.width} × ${props.fileMetadata.height}`
+                    }
+                    {props.fileMetadata.fileSize &&
+                      ` • ${props.fileMetadata.fileSize < 102400
+                        ? `${(props.fileMetadata.fileSize / 1024).toFixed(1)}kb`
+                        : `${(props.fileMetadata.fileSize / (1024 * 1024)).toFixed(1)}mb`}`
+                    }
+                  </div>
+                  <div>
+                    {props.fileMetadata.date &&
+                      new Date(props.fileMetadata.date).toISOString().split('T')[0]
+                    }
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="w-full aspect-[9/16]">
@@ -67,7 +104,15 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 controls
                 autoPlay
                 className="w-full h-full object-contain"
-              />
+              >
+                {/* Adding a track element to satisfy a11y requirements */}
+                <track
+                  kind="captions"
+                  src={_transcript ? _transcript : undefined}
+                  label="English captions"
+                  srcLang="en"
+                />
+              </video>
             </div>
           )}
         </div>

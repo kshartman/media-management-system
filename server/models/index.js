@@ -43,6 +43,16 @@ const cardSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.type === 'reel'; } // Required for reel type
   },
+  // File metadata
+  fileMetadata: {
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    width: Number,  // For images and videos
+    height: Number, // For images and videos
+    fileSize: Number // In bytes
+  }
 }, { timestamps: true });
 
 // User Schema

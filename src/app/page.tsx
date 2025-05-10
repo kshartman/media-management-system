@@ -1,12 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import CardFactory from '../components/cards/CardFactory';
 import TypeDropdown from '../components/filters/TypeDropdown';
+import TagDropdown from '../components/filters/TagDropdown';
+import SortDropdown, { SortOption } from '../components/filters/SortDropdown';
+import SearchField from '../components/filters/SearchField';
 import LoginForm from '../components/auth/LoginForm';
 import AdminBar from '../components/admin/AdminBar';
 import CardUploadModal from '../components/admin/CardUploadModal';
-import { CardProps } from '../types';
+import { CardProps, ImageCardProps, SocialCardProps, ReelCardProps } from '../types';
 import { useAuth } from '../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags } from '../lib/api';
 
@@ -48,11 +52,14 @@ const SampleCards: CardProps[] = [
 ];
 
 export default function Home() {
-  const { isAdmin, login, logout } = useAuth();
+  const { isAdmin, _login, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['image']);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [currentSort, setCurrentSort] = useState<SortOption>('newest');
+  const [searchTerm, setSearchTerm] = useState('');
   const [filteredCards, setFilteredCards] = useState<CardProps[]>([]);
   const [cards, setCards] = useState<CardProps[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -73,14 +80,28 @@ export default function Home() {
         setCards(cardsResponse.cards);
         setAvailableTags(tagsResponse);
 
-        // Filter to show only image cards by default
-        setFilteredCards(cardsResponse.cards.filter(card => card.type === 'image'));
+        // Filter to show only image cards by default and apply sorting
+        const initialFiltered = applyFiltersAndSort(
+          cardsResponse.cards,
+          ['image'],  // Default to image type
+          [],         // No tags selected by default
+          'newest',   // Default sort to newest
+          ''          // No search term
+        );
+        setFilteredCards(initialFiltered);
       } catch (error) {
         console.error('Error loading data:', error);
         // Fallback to sample cards if API fails
         setCards(SampleCards);
-        // Filter to show only image cards by default
-        setFilteredCards(SampleCards.filter(card => card.type === 'image'));
+        // Filter to show only image cards by default and apply sorting
+        const initialFiltered = applyFiltersAndSort(
+          SampleCards,
+          ['image'],  // Default to image type
+          [],         // No tags selected by default
+          'newest',   // Default sort to newest
+          ''          // No search term
+        );
+        setFilteredCards(initialFiltered);
       } finally {
         setLoading(false);
       }
@@ -89,18 +110,129 @@ export default function Home() {
     loadData();
   }, []);
   
-  const handleFilterChange = (filters: { type?: string[] }) => {
-    if (filters.type) {
-      setSelectedTypes(filters.type);
-      
-      if (filters.type.length === 0) {
-        // If no filters selected, show all cards
-        setFilteredCards(cards);
-      } else {
-        // Filter cards by selected types
-        setFilteredCards(cards.filter(card => filters.type!.includes(card.type)));
-      }
+  // Apply all filters and sorting
+  const applyFiltersAndSort = (
+    allCards: CardProps[],
+    types: string[],
+    tags: string[],
+    sort: SortOption,
+    search: string = ''
+  ) => {
+    // Apply filters
+    let filtered = [...allCards];
+
+    // Filter by type if any types are selected
+    if (types.length > 0) {
+      filtered = filtered.filter(card => types.includes(card.type));
     }
+
+    // Filter by tags if any tags are selected
+    if (tags.length > 0) {
+      filtered = filtered.filter(card =>
+        // Card must have at least one of the selected tags
+        card.tags.some(tag => tags.includes(tag))
+      );
+    }
+
+    // Filter by search term if provided
+    if (search.trim() !== '') {
+      const searchLower = search.toLowerCase();
+      const searchTerms = searchLower.split(/\s+/).filter(term => term.length > 0);
+
+      filtered = filtered.filter(card => {
+        // For each search term, check if it matches as a word or word start
+        return searchTerms.every(term => {
+          const descLower = card.description.toLowerCase();
+
+          // Split description into words and check for exact matches or prefixes
+          const words = descLower.split(/\s+/);
+          if (words.some(word => word === term || word.startsWith(term))) return true;
+
+          // Also check if the term appears in the tags (exact match only)
+          if (card.tags.some(tag => tag.toLowerCase() === term)) return true;
+
+          // Search in file names (extract file names from paths)
+          const files: (string | undefined | null)[] = [
+            card.preview
+          ];
+
+          // Add type-specific files based on card type
+          if (card.type === 'image') {
+            files.push((card as unknown as ImageCardProps).download);
+          } else if (card.type === 'social') {
+            files.push((card as unknown as SocialCardProps).documentCopy);
+          } else if (card.type === 'reel') {
+            files.push((card as unknown as ReelCardProps).movie);
+            files.push((card as unknown as ReelCardProps).transcript);
+          }
+
+          // Filter out null/undefined values
+          const validFiles = files.filter(Boolean);
+
+          return validFiles.some(file => {
+            if (!file) return false;
+            // Extract filename from path
+            const fullFilename = file.split('/').pop()?.toLowerCase() || '';
+
+            // Split filename by common separators and extract words
+            const filenameWords = fullFilename
+              .split(/[.\-_\s]/) // Split by dots, hyphens, underscores, spaces
+              .filter(Boolean);  // Remove empty strings
+
+            // Look for exact word matches or prefixes in filename parts
+            return filenameWords.some(word => word === term || word.startsWith(term));
+          });
+        });
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      const dateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
+      const dateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
+
+      return sort === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    return filtered;
+  };
+
+  const handleFilterChange = (filters: { type?: string[], tags?: string[] }) => {
+    // Update selected types if provided
+    if (filters.type !== undefined) {
+      setSelectedTypes(filters.type);
+    }
+
+    // Update selected tags if provided
+    if (filters.tags !== undefined) {
+      setSelectedTags(filters.tags);
+    }
+
+    // Get current filter states (using the updated values)
+    const types = filters.type !== undefined ? filters.type : selectedTypes;
+    const tags = filters.tags !== undefined ? filters.tags : selectedTags;
+
+    // Apply filters and sort
+    const filteredAndSorted = applyFiltersAndSort(cards, types, tags, currentSort, searchTerm);
+    setFilteredCards(filteredAndSorted);
+  };
+
+  // Handle sorting change
+  const handleSortChange = (sortOption: SortOption) => {
+    setCurrentSort(sortOption);
+
+    // Re-apply current filters with new sort option
+    const filteredAndSorted = applyFiltersAndSort(cards, selectedTypes, selectedTags, sortOption, searchTerm);
+    setFilteredCards(filteredAndSorted);
+  };
+
+  // Handle search changes
+  const handleSearch = (search: string) => {
+    setSearchTerm(search);
+
+    // Re-apply current filters with new search term
+    const filteredAndSorted = applyFiltersAndSort(cards, selectedTypes, selectedTags, currentSort, search);
+    setFilteredCards(filteredAndSorted);
   };
 
   const handleLoginClick = () => {
@@ -190,9 +322,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Media Management System</h1>
+      <header className="bg-[#d9f2fc] border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center relative">
+          <h1 className="text-xl font-bold text-gray-900 hidden sm:block">Affiliate Resources</h1>
+
+          <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+            <Image
+              src="/zive-logo.png"
+              alt="ZIVE logo"
+              className="h-8 w-auto"
+              width={96}
+              height={32}
+              priority
+            />
+          </div>
 
           <button
             onClick={handleLoginClick}
@@ -203,20 +346,67 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {isAdmin && (
-          <AdminBar
-            onCardCreated={handleCardCreated}
-            availableTags={availableTags}
-          />
-        )}
+      <div className="sticky top-[60px] z-30 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          {/* Controls row - keeps all controls on one line */}
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <div className="mr-2">
+                <AdminBar
+                  onCardCreated={handleCardCreated}
+                  availableTags={availableTags}
+                />
+              </div>
+            )}
+            <TypeDropdown
+              onFilterChange={handleFilterChange}
+              selectedTypes={selectedTypes}
+            />
+            <TagDropdown
+              onFilterChange={handleFilterChange}
+              selectedTags={selectedTags}
+              availableTags={availableTags}
+            />
+            <SortDropdown
+              onSortChange={handleSortChange}
+              currentSort={currentSort}
+            />
+            <div className="ml-auto">
+              <SearchField
+                onSearch={handleSearch}
+                initialSearchTerm={searchTerm}
+              />
+            </div>
+          </div>
 
-        <div className="mb-6">
-          <TypeDropdown
-            onFilterChange={handleFilterChange}
-            selectedTypes={selectedTypes}
-          />
+          {/* Selected tags row - appears below the controls */}
+          {selectedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2 ml-0 items-center">
+              <span className="font-medium text-sm text-gray-700 mr-1">Filter:</span>
+              {selectedTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newTags = selectedTags.filter(t => t !== tag);
+                      handleFilterChange({ tags: newTags });
+                    }}
+                    className="ml-1.5 text-blue-600 hover:text-blue-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 pt-6">
 
         {loading ? (
           <div className="flex justify-center p-8">

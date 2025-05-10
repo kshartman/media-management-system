@@ -33,28 +33,15 @@ const CardGrid: React.FC<CardGridProps> = ({
   
   // Initialize the observer ref with null initially
   const observer = useRef<IntersectionObserver | null>(null);
-  
-  const lastCardRef = useCallback((node: HTMLDivElement) => {
-    if (loading) return;
-    if (observer.current) observer.current.disconnect();
-    
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        loadMoreCards();
-      }
-    });
-    
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore]);
 
-  const loadMoreCards = async () => {
+  const loadMoreCards = useCallback(async () => {
     if (loading || !hasMore) return;
-    
+
     setLoading(true);
     try {
       const nextPage = page + 1;
       const newCards = await loadMore(nextPage);
-      
+
       if (newCards.length === 0) {
         setHasMore(false);
       } else {
@@ -66,7 +53,20 @@ const CardGrid: React.FC<CardGridProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading, hasMore, page, loadMore]);
+
+  const lastCardRef = useCallback((node: HTMLDivElement) => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        loadMoreCards();
+      }
+    });
+
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore, loadMoreCards]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
