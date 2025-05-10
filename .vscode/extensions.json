@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-typescript-next",
+    "dsznajder.es7-react-js-snippets",
+    "msjsdiag.debugger-for-chrome",
+    "firefox-devtools.vscode-firefox-debug",
+    "christian-kohler.path-intellisense",
+    "christian-kohler.npm-intellisense",
+    "mgmcdermott.vscode-language-babel",
+    "wix.vscode-import-cost"
+  ]
+}

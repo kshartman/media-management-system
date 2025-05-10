@@ -2,7 +2,8 @@
 
 import { CardProps } from '../types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+// Use the API proxy through Next.js rewrites
+const API_URL = '/api';
 const PAGE_SIZE = 12;
 
 // Helper function for API requests
@@ -24,18 +25,28 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
   console.log(`API Request to ${API_URL}${endpoint}`, config);
 
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, config);
-    
+    console.log(`Requesting ${API_URL}${endpoint}`);
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...config,
+      mode: 'cors', // Explicitly set CORS mode
+      credentials: 'same-origin'
+    });
+
     if (!response.ok) {
       console.error(`API Error: ${response.status}`, await response.text());
       throw new Error(`API Error: ${response.status}`);
     }
-    
+
     const data = await response.json();
     console.log(`API Response from ${endpoint}:`, data);
     return data;
   } catch (error) {
     console.error(`API Error for ${endpoint}:`, error);
+    // Add more detailed error information for debugging
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error('This could be due to CORS issues, network connectivity, or server unavailability.');
+      console.error('Verify the server is running and CORS is properly configured.');
+    }
     throw error;
   }
 };
@@ -48,29 +59,55 @@ export const fetchCards = async (
   const queryParams = new URLSearchParams();
   queryParams.append('page', page.toString());
   queryParams.append('limit', PAGE_SIZE.toString());
-  
+
   if (filters.search) {
     queryParams.append('search', filters.search);
   }
-  
+
   if (filters.type && filters.type.length > 0) {
     filters.type.forEach(type => queryParams.append('type', type));
   }
-  
+
   if (filters.tags && filters.tags.length > 0) {
     filters.tags.forEach(tag => queryParams.append('tag', tag));
   }
 
-  return request(`/cards?${queryParams.toString()}`);
+  const response = await request(`/cards?${queryParams.toString()}`);
+
+  // Map MongoDB _id to id for client-side compatibility
+  const mappedCards = response.cards.map(card => {
+    if ('_id' in card && !('id' in card)) {
+      return {
+        ...card,
+        id: card._id,
+      };
+    }
+    return card;
+  });
+
+  return {
+    ...response,
+    cards: mappedCards,
+  };
 };
 
 export const fetchCardById = async (id: string): Promise<CardProps> => {
-  return request(`/cards/${id}`);
+  const card = await request(`/cards/${id}`);
+
+  // Map MongoDB _id to id for client-side compatibility
+  if ('_id' in card && !('id' in card)) {
+    return {
+      ...card,
+      id: card._id,
+    };
+  }
+
+  return card;
 };
 
 export const createCard = async (cardData: FormData): Promise<CardProps> => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  
+
   if (!token) {
     throw new Error('Authentication required');
   }
@@ -89,7 +126,17 @@ export const createCard = async (cardData: FormData): Promise<CardProps> => {
       throw new Error(`API Error: ${response.status}`);
     }
 
-    return response.json();
+    const card = await response.json();
+
+    // Map MongoDB _id to id for client-side compatibility
+    if ('_id' in card && !('id' in card)) {
+      return {
+        ...card,
+        id: card._id,
+      };
+    }
+
+    return card;
   } catch (error) {
     console.error('Error creating card:', error);
     throw error;
@@ -98,7 +145,7 @@ export const createCard = async (cardData: FormData): Promise<CardProps> => {
 
 export const updateCard = async (id: string, cardData: FormData): Promise<CardProps> => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  
+
   if (!token) {
     throw new Error('Authentication required');
   }
@@ -117,7 +164,17 @@ export const updateCard = async (id: string, cardData: FormData): Promise<CardPr
       throw new Error(`API Error: ${response.status}`);
     }
 
-    return response.json();
+    const card = await response.json();
+
+    // Map MongoDB _id to id for client-side compatibility
+    if ('_id' in card && !('id' in card)) {
+      return {
+        ...card,
+        id: card._id,
+      };
+    }
+
+    return card;
   } catch (error) {
     console.error('Error updating card:', error);
     throw error;
@@ -143,5 +200,6 @@ export const logout = (): void => {
 };
 
 export const getAllTags = async (): Promise<string[]> => {
-  return request('/tags');
+  const response = await request('/tags');
+  return response;
 };

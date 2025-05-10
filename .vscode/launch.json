@@ -1,0 +1,106 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next.js: debug client-side (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack://_N_E/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "Start Client",
+      "timeout": 30000,
+      "userDataDir": "${workspaceFolder}/.vscode/chrome-debug-profile",
+      "runtimeArgs": [
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding"
+      ]
+    },
+    {
+      "name": "Next.js: attach to Chrome",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack://_N_E/*": "${webRoot}/*"
+      }
+    },
+    {
+      "name": "Next.js: debug client-side (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack://_N_E/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "Start Client",
+      "timeout": 30000
+    },
+    {
+      "name": "Next.js: debug client-side (Firefox)",
+      "type": "firefox",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}",
+      "pathMappings": [
+        {
+          "url": "webpack://_N_E/",
+          "path": "${webRoot}/"
+        }
+      ],
+      "preLaunchTask": "Start Client",
+      "timeout": 30000
+    },
+    {
+      "name": "Next.js: debug server-side",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/.next/**/*.js"],
+      "restart": true,
+      "timeout": 30000
+    },
+    {
+      "name": "Express Server: debug",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "restart": true,
+      "timeout": 30000
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: Next.js + Express",
+      "configurations": ["Next.js: debug server-side", "Express Server: debug"]
+    },
+    {
+      "name": "Full Stack: Chrome",
+      "configurations": ["Express Server: debug", "Next.js: debug client-side (Chrome)"]
+    },
+    {
+      "name": "Full Stack: Firefox",
+      "configurations": ["Express Server: debug", "Next.js: debug client-side (Firefox)"]
+    },
+    {
+      "name": "Full Stack: Edge",
+      "configurations": ["Express Server: debug", "Next.js: debug client-side (Edge)"]
+    }
+  ]
+}

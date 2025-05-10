@@ -32,21 +32,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      // In a real app, you would validate the token here
-      // For now, just extract user info from JWT
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser({
-          id: payload.id,
-          username: payload.username,
-          role: payload.role,
-        });
-      } catch (error) {
-        console.error('Invalid token:', error);
-        localStorage.removeItem('auth_token');
+    // Check if we're running in a browser environment
+    if (typeof window !== 'undefined') {
+      // Check if user is logged in
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        // In a real app, you would validate the token here
+        // For now, just extract user info from JWT
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          setUser({
+            id: payload.id,
+            username: payload.username,
+            role: payload.role,
+          });
+        } catch (error) {
+          console.error('Invalid token:', error);
+          localStorage.removeItem('auth_token');
+        }
       }
     }
     setIsLoading(false);
@@ -56,7 +59,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     try {
       const { token, user } = await apiLogin({ username, password });
-      localStorage.setItem('auth_token', token);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', token);
+      }
       setUser(user);
     } finally {
       setIsLoading(false);
@@ -65,7 +70,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     apiLogout();
-    localStorage.removeItem('auth_token');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+    }
     setUser(null);
   };
 

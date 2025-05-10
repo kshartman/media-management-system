@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { CardProps } from '../../types';
-import CardForm from './CardForm';
+import CardFormNew from './CardFormNew';
 
 interface CardUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (formData: FormData) => Promise<void>;
   initialData?: CardProps;
+  availableTags?: string[];
 }
 
 const CardUploadModal: React.FC<CardUploadModalProps> = ({
@@ -16,6 +17,7 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
   onClose,
   onSubmit,
   initialData,
+  availableTags = [],
 }) => {
   if (!isOpen) return null;
   
@@ -48,10 +50,12 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
         </div>
         
         <div className="px-6 py-4">
-          <CardForm
+          <CardFormNew
+            key={initialData?.id || 'new'} // Using key to force recreation when card changes
             initialData={initialData}
             onSubmit={onSubmit}
             onCancel={onClose}
+            availableTags={availableTags}
           />
         </div>
       </div>

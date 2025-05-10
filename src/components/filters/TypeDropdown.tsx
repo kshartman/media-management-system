@@ -16,21 +16,13 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const typeOptions = [
-    { id: 'all', label: 'All Types' },
     { id: 'image', label: 'Images' },
     { id: 'social', label: 'Posts' },
     { id: 'reel', label: 'Reels' }
   ];
 
   const handleTypeChange = (typeId: string) => {
-    let newTypes: string[] = [];
-    
-    if (typeId === 'all') {
-      newTypes = [];
-    } else {
-      newTypes = [typeId];
-    }
-    
+    const newTypes = [typeId];
     onFilterChange({ type: newTypes });
     setIsOpen(false);
   };
@@ -38,10 +30,10 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   // Determine current selection label
   const getCurrentSelectionLabel = () => {
     if (selectedTypes.length === 0) {
-      return 'All Types';
+      return 'Images';
     } else {
       const selectedType = typeOptions.find(type => type.id === selectedTypes[0]);
-      return selectedType ? selectedType.label : 'All Types';
+      return selectedType ? selectedType.label : 'Images';
     }
   };
   

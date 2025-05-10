@@ -1,38 +1,55 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CardProps } from '../../types';
+import { getAllTags } from '../../lib/api';
 
 interface CardFormProps {
   initialData?: CardProps;
   onSubmit: (formData: FormData) => Promise<void>;
   onCancel: () => void;
+  availableTags?: string[];
 }
 
-const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) => {
-  const [type, setType] = useState<'image' | 'social' | 'reel'>(initialData?.type || 'image');
+const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, availableTags = [] }) => {
+  console.log('[FORM DEBUG] CardForm initializing with initialData:', initialData);
+  console.log('[FORM DEBUG] Card tags when form initializes:', initialData?.tags || []);
+
+  // Card type is fixed and cannot be changed after creation
+  const type = initialData?.type || 'image';
   const [description, setDescription] = useState(initialData?.description || '');
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
   const [newTag, setNewTag] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File | null>>({
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File | null | boolean>>({
     preview: null,
     download: null,
     documentCopy: null,
     movie: null,
     transcript: null,
+    remove_preview: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // For tag autocomplete
+  const [allAvailableTags, setAllAvailableTags] = useState<string[]>(availableTags);
+  const [filteredTags, setFilteredTags] = useState<string[]>([]);
+  const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+
+  // This effect has been removed since we're using the key prop to fully
+  // recreate the component when initialData changes. The useState
+  // initializations are sufficient.
+
   // Set up the required fields based on card type
   const getRequiredFields = () => {
-    const common = ['preview', 'description'];
+    const common = ['description'];
     const typeSpecific = {
       image: ['download'],
       social: ['documentCopy'],
       reel: ['movie', 'transcript'],
     };
-    
+
     return [...common, ...typeSpecific[type]];
   };
 
@@ -61,11 +78,22 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
 
   const handleFileChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+
+      // Check file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: 'File size exceeds 50MB limit'
+        }));
+        return;
+      }
+
       setUploadedFiles(prev => ({
         ...prev,
-        [field]: e.target.files![0],
+        [field]: file,
       }));
-      
+
       // Clear error for this field if it exists
       if (errors[field]) {
         setErrors(prev => {
@@ -74,14 +102,89 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
           return newErrors;
         });
       }
+
+      // Display the selected filename
+      console.log(`Selected file for ${field}: ${file.name} (${file.type})`);
     }
   };
 
-  const handleTagAdd = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
+  // Fetch available tags when component mounts if none were passed in props
+  useEffect(() => {
+    // Initialize with props or fetch from API
+    const initializeTags = async () => {
+      try {
+        if (availableTags && availableTags.length > 0) {
+          console.log('[TAG DEBUG] Using tags from props:', availableTags);
+          setAllAvailableTags(availableTags);
+        } else {
+          console.log('[TAG DEBUG] Fetching tags from API');
+          const tags = await getAllTags();
+          console.log('[TAG DEBUG] Tags fetched from API:', tags);
+          setAllAvailableTags(tags);
+        }
+      } catch (error) {
+        console.error('Error initializing tags:', error);
+      }
+    };
+
+    initializeTags();
+  }, [availableTags]);
+
+  // Filter tags when input changes - PREFIX MATCHES ONLY
+  useEffect(() => {
+    console.log('[TAG DEBUG] Filter effect triggered');
+    console.log('[TAG DEBUG] Current input:', newTag);
+    console.log('[TAG DEBUG] All available tags stored in state:', allAvailableTags);
+    console.log('[TAG DEBUG] Currently selected tags:', tags);
+
+    if (newTag.trim() === '') {
+      // If no input but dropdown is open, show all available tags not already selected
+      if (isTagsDropdownOpen) {
+        // Sort alphabetically for better user experience
+        const availableTags = [...allAvailableTags]
+          .filter(tag => tag && !tags.includes(tag))
+          .sort((a, b) => a.localeCompare(b));
+
+        console.log('[TAG DEBUG] No input, dropdown open, showing all available tags:', availableTags);
+        setFilteredTags(availableTags);
+      } else {
+        console.log('[TAG DEBUG] No input, dropdown closed, showing no tags');
+        setFilteredTags([]);
+      }
+      return;
+    }
+
+    // Get all unselected tags
+    const availableTags = allAvailableTags.filter(tag => tag && !tags.includes(tag));
+    const input = newTag.toLowerCase().trim();
+
+    // ONLY PREFIX MATCHES - strict prefix matching as required
+    const prefixMatches = availableTags
+      .filter(tag => tag.toLowerCase().startsWith(input))
+      .sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+
+    console.log(`[TAG DEBUG] Prefix matches for "${input}":`, prefixMatches);
+    setFilteredTags(prefixMatches);
+  }, [newTag, allAvailableTags, tags, isTagsDropdownOpen]);
+
+  const handleTagInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewTag(e.target.value);
+    setIsTagsDropdownOpen(true);
+  };
+
+  const handleTagAdd = (tagToAdd?: string) => {
+    const tagValue = tagToAdd || newTag.trim();
+    console.log('[TAG DEBUG] Attempting to add tag:', tagValue);
+    console.log('[TAG DEBUG] Current tags before add:', tags);
+
+    if (tagValue && !tags.includes(tagValue)) {
+      console.log('[TAG DEBUG] Tag is unique, adding to selected tags');
+      const updatedTags = [...tags, tagValue];
+      console.log('[TAG DEBUG] New tags list after add:', updatedTags);
+      setTags(updatedTags);
       setNewTag('');
-      
+      setIsTagsDropdownOpen(false);
+
       // Clear tag error if it exists
       if (errors.tags) {
         setErrors(prev => {
@@ -90,35 +193,66 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
           return newErrors;
         });
       }
+
+      // Focus back on the input
+      if (tagInputRef.current) {
+        tagInputRef.current.focus();
+      }
+    } else if (tagValue) {
+      console.log('[TAG DEBUG] Tag already exists in selected tags, not adding duplicate');
     }
   };
-  
+
   const handleTagDelete = (tagToDelete: string) => {
-    setTags(tags.filter(tag => tag !== tagToDelete));
+    console.log('[TAG DEBUG] Deleting tag:', tagToDelete);
+    console.log('[TAG DEBUG] Tags before delete:', tags);
+    const updatedTags = tags.filter(tag => tag !== tagToDelete);
+    console.log('[TAG DEBUG] Tags after delete:', updatedTags);
+    setTags(updatedTags);
   };
+
+  // Handle click outside of the dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagInputRef.current && !tagInputRef.current.contains(event.target as Node)) {
+        setIsTagsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const formData = new FormData();
       formData.append('type', type);
       formData.append('description', description);
+      console.log('[TAG DEBUG] Tags being submitted:', tags);
+      console.log('[TAG DEBUG] Tags joined for submission:', tags.join(','));
       formData.append('tags', tags.join(','));
-      
+
       // Append files if they exist
-      Object.entries(uploadedFiles).forEach(([field, file]) => {
-        if (file) {
-          formData.append(field, file);
+      Object.entries(uploadedFiles).forEach(([field, value]) => {
+        if (field.startsWith('remove_') && value === true) {
+          // Handle removal flags
+          const actualField = field.replace('remove_', '');
+          formData.append(`remove_${actualField}`, 'true');
+        } else if (value instanceof File) {
+          formData.append(field, value);
         }
       });
-      
+
       await onSubmit(formData);
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -131,54 +265,138 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
     }
   };
 
-  const renderFileInput = (field: string, label: string, accept?: string) => (
-    <div className="mb-4">
-      <div className="font-medium mb-1 text-sm">{label}</div>
-      <input
-        id={field}
-        type="file"
-        onChange={handleFileChange(field)}
-        accept={accept}
-        className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-      />
-      {initialData && initialData[field as keyof CardProps] && (
-        <div className="mt-1 text-sm text-gray-600">
-          Current file: {typeof initialData[field as keyof CardProps] === 'string' ? 
-            (initialData[field as keyof CardProps] as string).split('/').pop() : 
-            'File'
-          }
+  const handleRemoveFile = (field: string) => () => {
+    setUploadedFiles(prev => ({
+      ...prev,
+      [field]: null,
+    }));
+
+    // Set special flag for preview removal
+    if (field === 'preview' && initialData?.[field]) {
+      setUploadedFiles(prev => ({
+        ...prev,
+        [`remove_${field}`]: true,
+      }));
+    }
+  };
+
+  const handleFileInputClick = (fieldId: string) => (e: React.MouseEvent) => {
+    // Prevent default button behavior
+    e.preventDefault();
+    // Programmatically click the hidden file input
+    document.getElementById(fieldId)?.click();
+  };
+
+  const renderFileInput = (field: string, label: string, accept?: string, isOptional: boolean = false) => {
+    const hasSelectedFile = uploadedFiles[field] instanceof File;
+    const selectedFileName = hasSelectedFile ? (uploadedFiles[field] as File).name : '';
+    const fileInputId = `${field}-input`;
+
+    return (
+      <div className="mb-4">
+        <div className="font-medium mb-1 text-sm">
+          {label} {isOptional && <span className="text-gray-500 text-xs">(Optional)</span>}
         </div>
-      )}
-      {errors[field] && (
-        <div className="mt-1 text-sm text-red-500">
-          {errors[field]}
+        <div className="flex flex-col">
+          {/* Hidden file input for native file dialog */}
+          <input
+            id={fileInputId}
+            type="file"
+            onChange={handleFileChange(field)}
+            accept={accept || "*/*"}
+            multiple={false}
+            className="hidden" // Hide the native input
+          />
+
+          {/* Custom file input UI */}
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={handleFileInputClick(fileInputId)}
+              className="px-4 py-2 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span>Browse files...</span>
+            </button>
+
+            {hasSelectedFile && (
+              <div className="ml-3 flex items-center gap-2">
+                <span className="text-sm text-blue-600 font-medium truncate max-w-xs">
+                  {selectedFileName}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile(field)}
+                  className="text-red-500 hover:text-red-700"
+                  title="Remove file"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
+          <small className="text-gray-500 mt-1 text-xs">
+            {field.includes('preview') || field.includes('download') ?
+              'Supported formats: jpg, jpeg, png, gif, webp, svg' :
+              field.includes('movie') || field.includes('video') ?
+                'Supported formats: mp4, mov, avi, webm' :
+                'Supported formats: pdf, txt, doc, docx, srt'
+            }
+          </small>
         </div>
-      )}
-    </div>
-  );
+        {initialData && initialData[field as keyof CardProps] && !hasSelectedFile && (
+          <div className="mt-1 flex items-center">
+            <span className="text-sm text-gray-600">
+              Current file: {typeof initialData[field as keyof CardProps] === 'string' ?
+                (initialData[field as keyof CardProps] as string).split('/').pop() :
+                'File'
+              }
+            </span>
+            {isOptional && (
+              <button
+                type="button"
+                onClick={handleRemoveFile(field)}
+                className="ml-2 text-xs text-red-600 hover:text-red-800"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        )}
+        {errors[field] && (
+          <div className="mt-1 text-sm text-red-500">
+            {errors[field]}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderCardTypeFields = () => {
     switch (type) {
       case 'image':
         return (
           <>
-            {renderFileInput('preview', 'Preview Image', 'image/*')}
-            {renderFileInput('download', 'Downloadable Image', 'image/*')}
+            {renderFileInput('preview', 'Preview Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
+            {renderFileInput('download', 'Downloadable Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg')}
           </>
         );
       case 'social':
         return (
           <>
-            {renderFileInput('preview', 'Preview Image', 'image/*')}
-            {renderFileInput('documentCopy', 'Document Copy', '.txt,.pdf,.doc,.docx')}
+            {renderFileInput('preview', 'Preview Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
+            {renderFileInput('documentCopy', 'Document Copy', 'application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,.pdf,.doc,.docx')}
           </>
         );
       case 'reel':
         return (
           <>
-            {renderFileInput('preview', 'Thumbnail Image', 'image/*')}
-            {renderFileInput('movie', 'Video File', 'video/*')}
-            {renderFileInput('transcript', 'Transcript', '.txt,.pdf,.srt')}
+            {renderFileInput('preview', 'Thumbnail Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
+            {renderFileInput('movie', 'Video File', 'video/*,.mp4,.mov,.avi,.webm')}
+            {renderFileInput('transcript', 'Transcript', 'application/pdf,text/plain,.txt,.pdf,.srt')}
           </>
         );
       default:
@@ -195,41 +413,25 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
       )}
       
       <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <h3 className="text-base font-medium mb-2">Card Type</h3>
-          <div className="flex gap-4">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                name="type"
-                checked={type === 'image'}
-                onChange={() => setType('image')}
-                className="mr-2"
-              />
-              Image
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                name="type"
-                checked={type === 'social'}
-                onChange={() => setType('social')}
-                className="mr-2"
-              />
-              Social
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                name="type"
-                checked={type === 'reel'}
-                onChange={() => setType('reel')}
-                className="mr-2"
-              />
-              Reel
-            </label>
+        {!initialData && (
+          <div className="mb-4">
+            <h3 className="text-base font-medium mb-2">Card Type</h3>
+            <div className="flex gap-4">
+              <div className="text-gray-700 py-1">Image</div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Card type is fixed and cannot be changed after creation</p>
           </div>
-        </div>
+        )}
+        {initialData && (
+          <div className="mb-4">
+            <h3 className="text-base font-medium mb-2">Card Type</h3>
+            <div className="flex gap-4">
+              <div className="text-gray-700 py-1 font-medium">
+                {type === 'image' ? 'Image' : type === 'social' ? 'Social' : 'Reel'}
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" htmlFor="description">
@@ -251,34 +453,99 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
         
         <div className="mb-4">
           <h3 className="text-base font-medium mb-2">Tags</h3>
-          <div className="flex mb-2">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              placeholder="Add a tag"
-              className="w-full mr-2 px-3 py-2 border border-gray-300 rounded text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleTagAdd();
-                }
-              }}
-            />
-            <button 
-              type="button"
-              onClick={handleTagAdd}
-              className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
-            >
-              Add
-            </button>
+          <div className="relative">
+            <div className="flex mb-2">
+              <div className="relative w-full">
+                <input
+                  ref={tagInputRef}
+                  type="text"
+                  value={newTag}
+                  onChange={handleTagInput}
+                  placeholder="Type to search or add a new tag"
+                  className="w-full mr-2 px-3 py-2 border border-gray-300 rounded text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleTagAdd();
+                    } else if (e.key === 'Escape') {
+                      setIsTagsDropdownOpen(false);
+                    } else if (e.key === 'ArrowDown' && filteredTags.length > 0 && isTagsDropdownOpen) {
+                      // Focus on first dropdown item
+                      const dropdownList = document.getElementById('tags-dropdown');
+                      if (dropdownList && dropdownList.firstChild) {
+                        (dropdownList.firstChild as HTMLElement).focus();
+                      }
+                    }
+                  }}
+                  onFocus={() => {
+                    // Show all available tags when focusing
+                    setIsTagsDropdownOpen(true);
+                  }}
+                  autoComplete="off" // Prevent browser autocomplete from interfering
+                />
+                {isTagsDropdownOpen && (
+                  <div
+                    id="tags-dropdown"
+                    className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                  >
+                    {console.log('[TAG DEBUG] Rendering dropdown with filtered tags:', filteredTags)}
+                    {filteredTags.length > 0 ? (
+                      filteredTags.map((tag) => {
+                        // Only highlight the prefix (since we're only doing prefix matching)
+                        const lowerInput = newTag.toLowerCase().trim();
+
+                        let tagDisplay;
+                        if (lowerInput.length > 0) {
+                          // Highlight just the prefix that matches
+                          const prefixLength = lowerInput.length;
+                          const prefix = tag.substring(0, prefixLength);
+                          const rest = tag.substring(prefixLength);
+
+                          tagDisplay = (
+                            <>
+                              <span className="font-bold text-blue-600">{prefix}</span>
+                              {rest}
+                            </>
+                          );
+                        } else {
+                          tagDisplay = tag;
+                        }
+
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => handleTagAdd(tag)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
+                            tabIndex={0}
+                          >
+                            {tagDisplay}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        No matching tags. Type to create a new tag.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleTagAdd()}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm whitespace-nowrap"
+              >
+                Add Tag
+              </button>
+            </div>
           </div>
-          
+
           <div className="flex flex-wrap gap-2 mt-2">
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
+                className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800"
               >
                 {tag}
                 <button
@@ -291,11 +558,15 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel }) 
               </span>
             ))}
           </div>
-          
+
           {errors.tags && (
             <div className="mt-1 text-sm text-red-500">
               {errors.tags}
             </div>
+          )}
+
+          {tags.length === 0 && (
+            <p className="text-xs text-gray-500 mt-1">Add at least one tag to categorize this card</p>
           )}
         </div>
         

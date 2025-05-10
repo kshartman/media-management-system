@@ -3,22 +3,43 @@
 import React from 'react';
 import Image from 'next/image';
 import { ImageCardProps } from '../../types';
+import BaseCard from './BaseCard';
 
 const ImageCard: React.FC<ImageCardProps> = (props) => {
   const { preview, download, ...baseProps } = props;
-  
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <BaseCard {...baseProps}>
       <div className="relative group">
         <div className="w-full h-56 relative">
-          <Image 
-            src={preview}
-            alt={props.description}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            priority
-          />
+          {preview ? (
+            <Image 
+              src={preview}
+              alt={props.description}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              priority
+            />
+          ) : (
+            <>
+              {/* If no preview, use download image or placeholder */}
+              <div className="w-full h-full bg-blue-100 flex items-center justify-center">
+                {download ? (
+                  <Image
+                    src={download}
+                    alt={props.description}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority
+                  />
+                ) : (
+                  <div className="text-xl font-bold text-blue-600">IMAGE</div>
+                )}
+              </div>
+            </>
+          )}
           
           {/* Download Icon Overlay */}
           <a 
@@ -36,22 +57,7 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
           </a>
         </div>
       </div>
-      
-      <div className="p-3">
-        <p className="text-sm text-gray-700 truncate font-medium">{props.description}</p>
-        
-        <div className="flex flex-wrap gap-1 mt-2">
-          {baseProps.tags.map((tag) => (
-            <span 
-              key={tag} 
-              className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
+    </BaseCard>
   );
 };
 

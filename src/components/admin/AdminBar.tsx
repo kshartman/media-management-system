@@ -6,18 +6,21 @@ import { createCard } from '../../lib/api';
 
 interface AdminBarProps {
   onCardCreated: () => void;
+  availableTags?: string[];
 }
 
-const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated }) => {
+const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCreateCard = async (formData: FormData) => {
     try {
       await createCard(formData);
       setIsModalOpen(false);
+      // Notify parent to refresh cards
       onCardCreated();
     } catch (error) {
       console.error('Error creating card:', error);
+      alert('Error creating card: ' + (error as Error).message);
       throw error;
     }
   };
@@ -44,6 +47,7 @@ const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated }) => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateCard}
+        availableTags={availableTags}
       />
     </div>
   );

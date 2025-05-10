@@ -10,19 +10,19 @@ export interface BaseCardProps {
 
 export interface ImageCardProps extends BaseCardProps {
   type: "image";
-  preview: string;
+  preview?: string;
   download: string;
 }
 
 export interface SocialCardProps extends BaseCardProps {
   type: "social";
-  preview: string;
+  preview?: string;
   documentCopy: string;
 }
 
 export interface ReelCardProps extends BaseCardProps {
   type: "reel";
-  preview: string;
+  preview?: string;
   movie: string;
   transcript: string;
 }

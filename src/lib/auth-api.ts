@@ -1,45 +1,31 @@
 'use client'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-
-// Helper function for API requests
-const request = async (endpoint: string, options: RequestInit = {}) => {
-  // Get auth token if available
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  };
-
-  const config = {
-    ...options,
-    headers,
-  };
-
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`, config);
-    
-    if (!response.ok) {
-      console.error(`API Error: ${response.status}`, await response.text());
-      throw new Error(`API Error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`API Error for ${endpoint}:`, error);
-    throw error;
-  }
-};
+// Use the API proxy through Next.js rewrites
+const API_URL = '/api';
 
 // Auth API functions
 export const login = async (credentials: { username: string; password: string }): Promise<{ token: string; user: { id: string; username: string; role: string } }> => {
-  return request('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
+  try {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(credentials),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API Error: ${response.status}`, errorText);
+      throw new Error('Invalid username or password');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
 };
 
 export const logout = (): void => {

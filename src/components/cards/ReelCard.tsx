@@ -3,26 +3,37 @@
 import React from 'react';
 import Image from 'next/image';
 import { ReelCardProps } from '../../types';
+import BaseCard from './BaseCard';
 
 const ReelCard: React.FC<ReelCardProps> = (props) => {
   const { preview, movie, transcript, ...baseProps } = props;
   const [isPlaying, setIsPlaying] = React.useState(false);
   
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <BaseCard {...baseProps}>
       <div className="relative group">
-        <div className="w-full h-56 relative">
+        <div className="w-full aspect-[9/16] relative">
           {!isPlaying ? (
             <>
-              <Image 
-                src={preview}
-                alt={props.description}
-                fill
-                className="object-cover cursor-pointer"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                priority
-                onClick={() => setIsPlaying(true)}
-              />
+              {preview ? (
+                <Image 
+                  src={preview}
+                  alt={props.description}
+                  fill
+                  className="object-cover cursor-pointer"
+                  style={{ aspectRatio: '9/16' }}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  priority
+                  onClick={() => setIsPlaying(true)}
+                />
+              ) : (
+                <div 
+                  className="w-full h-full bg-yellow-100 flex items-center justify-center cursor-pointer"
+                  onClick={() => setIsPlaying(true)}
+                >
+                  <div className="text-xl font-bold text-yellow-600">VIDEO</div>
+                </div>
+              )}
               
               {/* Play button overlay */}
               <div className="absolute inset-0 flex items-center justify-center">
@@ -50,33 +61,18 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               </a>
             </>
           ) : (
-            <div className="h-full w-full">
-              <video 
-                src={movie} 
-                controls 
+            <div className="w-full aspect-[9/16]">
+              <video
+                src={movie}
+                controls
                 autoPlay
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
           )}
         </div>
       </div>
-      
-      <div className="p-3">
-        <p className="text-sm text-gray-700 truncate font-medium">{props.description}</p>
-        
-        <div className="flex flex-wrap gap-1 mt-2">
-          {baseProps.tags.map((tag) => (
-            <span 
-              key={tag} 
-              className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
+    </BaseCard>
   );
 };
 

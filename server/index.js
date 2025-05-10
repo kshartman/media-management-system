@@ -5,13 +5,20 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const { connectToDatabase } = require('./db/connection');
+const { Card, User, Tag } = require('./models');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // In production, use a secure environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3002'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -25,16 +32,46 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    // Remove spaces and special characters from original filename
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `${Date.now()}-${sanitizedName}`);
   },
 });
 
-const upload = multer({ storage });
+// File filter to allow all common media file types
+const fileFilter = (req, file, cb) => {
+  // Check if the file MIME type is allowed
+  const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+  const allowedDocumentTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
 
-// In-memory data store (replace with a real database in production)
-let cards = [
+  // Allow any of these file types
+  const allowedTypes = [...allowedImageTypes, ...allowedDocumentTypes, ...allowedVideoTypes];
+
+  // Some browsers don't properly set mime types, so check file extension as fallback
+  const extension = path.extname(file.originalname).toLowerCase();
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf', '.txt', '.doc', '.docx', '.mp4', '.mov', '.avi', '.webm', '.srt'];
+
+  // Accept either by MIME type or extension
+  if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
+    cb(null, true);
+  } else {
+    console.log(`Rejected file: ${file.originalname} (${file.mimetype})`);
+    cb(null, false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+});
+
+// Sample data for initial seeding (if database is empty)
+const sampleCards = [
   {
-    id: '1',
     type: 'image',
     preview: '/uploads/sample-image-preview.jpg',
     download: '/uploads/sample-image-download.jpg',
@@ -42,7 +79,6 @@ let cards = [
     description: 'Beautiful mountain landscape at sunset',
   },
   {
-    id: '2',
     type: 'social',
     preview: '/uploads/sample-social-preview.jpg',
     documentCopy: '/uploads/sample-social-copy.pdf',
@@ -50,24 +86,87 @@ let cards = [
     description: 'Social media post template for summer campaign',
   },
   {
-    id: '3',
     type: 'reel',
     preview: '/uploads/sample-reel-preview.jpg',
     movie: '/uploads/sample-reel-video.mp4',
     transcript: '/uploads/sample-reel-transcript.txt',
     tags: ['video', 'testimonial'],
     description: 'Customer testimonial about our services',
+  },
+  {
+    type: 'image',
+    preview: '/uploads/sample-image-preview.jpg',
+    download: '/uploads/sample-image-download.jpg',
+    tags: ['product', 'photography'],
+    description: 'Product photography for the new collection',
+  },
+  {
+    type: 'image',
+    download: '/uploads/1746863291660-ZIVE-logo_Sky.png',
+    tags: ['logo', 'branding'],
+    description: 'ZIVE Sky Logo',
+  },
+  {
+    type: 'image',
+    download: '/uploads/1746863024641-ZIVE-logo_Blue.png',
+    tags: ['logo', 'branding'],
+    description: 'ZIVE Blue Logo',
   }
 ];
 
-let users = [
+const sampleUsers = [
   {
-    id: '1',
     username: 'admin',
     password: 'admin123', // In production, use hashed passwords
     role: 'admin',
   },
 ];
+
+// Sample tags to ensure we have a good starter set
+const sampleTags = [
+  { name: 'nature', count: 1 },
+  { name: 'landscape', count: 1 },
+  { name: 'marketing', count: 1 },
+  { name: 'social media', count: 1 },
+  { name: 'video', count: 1 },
+  { name: 'testimonial', count: 1 },
+  { name: 'product', count: 1 },
+  { name: 'photography', count: 1 },
+  { name: 'logo', count: 2 },
+  { name: 'branding', count: 2 },
+  { name: 'corporate', count: 0 },
+  { name: 'event', count: 0 },
+  { name: 'design', count: 0 },
+  { name: 'creative', count: 0 }
+];
+
+// Initialize database with sample data if empty
+async function seedDatabase() {
+  try {
+    // Check if we have any cards
+    const cardCount = await Card.countDocuments();
+    if (cardCount === 0) {
+      console.log('Seeding database with sample cards...');
+      await Card.insertMany(sampleCards);
+    }
+
+    // Check if we have any users
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      console.log('Seeding database with sample users...');
+      await User.insertMany(sampleUsers);
+    }
+
+    // Check if we have any tags
+    const tagCount = await Tag.countDocuments();
+    if (tagCount === 0) {
+      console.log('Seeding database with sample tags...');
+      await Tag.insertMany(sampleTags);
+    }
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  }
+}
 
 // Authentication middleware
 const authMiddleware = (req, res, next) => {
@@ -91,127 +190,238 @@ const getBaseUrl = (req) => {
   return `${req.protocol}://${req.get('host')}`;
 };
 
-const getAllTags = () => {
-  const tagSet = new Set();
-  cards.forEach(card => {
-    card.tags.forEach(tag => tagSet.add(tag));
-  });
-  return Array.from(tagSet);
+const getAllTags = async () => {
+  try {
+    console.log('[TAG DEBUG SERVER] Getting all tags from database');
+    // Get all tags from the dedicated Tag collection
+    const tags = await Tag.find({}).sort({ name: 1 });
+    console.log('[TAG DEBUG SERVER] Raw tags from database:', tags);
+    const tagNames = tags.map(tag => tag.name);
+    console.log('[TAG DEBUG SERVER] Returning tag names:', tagNames);
+    return tagNames;
+  } catch (error) {
+    console.error('Error getting all tags:', error);
+    return [];
+  }
+};
+
+// Function to process tags when creating or updating cards
+const processTags = async (tagsList) => {
+  if (!tagsList || !Array.isArray(tagsList) || tagsList.length === 0) {
+    console.log('[TAG DEBUG SERVER] No tags to process');
+    return;
+  }
+
+  console.log('[TAG DEBUG SERVER] Processing tags:', tagsList);
+
+  try {
+    // Process each tag in the list
+    for (const tagName of tagsList) {
+      const trimmedTag = tagName.trim();
+      if (!trimmedTag) {
+        console.log('[TAG DEBUG SERVER] Skipping empty tag');
+        continue;
+      }
+
+      // Try to find the tag
+      const existingTag = await Tag.findOne({ name: trimmedTag });
+
+      if (existingTag) {
+        console.log(`[TAG DEBUG SERVER] Found existing tag "${trimmedTag}", incrementing count`);
+        // Increment the tag usage count
+        await Tag.updateOne(
+          { _id: existingTag._id },
+          { $inc: { count: 1 } }
+        );
+      } else {
+        console.log(`[TAG DEBUG SERVER] Creating new tag "${trimmedTag}"`);
+        // Create a new tag
+        await Tag.create({
+          name: trimmedTag,
+          count: 1
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error processing tags:', error);
+  }
+};
+
+// Function to update tag counts when deleting cards or removing tags
+const updateTagCounts = async (tagsList) => {
+  if (!tagsList || !Array.isArray(tagsList) || tagsList.length === 0) {
+    return;
+  }
+
+  try {
+    // Decrease count for each tag and remove if count reaches 0
+    for (const tagName of tagsList) {
+      const trimmedTag = tagName.trim();
+      if (!trimmedTag) continue;
+
+      // Update tag count
+      const tag = await Tag.findOne({ name: trimmedTag });
+      if (tag) {
+        if (tag.count <= 1) {
+          // If this is the last usage, remove the tag
+          await Tag.deleteOne({ _id: tag._id });
+        } else {
+          // Otherwise decrement the count
+          await Tag.updateOne(
+            { _id: tag._id },
+            { $inc: { count: -1 } }
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error updating tag counts:', error);
+  }
 };
 
 // Auth routes
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = users.find(
-    (u) => u.username === username && u.password === password
-  );
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username, password });
 
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '1h' }
-  );
-
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-    },
-  });
 });
 
 // Card routes
-app.get('/api/cards', (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 12;
-  const search = req.query.search || '';
-  const types = req.query.type ? (Array.isArray(req.query.type) ? req.query.type : [req.query.type]) : [];
-  const tags = req.query.tag ? (Array.isArray(req.query.tag) ? req.query.tag : [req.query.tag]) : [];
+app.get('/api/cards', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const search = req.query.search || '';
+    const types = req.query.type ? (Array.isArray(req.query.type) ? req.query.type : [req.query.type]) : [];
+    const tags = req.query.tag ? (Array.isArray(req.query.tag) ? req.query.tag : [req.query.tag]) : [];
 
-  // Filter cards based on query parameters
-  let filteredCards = [...cards];
+    // Build the filter query
+    const filter = {};
+    
+    if (search) {
+      filter.description = { $regex: search, $options: 'i' };
+    }
+    
+    if (types.length > 0) {
+      filter.type = { $in: types };
+    }
+    
+    if (tags.length > 0) {
+      filter.tags = { $in: tags };
+    }
 
-  if (search) {
-    const searchLower = search.toLowerCase();
-    filteredCards = filteredCards.filter(card => 
-      card.description.toLowerCase().includes(searchLower)
-    );
+    // Get total count
+    const totalCount = await Card.countDocuments(filter);
+    
+    // Pagination
+    const skip = (page - 1) * limit;
+    
+    // Get paginated cards
+    const cards = await Card.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Convert relative URLs to absolute URLs
+    const baseUrl = getBaseUrl(req);
+    const cardsWithAbsoluteUrls = cards.map(card => {
+      const result = card.toObject();
+      
+      // Convert URLs based on card type
+      if (card.type === 'image') {
+        if (card.preview) {
+          result.preview = baseUrl + card.preview;
+        }
+        result.download = baseUrl + card.download;
+      } else if (card.type === 'social') {
+        if (card.preview) {
+          result.preview = baseUrl + card.preview;
+        }
+        result.documentCopy = baseUrl + card.documentCopy;
+      } else if (card.type === 'reel') {
+        if (card.preview) {
+          result.preview = baseUrl + card.preview;
+        }
+        result.movie = baseUrl + card.movie;
+        result.transcript = baseUrl + card.transcript;
+      }
+      
+      return result;
+    });
+
+    // Get all available tags
+    const availableTags = await getAllTags();
+
+    res.json({
+      cards: cardsWithAbsoluteUrls,
+      totalCount,
+      availableTags,
+    });
+  } catch (error) {
+    console.error('Error getting cards:', error);
+    res.status(500).json({ error: 'Server error' });
   }
+});
 
-  if (types.length > 0) {
-    filteredCards = filteredCards.filter(card => types.includes(card.type));
-  }
+app.get('/api/cards/:id', async (req, res) => {
+  try {
+    const card = await Card.findById(req.params.id);
+    
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
 
-  if (tags.length > 0) {
-    filteredCards = filteredCards.filter(card => 
-      tags.some(tag => card.tags.includes(tag))
-    );
-  }
-
-  // Pagination
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  const paginatedCards = filteredCards.slice(startIndex, endIndex);
-
-  // Convert relative URLs to absolute URLs
-  const baseUrl = getBaseUrl(req);
-  const cardsWithAbsoluteUrls = paginatedCards.map(card => {
-    const result = { ...card };
+    // Convert relative URLs to absolute URLs
+    const baseUrl = getBaseUrl(req);
+    const result = card.toObject();
     
     // Convert URLs based on card type
     if (card.type === 'image') {
-      result.preview = baseUrl + card.preview;
+      if (card.preview) {
+        result.preview = baseUrl + card.preview;
+      }
       result.download = baseUrl + card.download;
     } else if (card.type === 'social') {
-      result.preview = baseUrl + card.preview;
+      if (card.preview) {
+        result.preview = baseUrl + card.preview;
+      }
       result.documentCopy = baseUrl + card.documentCopy;
     } else if (card.type === 'reel') {
-      result.preview = baseUrl + card.preview;
+      if (card.preview) {
+        result.preview = baseUrl + card.preview;
+      }
       result.movie = baseUrl + card.movie;
       result.transcript = baseUrl + card.transcript;
     }
     
-    return result;
-  });
-
-  res.json({
-    cards: cardsWithAbsoluteUrls,
-    totalCount: filteredCards.length,
-    availableTags: getAllTags(),
-  });
-});
-
-app.get('/api/cards/:id', (req, res) => {
-  const card = cards.find(c => c.id === req.params.id);
-  
-  if (!card) {
-    return res.status(404).json({ error: 'Card not found' });
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting card:', error);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  // Convert relative URLs to absolute URLs
-  const baseUrl = getBaseUrl(req);
-  const result = { ...card };
-  
-  // Convert URLs based on card type
-  if (card.type === 'image') {
-    result.preview = baseUrl + card.preview;
-    result.download = baseUrl + card.download;
-  } else if (card.type === 'social') {
-    result.preview = baseUrl + card.preview;
-    result.documentCopy = baseUrl + card.documentCopy;
-  } else if (card.type === 'reel') {
-    result.preview = baseUrl + card.preview;
-    result.movie = baseUrl + card.movie;
-    result.transcript = baseUrl + card.transcript;
-  }
-  
-  res.json(result);
 });
 
 // Middleware to handle file uploads for different card types
@@ -223,54 +433,129 @@ const handleCardUpload = upload.fields([
   { name: 'transcript', maxCount: 1 },
 ]);
 
-app.post('/api/cards', authMiddleware, handleCardUpload, (req, res) => {
+// Helper function to handle file upload validation
+const validateFiles = (files, requiredFields) => {
+  // Check if required files are present
+  for (const field of requiredFields) {
+    if (!files || !files[field] || files[field].length === 0) {
+      console.log(`Missing required file field: ${field}`);
+      return { valid: false, missingField: field };
+    }
+  }
+  return { valid: true };
+};
+
+// Helper to validate card type based on fields
+const validateCardType = (type, files) => {
+  // Verify that the card type matches the provided files
+  if (type === 'image' && (!files.download || files.download.length === 0)) {
+    return { valid: false, message: 'Image cards require a download file' };
+  } else if (type === 'social' && (!files.documentCopy || files.documentCopy.length === 0)) {
+    return { valid: false, message: 'Social cards require a document copy file' };
+  } else if (type === 'reel' &&
+            (!files.movie || files.movie.length === 0 ||
+             !files.transcript || files.transcript.length === 0)) {
+    return { valid: false, message: 'Reel cards require both movie and transcript files' };
+  }
+
+  return { valid: true };
+};
+
+// Debug utility to log received files
+const logReceivedFiles = (files) => {
+  console.log('Received files:');
+  if (!files) {
+    console.log('  No files received');
+    return;
+  }
+
+  Object.keys(files).forEach(fieldName => {
+    const file = files[fieldName][0];
+    if (file) {
+      console.log(`  ${fieldName}: ${file.originalname} (${file.mimetype}, ${Math.round(file.size/1024)}KB)`);
+    }
+  });
+};
+
+app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
   try {
+    // Log all received files for debugging
+    logReceivedFiles(req.files);
+
     const { type, description } = req.body;
+    console.log('[TAG DEBUG SERVER] Raw tags received from POST form:', req.body.tags);
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
-    
+    console.log('[TAG DEBUG SERVER] Processed tags array for POST:', tags);
+
     if (!type || !description) {
       return res.status(400).json({ error: 'Type and description are required' });
     }
-    
+
+    // Validate card type and files
+    const typeValidation = validateCardType(type, req.files || {});
+    if (!typeValidation.valid) {
+      return res.status(400).json({ error: typeValidation.message });
+    }
+
+    // Process tags - add new tags or update existing ones
+    await processTags(tags);
+
     const newCard = {
-      id: uuidv4(),
       type,
       tags,
       description,
     };
-    
+
     // Handle different card types
     if (type === 'image') {
-      if (!req.files.preview || !req.files.download) {
-        return res.status(400).json({ error: 'Preview and download images are required for image cards' });
+      const validation = validateFiles(req.files, ['download']);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: `Download image is required for image cards. Missing: ${validation.missingField}`
+        });
       }
-      newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+      if (req.files.preview && req.files.preview.length > 0) {
+        newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+      }
       newCard.download = `/uploads/${req.files.download[0].filename}`;
     } else if (type === 'social') {
-      if (!req.files.preview || !req.files.documentCopy) {
-        return res.status(400).json({ error: 'Preview image and document copy are required for social cards' });
+      const validation = validateFiles(req.files, ['documentCopy']);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: `Document copy is required for social cards. Missing: ${validation.missingField}`
+        });
       }
-      newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+      if (req.files.preview && req.files.preview.length > 0) {
+        newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+      }
       newCard.documentCopy = `/uploads/${req.files.documentCopy[0].filename}`;
     } else if (type === 'reel') {
-      if (!req.files.preview || !req.files.movie || !req.files.transcript) {
-        return res.status(400).json({ error: 'Preview image, movie, and transcript are required for reel cards' });
+      const validation = validateFiles(req.files, ['movie', 'transcript']);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: `Movie and transcript are required for reel cards. Missing: ${validation.missingField}`
+        });
       }
-      newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+      if (req.files.preview && req.files.preview.length > 0) {
+        newCard.preview = `/uploads/${req.files.preview[0].filename}`;
+      }
       newCard.movie = `/uploads/${req.files.movie[0].filename}`;
       newCard.transcript = `/uploads/${req.files.transcript[0].filename}`;
     } else {
       return res.status(400).json({ error: 'Invalid card type' });
     }
     
-    cards.push(newCard);
+    // Save to database
+    const card = new Card(newCard);
+    await card.save();
     
     // Convert relative URLs to absolute URLs for response
     const baseUrl = getBaseUrl(req);
-    const response = { ...newCard };
+    const response = card.toObject();
     
     Object.keys(response).forEach(key => {
-      if (key !== 'id' && key !== 'type' && key !== 'tags' && key !== 'description') {
+      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' && 
+          key !== 'createdAt' && key !== 'updatedAt' && response[key]) {
         response[key] = baseUrl + response[key];
       }
     });
@@ -282,64 +567,129 @@ app.post('/api/cards', authMiddleware, handleCardUpload, (req, res) => {
   }
 });
 
-app.put('/api/cards/:id', authMiddleware, handleCardUpload, (req, res) => {
+app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => {
   try {
+    // Log all received files for debugging
+    logReceivedFiles(req.files);
+    console.log('Request body:', req.body);
+
     const cardId = req.params.id;
-    const cardIndex = cards.findIndex(c => c.id === cardId);
-    
-    if (cardIndex === -1) {
+    const card = await Card.findById(cardId);
+
+    if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     const { type, description } = req.body;
+    console.log('[TAG DEBUG SERVER] Raw tags received from PUT form:', req.body.tags);
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
-    
+    console.log('[TAG DEBUG SERVER] Processed tags array for PUT:', tags);
+    console.log('[TAG DEBUG SERVER] Existing card tags before update:', card.tags);
+
     if (!type || !description) {
       return res.status(400).json({ error: 'Type and description are required' });
     }
-    
+
+    // Prevent changing card type after creation
+    if (type !== card.type) {
+      console.log(`Card type change attempted: ${card.type} -> ${type}`);
+      return res.status(400).json({
+        error: 'Card type cannot be changed after creation'
+      });
+    }
+
+    // Handle tag changes
+    // 1. Find removed tags to update their counts
+    const removedTags = card.tags.filter(tag => !tags.includes(tag));
+    if (removedTags.length > 0) {
+      await updateTagCounts(removedTags);
+    }
+
+    // 2. Process new tags that didn't exist in the original card
+    const newTags = tags.filter(tag => !card.tags.includes(tag));
+    if (newTags.length > 0) {
+      await processTags(newTags);
+    }
+
     const updatedCard = {
-      ...cards[cardIndex],
       type,
       tags,
       description,
     };
-    
+
+    // Handle file removal and update flags
+    const handleFileField = (field, currentValue) => {
+      const removeFlag = req.body[`remove_${field}`] === 'true';
+
+      if (removeFlag) {
+        console.log(`Removing ${field}`);
+        return undefined;
+      } else if (req.files && req.files[field] && req.files[field].length > 0) {
+        console.log(`Updating ${field} with new file: ${req.files[field][0].filename}`);
+        return `/uploads/${req.files[field][0].filename}`;
+      } else if (currentValue) {
+        console.log(`Keeping existing ${field}: ${currentValue}`);
+        return currentValue;
+      }
+
+      return undefined;
+    };
+
     // Update files if new ones are uploaded
     if (type === 'image') {
-      if (req.files.preview) {
-        updatedCard.preview = `/uploads/${req.files.preview[0].filename}`;
-      }
-      if (req.files.download) {
-        updatedCard.download = `/uploads/${req.files.download[0].filename}`;
+      // Handle preview field (optional)
+      updatedCard.preview = handleFileField('preview', card.preview);
+
+      // Handle download field (required for image cards)
+      updatedCard.download = handleFileField('download', card.download);
+
+      // Ensure download field is present for image cards
+      if (!updatedCard.download) {
+        return res.status(400).json({
+          error: 'Download image is required for image cards. Please upload a new file.'
+        });
       }
     } else if (type === 'social') {
-      if (req.files.preview) {
-        updatedCard.preview = `/uploads/${req.files.preview[0].filename}`;
-      }
-      if (req.files.documentCopy) {
-        updatedCard.documentCopy = `/uploads/${req.files.documentCopy[0].filename}`;
+      // Handle preview field (optional)
+      updatedCard.preview = handleFileField('preview', card.preview);
+
+      // Handle documentCopy field (required for social cards)
+      updatedCard.documentCopy = handleFileField('documentCopy', card.documentCopy);
+
+      // Ensure documentCopy field is present for social cards
+      if (!updatedCard.documentCopy) {
+        return res.status(400).json({
+          error: 'Document copy is required for social cards. Please upload a new file.'
+        });
       }
     } else if (type === 'reel') {
-      if (req.files.preview) {
-        updatedCard.preview = `/uploads/${req.files.preview[0].filename}`;
-      }
-      if (req.files.movie) {
-        updatedCard.movie = `/uploads/${req.files.movie[0].filename}`;
-      }
-      if (req.files.transcript) {
-        updatedCard.transcript = `/uploads/${req.files.transcript[0].filename}`;
+      // Handle preview field (optional)
+      updatedCard.preview = handleFileField('preview', card.preview);
+
+      // Handle movie field (required for reel cards)
+      updatedCard.movie = handleFileField('movie', card.movie);
+
+      // Handle transcript field (required for reel cards)
+      updatedCard.transcript = handleFileField('transcript', card.transcript);
+
+      // Ensure required fields are present for reel cards
+      if (!updatedCard.movie || !updatedCard.transcript) {
+        return res.status(400).json({
+          error: 'Movie and transcript are required for reel cards. Please upload new files.'
+        });
       }
     }
     
-    cards[cardIndex] = updatedCard;
+    // Update the card in the database
+    const updated = await Card.findByIdAndUpdate(cardId, updatedCard, { new: true });
     
     // Convert relative URLs to absolute URLs for response
     const baseUrl = getBaseUrl(req);
-    const response = { ...updatedCard };
+    const response = updated.toObject();
     
     Object.keys(response).forEach(key => {
-      if (key !== 'id' && key !== 'type' && key !== 'tags' && key !== 'description') {
+      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' && 
+          key !== 'createdAt' && key !== 'updatedAt' && response[key]) {
         response[key] = baseUrl + response[key];
       }
     });
@@ -351,26 +701,59 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, (req, res) => {
   }
 });
 
-app.delete('/api/cards/:id', authMiddleware, (req, res) => {
-  const cardId = req.params.id;
-  const cardIndex = cards.findIndex(c => c.id === cardId);
-  
-  if (cardIndex === -1) {
-    return res.status(404).json({ error: 'Card not found' });
+app.delete('/api/cards/:id', authMiddleware, async (req, res) => {
+  try {
+    const cardId = req.params.id;
+    const card = await Card.findById(cardId);
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    // Update tag counts before deleting the card
+    if (card.tags && card.tags.length > 0) {
+      await updateTagCounts(card.tags);
+    }
+
+    // Delete the card
+    await Card.findByIdAndDelete(cardId);
+
+    res.status(204).end();
+  } catch (error) {
+    console.error('Error deleting card:', error);
+    res.status(500).json({ error: 'Server error' });
   }
-  
-  // Remove the card
-  cards.splice(cardIndex, 1);
-  
-  res.status(204).end();
 });
 
 // Get all available tags
-app.get('/api/tags', (req, res) => {
-  res.json(getAllTags());
+app.get('/api/tags', async (req, res) => {
+  try {
+    const tags = await getAllTags();
+    res.json(tags);
+  } catch (error) {
+    console.error('Error getting tags:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Start the application
+async function startApp() {
+  try {
+    // Connect to MongoDB
+    await connectToDatabase();
+    
+    // Seed the database with initial data if empty
+    await seedDatabase();
+    
+    // Start the server
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Error starting application:', error);
+    process.exit(1);
+  }
+}
+
+// Initialize the application
+startApp();
