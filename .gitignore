@@ -51,4 +51,13 @@ next-env.d.ts
 .\#*
 .*\#
 
+# VS Code settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+# Exclude chrome debug profile
+.vscode/chrome-debug-profile/
+
 
