@@ -1,0 +1,83 @@
+'use client'
+
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { login as apiLogin, logout as apiLogout } from './auth-api';
+
+interface User {
+  id: string;
+  username: string;
+  role: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isAdmin: boolean;
+  isLoading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAdmin: false,
+  isLoading: true,
+  login: async () => {},
+  logout: () => {},
+});
+
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      // In a real app, you would validate the token here
+      // For now, just extract user info from JWT
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUser({
+          id: payload.id,
+          username: payload.username,
+          role: payload.role,
+        });
+      } catch (error) {
+        console.error('Invalid token:', error);
+        localStorage.removeItem('auth_token');
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  const login = async (username: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const { token, user } = await apiLogin({ username, password });
+      localStorage.setItem('auth_token', token);
+      setUser(user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    apiLogout();
+    localStorage.removeItem('auth_token');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      isAdmin: user?.role === 'admin' || false,
+      isLoading, 
+      login, 
+      logout 
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
