@@ -6,22 +6,19 @@ import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
 
 const ReelCard: React.FC<ReelCardProps> = (props) => {
-  const { preview, movie,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    transcript: _transcript,
-    ...baseProps
-  } = props;
+  // Keep all props to pass to BaseCard
+  const { ...baseProps } = props;
   const [isPlaying, setIsPlaying] = React.useState(false);
-  
+
   return (
-    <BaseCard {...baseProps}>
+    <BaseCard {...baseProps} preview={props.preview} movie={props.movie} transcript={props.transcript}>
       <div className="relative group">
         <div className="w-full aspect-[9/16] relative">
           {!isPlaying ? (
             <>
-              {preview ? (
+              {props.preview ? (
                 <Image 
-                  src={preview}
+                  src={props.preview}
                   alt={props.description}
                   fill
                   className="object-cover cursor-pointer"
@@ -58,12 +55,13 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               
               {/* Download Icon Overlay */}
               <a
-                href={movie}
-                download
+                href={props.movie}
+                download={props.fileMetadata?.movieOriginalFileName || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="absolute top-2 right-2"
                 onClick={(e) => e.stopPropagation()}
+                title={`Download ${props.fileMetadata?.movieOriginalFileName || 'video'}`}
               >
                 <div className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,32 +73,39 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               {/* Metadata Overlay */}
               {props.fileMetadata && (
                 <div
-                  className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-2 text-[0.65rem] flex justify-between font-medium"
+                  className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1.5 px-2 text-[0.65rem] flex flex-col font-medium"
                   role="region"
                   aria-label="File metadata"
                 >
-                  <div>
-                    {props.fileMetadata.width && props.fileMetadata.height &&
-                      `${props.fileMetadata.width} × ${props.fileMetadata.height}`
-                    }
-                    {props.fileMetadata.fileSize &&
-                      ` • ${props.fileMetadata.fileSize < 102400
-                        ? `${(props.fileMetadata.fileSize / 1024).toFixed(1)}kb`
-                        : `${(props.fileMetadata.fileSize / (1024 * 1024)).toFixed(1)}mb`}`
-                    }
+                  <div className="flex justify-between">
+                    <div>
+                      {props.fileMetadata.width && props.fileMetadata.height &&
+                        `${props.fileMetadata.width} × ${props.fileMetadata.height}`
+                      }
+                      {props.fileMetadata.fileSize &&
+                        ` • ${props.fileMetadata.fileSize < 102400
+                          ? `${(props.fileMetadata.fileSize / 1024).toFixed(1)}kb`
+                          : `${(props.fileMetadata.fileSize / (1024 * 1024)).toFixed(1)}mb`}`
+                      }
+                    </div>
+                    <div>
+                      {props.fileMetadata.date &&
+                        new Date(props.fileMetadata.date).toISOString().split('T')[0]
+                      }
+                    </div>
                   </div>
-                  <div>
-                    {props.fileMetadata.date &&
-                      new Date(props.fileMetadata.date).toISOString().split('T')[0]
-                    }
-                  </div>
+                  {props.fileMetadata.movieOriginalFileName && (
+                    <div className="text-xs mt-0.5 truncate text-gray-200">
+                      {props.fileMetadata.movieOriginalFileName}
+                    </div>
+                  )}
                 </div>
               )}
             </>
           ) : (
             <div className="w-full aspect-[9/16]">
               <video
-                src={movie}
+                src={props.movie}
                 controls
                 autoPlay
                 className="w-full h-full object-contain"
@@ -108,7 +113,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 {/* Adding a track element to satisfy a11y requirements */}
                 <track
                   kind="captions"
-                  src={_transcript ? _transcript : undefined}
+                  src={props.transcript || undefined}
                   label="English captions"
                   srcLang="en"
                 />

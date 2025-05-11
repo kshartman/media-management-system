@@ -1,8 +1,8 @@
 # Media Management System
 
-A Next.js-based media management system for browsing, categorizing, and managing digital media assets.
+A comprehensive system for browsing, categorizing, and managing digital media assets like images, documents, and videos with S3 storage support.
 
-## Features
+## Key Features
 
 - **Responsive Design**: Works on mobile, tablet, and desktop devices
 - **Media Cards**: Three card types (Image, Social Post, Reel) with appropriate metadata
@@ -10,6 +10,23 @@ A Next.js-based media management system for browsing, categorizing, and managing
 - **Infinite Scroll**: Load more content as you scroll
 - **Access Control**: Anonymous browsing and authenticated admin features
 - **Admin Features**: Upload, edit, and delete media assets
+- **Cloud Storage**: Support for Amazon S3 storage
+- **User Management**: Admin interface for managing users
+
+## System Architecture
+
+This application consists of two main parts:
+- **Frontend**: A Next.js application that provides the user interface
+- **Backend**: An Express.js server that manages the API, database operations, and file storage
+
+### Storage Architecture
+
+The system supports two storage options:
+
+1. **Local File Storage**: Files are stored in the server's `/uploads` directory
+2. **Amazon S3 Cloud Storage**: Files are stored in an S3 bucket in a dedicated folder
+
+The storage system is abstracted through utility functions that handle file operations (upload, download, delete) in a storage-agnostic way, making it easy to switch between storage options via configuration.
 
 ## Getting Started
 
@@ -17,8 +34,442 @@ A Next.js-based media management system for browsing, categorizing, and managing
 
 - Node.js (v14 or later)
 - npm or yarn
+- MongoDB database
+- AWS account with S3 access (for cloud storage)
 
 ### Installation
 
 1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd media-management-system
+   ```
 
+2. Install dependencies for both frontend and backend:
+   ```bash
+   # Install frontend dependencies
+   npm install
+
+   # Install backend dependencies
+   cd server
+   npm install
+   ```
+
+### Configuration
+
+#### Environment Setup
+
+Create a complete `.env` file in the `/server` directory with all necessary configuration:
+
+```
+# MongoDB Configuration
+MONGODB_URI=mongodb://username:password@hostname:port/?ssl=true&retryWrites=false&loadBalanced=false&connectTimeoutMS=10000&authSource=dbname&authMechanism=SCRAM-SHA-256
+MONGODB_DB_NAME=media-management  # Database name (fallback if not specified in URI)
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# JWT Authentication
+JWT_SECRET=your-secret-jwt-key-change-in-production
+JWT_EXPIRES_IN=24h
+
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_REGION=us-east-1
+S3_BUCKET=your-bucket-name
+S3_CUSTOM_DOMAIN=cdn.example.com  # Optional: Set if you're using a CDN
+
+# Storage Configuration
+USE_S3_STORAGE=true  # Set to true for S3, false for local storage
+```
+
+Replace all placeholders with your actual values. The S3 configuration is only required if you're using S3 storage (`USE_S3_STORAGE=true`).
+
+### Starting the Application
+
+1. Start the backend server:
+   ```bash
+   cd server
+   npm run dev
+   ```
+
+2. In a separate terminal, start the frontend:
+   ```bash
+   npm run dev
+   ```
+
+3. Access the application at `http://localhost:3000`
+
+## AWS S3 Setup
+
+### IAM Policy for S3 Access
+
+Create an IAM policy with the following JSON to restrict access to just your S3 bucket:
+
+```json
+{
+"Version": "2012-10-17",
+"Statement": [
+{
+"Effect": "Allow",
+"Action": [
+"s3:PutObject",
+"s3:GetObject",
+"s3:DeleteObject",
+"s3:ListBucket"
+],
+"Resource": [
+"arn:aws:s3:::your-bucket-name",
+"arn:aws:s3:::your-bucket-name/dams/*"
+]
+}
+]
+}
+```
+
+Replace `your-bucket-name` with your actual bucket name.
+
+### IAM User Setup
+
+1. Create an IAM user in AWS with programmatic access
+2. Attach the policy you created above to this user
+3. Get the Access Key ID and Secret Access Key
+4. Add these credentials to your `.env` file
+
+For detailed instructions, see the [S3 IAM Setup Guide](./server/s3-iam-setup-guide.md).
+
+### S3 Integration Details
+
+The S3 integration includes the following features:
+
+1. **S3 Folder Structure**:
+   - All files are stored in a `dams/` folder in the S3 bucket
+   - Each file gets a unique timestamped name to prevent conflicts
+
+2. **URL Generation**:
+   - System automatically generates appropriate URLs for S3 objects
+   - Supports using a custom domain (CDN) by setting `S3_CUSTOM_DOMAIN` environment variable
+   - Default format: `https://<bucket>.s3.<region>.amazonaws.com/dams/<filename>`
+
+3. **Pre-signed URLs**:
+   - System can generate temporary signed URLs for private content
+   - Configurable expiration time (default: 1 hour)
+
+4. **Seamless Switching**:
+   - Switch between S3 and local storage by changing the `USE_S3_STORAGE` setting
+   - No code changes required when switching storage backends
+
+## Migrating Files to S3
+
+To migrate existing files from local storage to S3:
+
+1. Ensure S3 is properly configured in your `.env` file
+2. Run the migration script:
+   ```bash
+   cd server
+   node migrate-files-to-s3.js
+   ```
+
+The migration script:
+1. Scans your local `uploads` directory for all media files
+2. Uploads each file to the `dams/` folder in your S3 bucket
+3. Updates database records to point to the new S3 locations
+4. Preserves file metadata (content type, original name)
+5. Creates a mapping between local files and S3 keys
+6. Handles all three media card types (image, social, reel)
+
+### Migration Options
+
+By default, the script runs in "dry run" mode to show what would happen without making actual changes. To perform the actual migration:
+
+1. Open `server/migrate-files-to-s3.js`
+2. Find the `DRY_RUN` variable near the top of the file
+3. Change it from `true` to `false`
+4. Save and run the script again
+
+### Migration Safety
+
+The migration script is designed to be:
+- **Non-destructive**: Local files remain untouched
+- **Idempotent**: Safe to run multiple times without duplicating content
+- **Resumable**: If interrupted, you can pick up where you left off
+- **Error-tolerant**: Continues processing even if individual file uploads fail
+
+## Detailed Feature Reference
+
+### Media Card Types
+
+The system supports three types of media cards:
+
+1. **Image Cards**:
+   - Preview image for display in the grid
+   - Downloadable high-resolution version
+   - Tags for categorization
+   - Description field for searchable content
+
+2. **Social Cards**:
+   - Preview image showing the social post design
+   - Downloadable document (PDF) with copy and specifications
+   - Tags for categorization by platform or campaign
+   - Description field for searchable content
+
+3. **Reel Cards**:
+   - Preview thumbnail image
+   - Embedded video player (mp4 format)
+   - Optional transcript file
+   - Tags for categorization
+   - Description field for searchable content
+
+### User Management
+
+The system includes user management features:
+
+- User roles (admin, regular user)
+- Secure authentication with JWT
+- Password hashing with scrypt
+- Admin panel for user management
+
+The default admin credentials are:
+- Username: `admin`
+- Email: `owner@shopzive.com`
+- Password: `HealthyGuts4Me!`
+
+Change these credentials after the first login.
+
+### File Storage Options
+
+The system supports two storage options with a unified API for file operations:
+
+1. **Local Storage**:
+   - Files are stored in the server's `/uploads` directory
+   - Uses the Node.js `fs` module for file operations
+   - URLs are relative paths like `/uploads/filename.jpg`
+   - Suitable for development and small deployments
+
+2. **S3 Storage**:
+   - Files are stored in an Amazon S3 bucket in the `dams/` folder
+   - Uses AWS SDK v3 for S3 operations
+   - Uses `multer-s3` for direct-to-S3 uploads
+   - URLs are S3 URLs or custom domain URLs if configured
+   - Supports pre-signed URLs for private content
+   - Recommended for production and larger deployments
+
+#### Implementation Details
+
+The storage abstraction is implemented in `server/utils/s3Storage.js` and provides:
+
+- **getStorage()**: Returns the appropriate multer storage engine
+- **getFileUrl()**: Converts local paths or S3 keys to appropriate URLs
+- **deleteFile()**: Handles file deletion from either storage system
+- **getSignedFileUrl()**: Generates temporary authenticated S3 URLs
+
+#### Configuration
+
+To switch between storage options:
+
+1. Open your `.env` file
+2. Set `USE_S3_STORAGE=true` for S3 storage or `USE_S3_STORAGE=false` for local storage
+3. Restart the server
+
+No code changes are required when switching between storage options.
+
+## API Endpoints
+
+### Authentication
+
+- `POST /api/auth/login` - Login with username and password
+
+The system uses JWT tokens for authentication:
+1. Admin users log in via the login form
+2. JWT token is stored in localStorage
+3. Protected routes/operations check for valid token
+4. The frontend maintains auth state in the AuthContext
+
+### Cards
+
+- `GET /api/cards` - Get all cards with optional filtering
+- `GET /api/cards/:id` - Get a single card by ID
+- `POST /api/cards` - Create a new card (admin only)
+- `PUT /api/cards/:id` - Update a card (admin only)
+- `DELETE /api/cards/:id` - Delete a card (admin only)
+
+### Tags
+
+- `GET /api/tags` - Get all available tags
+
+### Users (Admin Only)
+
+- `GET /api/users` - Get all users
+- `GET /api/users/:id` - Get a single user by ID
+- `POST /api/users` - Create a new user
+- `PUT /api/users/:id` - Update a user
+- `DELETE /api/users/:id` - Delete a user
+
+## Development
+
+### Project Structure
+
+```
+/media-management-system/
+├── /src/                  # Frontend Next.js application
+│   ├── /app/              # Next.js app router components
+│   │   ├── layout.tsx     # Main layout component
+│   │   └── page.tsx       # Home page component
+│   ├── /components/       # React components
+│   │   ├── /admin/        # Admin interface components
+│   │   ├── /auth/         # Authentication components
+│   │   ├── /cards/        # Card components
+│   │   ├── /filters/      # Filtering components
+│   │   └── /layout/       # Layout components
+│   ├── /lib/              # Utilities and API functions
+│   ├── /styles/           # CSS styles
+│   └── /types/            # TypeScript type definitions
+│
+├── /server/               # Express.js backend
+│   ├── index.js           # Main server entry point
+│   ├── /db/               # Database connection
+│   ├── /models/           # Mongoose models
+│   ├── /uploads/          # Local file storage
+│   ├── /utils/            # Utility functions
+│   │   └── s3Storage.js   # S3 storage abstraction
+│   └── migrate-files-to-s3.js  # Migration script
+│
+└── /public/               # Static assets
+```
+
+### Storage Architecture
+
+The storage system in this application follows these design principles:
+
+1. **Abstraction**: The storage mechanism is abstracted behind a unified API to allow for different storage backends.
+2. **Configurability**: Switching between storage options requires only configuration changes, not code changes.
+3. **Separation of Concerns**: File storage logic is separated from business logic.
+
+The storage system follows this flow:
+```
+Client Request → Express → Multer Middleware → Storage Engine (Local/S3) → Database Update
+```
+
+### Adding New Features
+
+To add a new feature:
+
+1. Understand which part of the system is affected (frontend or backend)
+2. For frontend changes:
+   - Find the relevant components in `/src/components`
+   - Update types in `/src/types` if needed
+   - Use TypeScript for type safety
+3. For backend changes:
+   - Modify the Express routes in `server/index.js`
+   - Test API endpoints with the frontend
+
+### Adding New Media Types
+
+To add a new media card type:
+
+1. Add type definition in `/src/types/index.ts`:
+   ```typescript
+   // Example for adding a new "Document" card type
+   export interface DocumentCard extends BaseCard {
+     type: 'document';
+     preview: string;
+     documentFile: string;
+     pageCount: number;
+   }
+   ```
+
+2. Create a new card component in `/src/components/cards/`:
+   ```typescript
+   // DocumentCard.tsx
+   import BaseCard from './BaseCard';
+   // ...
+   ```
+
+3. Update `CardFactory` to handle the new type:
+   ```typescript
+   // In CardFactory.tsx
+   import DocumentCard from './DocumentCard';
+   // ...
+   case 'document':
+     return <DocumentCard {...props} />;
+   ```
+
+4. Update `CardForm` in `/src/components/admin/CardForm.tsx` for admin uploading
+5. Modify server-side handlers in `server/index.js` to handle the new type
+
+#### Complete Workflow for New Media Types
+
+For a complete implementation of a new media type:
+
+1. Add type definition in `/src/types/index.ts`
+2. Create a new card component in `/src/components/cards/`
+3. Update `CardFactory` to handle the new type
+4. Update `CardForm` for admin uploading
+5. Modify server-side handlers to:
+   - Validate the new media type's required fields
+   - Handle file uploads for the new type
+   - Process metadata extraction
+   - Save to the database with proper validation
+
+## Troubleshooting & FAQs
+
+### Connection Issues
+
+**Q: MongoDB connection fails with authentication errors**
+A: Verify your MongoDB connection string in the `.env` file. Ensure the username, password, and authSource are correct. If using Atlas, check that your IP is whitelisted.
+
+**Q: S3 uploads fail with "Access Denied"**
+A: Check your AWS credentials and IAM permissions. Ensure your IAM user has the correct permissions for the S3 bucket and that the bucket name is correct in your `.env` file.
+
+### Storage Issues
+
+**Q: Files upload locally but not to S3**
+A: Verify that `USE_S3_STORAGE=true` is set in your `.env` file and that all AWS configuration variables are correct. Also check that the S3 bucket exists and is accessible.
+
+**Q: After migration, some files show broken images**
+A: Run the migration script again with `DRY_RUN = false`. Check that the database records have been updated correctly with the new S3 URLs.
+
+**Q: How can I verify if I'm using S3 storage?**
+A: Check the server logs during startup. You should see a message like "Using S3 storage: bucket yourBucketName/dams in region your-region".
+
+### Security Considerations
+
+**Q: How can I secure access to my media files?**
+A: For basic security, ensure your S3 bucket has the correct CORS and bucket policies. For more advanced security, you can:
+- Use pre-signed URLs with short expiration times
+- Set up CloudFront with signed URLs
+- Implement JWT verification for file downloads
+
+**Q: How do I change the admin password?**
+A: The default admin password is set in `server/index.js`. Change it there before the first run, or use the admin interface to update it after logging in.
+
+### Performance Optimization
+
+**Q: File uploads are slow**
+A: If using S3, consider:
+- Using a region closer to your users
+- Setting up a CDN like CloudFront
+- Implementing multipart uploads for large files
+
+**Q: The application loads slowly**
+A: Consider enabling caching, optimizing database queries, and using pagination for card listings.
+
+## Future Enhancements
+
+The Media Management System can be further improved with the following features:
+
+### Short-term Enhancements
+- **CloudFront Integration**: Add CDN support for faster content delivery
+- **Image Optimization**: Implement automatic resizing and optimization of uploaded images
+- **Bulk Operations**: Add support for batch uploading and editing of media cards
+- **Advanced Filtering**: Enhance search with date ranges, file sizes, and metadata
+
+### Long-term Roadmap
+- **Multi-tenant Support**: Allow multiple organizations to use the system with isolated data
+- **AI Features**: Implement auto-tagging, content recognition, and transcript generation
+- **Analytics Dashboard**: Add usage statistics and popular content metrics
+- **Workflow Automation**: Create approval processes and publishing schedules
+
+Contributions to these features are welcome. Please follow the development guidelines outlined in this document.

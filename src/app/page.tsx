@@ -281,12 +281,15 @@ export default function Home() {
       setCards(cardsResponse.cards);
       setAvailableTags(tagsResponse);
 
-      // Update filtered cards based on current selection
-      if (selectedTypes.length > 0) {
-        setFilteredCards(cardsResponse.cards.filter(card => selectedTypes.includes(card.type)));
-      } else {
-        setFilteredCards(cardsResponse.cards);
-      }
+      // Apply all current filters and sorting
+      const filteredAndSorted = applyFiltersAndSort(
+        cardsResponse.cards,
+        selectedTypes,
+        selectedTags,
+        currentSort,
+        searchTerm
+      );
+      setFilteredCards(filteredAndSorted);
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
@@ -308,12 +311,15 @@ export default function Home() {
       setCards(cardsResponse.cards);
       setAvailableTags(tagsResponse);
 
-      // Update filtered cards based on current selection
-      if (selectedTypes.length > 0) {
-        setFilteredCards(cardsResponse.cards.filter(card => selectedTypes.includes(card.type)));
-      } else {
-        setFilteredCards(cardsResponse.cards);
-      }
+      // Apply all current filters and sorting
+      const filteredAndSorted = applyFiltersAndSort(
+        cardsResponse.cards,
+        selectedTypes,
+        selectedTags,
+        currentSort,
+        searchTerm
+      );
+      setFilteredCards(filteredAndSorted);
     } catch (error) {
       console.error('Error updating card:', error);
       alert('Failed to update card. Please try again.');
@@ -382,7 +388,15 @@ export default function Home() {
           {/* Selected tags row - appears below the controls */}
           {selectedTags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2 ml-0 items-center">
-              <span className="font-medium text-sm text-gray-700 mr-1">Filter:</span>
+              <button
+                onClick={() => handleFilterChange({ tags: [] })}
+                className="flex items-center justify-center text-red-600 hover:text-red-800 mr-1 focus:outline-none"
+                title="Clear all tag filters"
+                aria-label="Clear all tag filters"
+              >
+                <span className="font-bold text-xl">×</span>
+              </button>
+              <span className="font-semibold text-sm text-gray-700 mr-1">Filter Tags:</span>
               {selectedTags.map((tag) => (
                 <span
                   key={tag}

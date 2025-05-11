@@ -38,6 +38,7 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
   const [allAvailableTags, setAllAvailableTags] = useState<string[]>(availableTags);
   const [filteredTags, setFilteredTags] = useState<string[]>([]);
   const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
+  const [selectedTagIndex, setSelectedTagIndex] = useState(-1); // Track selected tag in dropdown
   const tagInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -170,10 +171,17 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
 
   const handleTagInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewTag(e.target.value);
-    setIsTagsDropdownOpen(true);
+    // Only show dropdown if there's input
+    if (e.target.value.trim() !== '') {
+      setIsTagsDropdownOpen(true);
+    }
+    // Reset selected index whenever input changes
+    setSelectedTagIndex(-1);
   };
 
   const handleTagAdd = (tagToAdd?: string) => {
+    // Important: If a tag is explicitly passed (from dropdown selection),
+    // use it directly instead of using the current input value
     const tagValue = tagToAdd || newTag.trim();
 
     if (tagValue && !tags.includes(tagValue)) {
@@ -235,13 +243,17 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
       formData.append('date', date);
       formData.append('tags', tags.join(','));
 
-      // Append files if they exist
+      // Append files and removal flags
       Object.entries(uploadedFiles).forEach(([field, value]) => {
+        console.log(`Processing field: ${field}, value:`, value);
+
         if (field.startsWith('remove_') && value === true) {
           // Handle removal flags
           const actualField = field.replace('remove_', '');
+          console.log(`Adding remove flag for ${actualField}`);
           formData.append(`remove_${actualField}`, 'true');
         } else if (value instanceof File) {
+          console.log(`Appending file for ${field}`);
           formData.append(field, value);
         }
       });
@@ -261,17 +273,38 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
   };
 
   const handleRemoveFile = (field: string) => () => {
-    setUploadedFiles(prev => ({
-      ...prev,
-      [field]: null,
-    }));
+    console.log(`Removing file ${field}`, initialData?.[field as keyof CardProps]);
 
-    // Set special flag for preview removal
-    if (field === 'preview' && initialData?.[field]) {
-      setUploadedFiles(prev => ({
+    // First set the field to null
+    setUploadedFiles(prev => {
+      console.log('Previous uploadedFiles state:', prev);
+      return {
         ...prev,
-        [`remove_${field}`]: true,
-      }));
+        [field]: null,
+      };
+    });
+
+    // Then, in a separate update, set the remove flag
+    // This needs to be done for all existing files, not just preview
+    if (initialData?.[field as keyof CardProps]) {
+      setUploadedFiles(prev => {
+        console.log(`Setting remove_${field} flag to true for ${field}:`, initialData[field as keyof CardProps]);
+        const result = {
+          ...prev,
+          [`remove_${field}`]: true,
+        };
+        console.log('Updated uploadedFiles state will be:', result);
+        return result;
+      });
+    }
+
+    // Clear any errors for this field
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
@@ -330,16 +363,40 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                   ✕
                 </button>
               </div>
+            ) : uploadedFiles[`remove_${field}`] === true ? (
+              // Show removed state when a file has been marked for removal
+              <div className="ml-3 flex items-center gap-2">
+                <span className="text-sm text-gray-500 italic truncate max-w-xs">
+                  (File will be removed)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Allow undoing the removal
+                    setUploadedFiles(prev => ({
+                      ...prev,
+                      [`remove_${field}`]: false
+                    }));
+                  }}
+                  className="text-blue-500 hover:text-blue-700"
+                  title="Undo removal"
+                >
+                  ↺
+                </button>
+              </div>
             ) : (
               initialData && initialData[field as keyof CardProps] && (
                 <div className="ml-3 flex items-center gap-2">
                   <span className="text-sm text-blue-600 font-medium truncate max-w-xs">
-                    {typeof initialData[field as keyof CardProps] === 'string' ?
-                      (initialData[field as keyof CardProps] as string).split('/').pop() :
-                      'File'
+                    {initialData.fileMetadata && initialData.fileMetadata[`${field}OriginalFileName` as keyof typeof initialData.fileMetadata] ?
+                      initialData.fileMetadata[`${field}OriginalFileName` as keyof typeof initialData.fileMetadata] as string :
+                      typeof initialData[field as keyof CardProps] === 'string' ?
+                        (initialData[field as keyof CardProps] as string).split('/').pop() :
+                        'File'
                     }
                   </span>
-                  {isOptional && (
+                  {/* Always allow removal if the file is optional or if we aren't editing an existing card */}
+                  {(isOptional || !initialData) && (
                     <button
                       type="button"
                       onClick={handleRemoveFile(field)}
@@ -466,83 +523,142 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
           <div className="relative">
             <div className="flex mb-2">
               <div className="relative w-full">
-                <input
-                  ref={tagInputRef}
-                  type="text"
-                  value={newTag}
-                  onChange={handleTagInput}
-                  placeholder="Type to search or add a new tag"
-                  className="w-full mr-2 px-3 py-2 border border-gray-300 rounded text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleTagAdd();
-                    } else if (e.key === 'Escape') {
-                      setIsTagsDropdownOpen(false);
-                    } else if (e.key === 'ArrowDown' && filteredTags.length > 0 && isTagsDropdownOpen) {
-                      // Focus on first dropdown item
-                      const dropdownList = document.getElementById('tags-dropdown');
-                      if (dropdownList && dropdownList.firstChild) {
-                        (dropdownList.firstChild as HTMLElement).focus();
-                      }
-                    }
-                  }}
-                  onFocus={() => {
-                    // Show all available tags when focusing
-                    setIsTagsDropdownOpen(true);
-                  }}
-                  autoComplete="off" // Prevent browser autocomplete from interfering
-                />
-                {isTagsDropdownOpen && (
-                  <div
-                    id="tags-dropdown"
-                    className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                  >
-                    {filteredTags.length > 0 ? (
-                      filteredTags.map((tag) => {
-                        // Only highlight the prefix (since we're only doing prefix matching)
-                        const lowerInput = newTag.toLowerCase().trim();
+                <div className="relative flex items-center">
+                  <input
+                    ref={tagInputRef}
+                    type="text"
+                    value={newTag}
+                    onChange={handleTagInput}
+                    placeholder="Type to search or add a new tag"
+                    className="w-full mr-2 px-3 py-2 pr-10 border border-gray-300 rounded text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
 
-                        let tagDisplay;
-                        if (lowerInput.length > 0) {
-                          // Highlight just the prefix that matches
-                          const prefixLength = lowerInput.length;
-                          const prefix = tag.substring(0, prefixLength);
-                          const rest = tag.substring(prefixLength);
-
-                          tagDisplay = (
-                            <>
-                              <span className="font-bold text-blue-600">{prefix}</span>
-                              {rest}
-                            </>
-                          );
-                        } else {
-                          tagDisplay = tag;
+                        // If a tag is selected in the dropdown, use that one
+                        if (isTagsDropdownOpen && selectedTagIndex >= 0 && selectedTagIndex < filteredTags.length) {
+                          handleTagAdd(filteredTags[selectedTagIndex]);
                         }
-
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => handleTagAdd(tag)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
-                            tabIndex={0}
-                          >
-                            {tagDisplay}
-                          </button>
+                        // If dropdown is open and has suggestions but none selected, use the first one
+                        else if (isTagsDropdownOpen && filteredTags.length > 0) {
+                          handleTagAdd(filteredTags[0]);
+                        } else {
+                          // Otherwise use current input
+                          handleTagAdd();
+                        }
+                      } else if (e.key === 'Escape') {
+                        setIsTagsDropdownOpen(false);
+                      } else if (e.key === 'ArrowDown' && filteredTags.length > 0 && isTagsDropdownOpen) {
+                        e.preventDefault();
+                        // Move to the next item or first item if none selected
+                        setSelectedTagIndex(prev =>
+                          prev < filteredTags.length - 1 ? prev + 1 : 0
                         );
-                      })
-                    ) : (
-                      <div className="px-3 py-2 text-sm text-gray-500">
-                        No matching tags. Type to create a new tag.
-                      </div>
-                    )}
-                  </div>
-                )}
+                      } else if (e.key === 'ArrowUp' && filteredTags.length > 0 && isTagsDropdownOpen) {
+                        e.preventDefault();
+                        // Move to the previous item or last item if at beginning
+                        setSelectedTagIndex(prev =>
+                          prev > 0 ? prev - 1 : filteredTags.length - 1
+                        );
+                      }
+                    }}
+                    onFocus={() => {
+                      // Do not show dropdown when focusing
+                    }}
+                    autoComplete="off" // Prevent browser autocomplete from interfering
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTagsDropdownOpen(!isTagsDropdownOpen);
+                      if (tagInputRef.current) {
+                        tagInputRef.current.focus();
+                      }
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                    aria-label={isTagsDropdownOpen ? "Close tag options" : "Show tag options"}
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      className={`transition-transform duration-200 ${isTagsDropdownOpen ? 'rotate-180' : ''}`}
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  {isTagsDropdownOpen && (
+                    <div
+                      id="tags-dropdown"
+                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                    >
+                      {filteredTags.length > 0 ? (
+                        filteredTags.map((tag, index) => {
+                          // Only highlight the prefix (since we're only doing prefix matching)
+                          const lowerInput = newTag.toLowerCase().trim();
+                          const isSelected = index === selectedTagIndex;
+
+                          let tagDisplay;
+                          if (lowerInput.length > 0) {
+                            // Highlight just the prefix that matches
+                            const prefixLength = lowerInput.length;
+                            const prefix = tag.substring(0, prefixLength);
+                            const rest = tag.substring(prefixLength);
+
+                            tagDisplay = (
+                              <>
+                                <span className="font-bold text-blue-600">{prefix}</span>
+                                {rest}
+                              </>
+                            );
+                          } else {
+                            tagDisplay = tag;
+                          }
+
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => handleTagAdd(tag)}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 focus:bg-blue-50 focus:outline-none ${isSelected ? 'bg-blue-100 font-medium' : ''}`}
+                              tabIndex={0}
+                              onMouseEnter={() => setSelectedTagIndex(index)}
+                            >
+                              {tagDisplay}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500">
+                          No matching tags. Type to create a new tag.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => handleTagAdd()}
+                onClick={() => {
+                  // If there's a selected tag in the dropdown, use that
+                  if (isTagsDropdownOpen && selectedTagIndex >= 0 && selectedTagIndex < filteredTags.length) {
+                    handleTagAdd(filteredTags[selectedTagIndex]);
+                  } 
+                  // If dropdown is open with suggestions but none selected, use first one
+                  else if (isTagsDropdownOpen && filteredTags.length > 0) {
+                    handleTagAdd(filteredTags[0]);
+                  } 
+                  // Otherwise use whatever is in the input
+                  else {
+                    handleTagAdd();
+                  }
+                }}
                 className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm whitespace-nowrap"
               >
                 Add Tag

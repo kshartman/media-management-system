@@ -5,11 +5,71 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const util = require('util');
 const sharp = require('sharp');
 const sizeOf = require('image-size');
 const { connectToDatabase } = require('./db/connection');
 const { Card, User, Tag } = require('./models');
+const { getStorage, getFileUrl, getSignedFileUrl, deleteFile, getFilenameFromUrl,
+  isS3Configured, safeDeleteOrphanedFile } = require('./utils/s3Storage');
 require('dotenv').config();
+
+// Promisify crypto.scrypt and crypto.randomBytes
+const scrypt = util.promisify(crypto.scrypt);
+const randomBytes = util.promisify(crypto.randomBytes);
+
+// Password hashing and verification helper functions
+async function hashPassword(password) {
+  // Generate a random salt
+  const salt = (await randomBytes(16)).toString('hex');
+  // Use scrypt to hash the password with the salt
+  const derivedKey = await scrypt(password, salt, 64);
+  // Return the salt and the hashed password
+  return `${salt}:${derivedKey.toString('hex')}`;
+}
+
+async function verifyPassword(storedPassword, suppliedPassword) {
+  try {
+    // Check for undefined or invalid values
+    if (!storedPassword) {
+      console.error('Error verifying password: storedPassword is undefined or null');
+      return false;
+    }
+
+    if (!suppliedPassword) {
+      console.error('Error verifying password: suppliedPassword is undefined or null');
+      return false;
+    }
+
+    // Check if the password is in the expected format
+    if (!isAlreadyHashed(storedPassword)) {
+      console.error('Error verifying password: stored password is not in the expected hashed format');
+      return false;
+    }
+
+    // Split the stored password into salt and hash
+    const [salt, storedHash] = storedPassword.split(':');
+
+    // Double-check that we got both parts
+    if (!salt || !storedHash) {
+      console.error('Error verifying password: could not extract salt and hash from stored password');
+      return false;
+    }
+
+    // Hash the supplied password with the same salt
+    const derivedKey = await scrypt(suppliedPassword, salt, 64);
+
+    // Compare the hashes
+    return crypto.timingSafeEqual(
+      Buffer.from(storedHash, 'hex'),
+      derivedKey
+    );
+  } catch (error) {
+    console.error('Error verifying password:', error);
+    return false;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,21 +84,8 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Setup multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // Remove spaces and special characters from original filename
-    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${Date.now()}-${sanitizedName}`);
-  },
-});
+// Get the configured storage engine from s3Storage utility
+const storage = getStorage();
 
 // File filter to allow all common media file types
 const fileFilter = (req, file, cb) => {
@@ -116,13 +163,13 @@ const sampleCards = [
   }
 ];
 
-const sampleUsers = [
-  {
-    username: 'admin',
-    password: 'HealthyGuts4Me!', // In production, use hashed passwords
-    role: 'admin',
-  },
-];
+// We'll store the admin user details but hash the password during seeding
+const adminUser = {
+  username: 'admin',
+  password: 'HealthyGuts4Me!',
+  email: 'owner@shopzive.com',
+  role: 'admin',
+};
 
 // Sample tags to ensure we have a good starter set
 const sampleTags = [
@@ -142,6 +189,12 @@ const sampleTags = [
   { name: 'creative', count: 0 }
 ];
 
+// Helper function to check if a password is already hashed
+function isAlreadyHashed(password) {
+  // Our hashed passwords have a specific format: salt:hash
+  return typeof password === 'string' && password.includes(':') && password.length > 64;
+}
+
 // Initialize database with sample data if empty
 async function seedDatabase() {
   try {
@@ -156,7 +209,39 @@ async function seedDatabase() {
     const userCount = await User.countDocuments();
     if (userCount === 0) {
       console.log('Seeding database with sample users...');
-      await User.insertMany(sampleUsers);
+
+      // Hash the admin password before saving with our scrypt helper
+      const hashedPassword = await hashPassword(adminUser.password);
+
+      // Create admin user with hashed password
+      await User.create({
+        username: adminUser.username,
+        email: adminUser.email,
+        password: hashedPassword,
+        role: adminUser.role
+      });
+
+      console.log('Admin user created with hashed password');
+    } else {
+      // Update existing users to use hashed passwords if they are not already hashed
+      console.log('Checking for users that need password hashing...');
+      const users = await User.find({});
+
+      for (const user of users) {
+        // If the password isn't hashed yet, hash it
+        if (!isAlreadyHashed(user.password)) {
+          console.log(`Updating password hash for user: ${user.username}`);
+
+          // If email is missing, add it (for backwards compatibility)
+          if (!user.email) {
+            user.email = user.username === 'admin' ? 'owner@shopzive.com' : `${user.username}@example.com`;
+          }
+
+          // Hash the plain text password
+          user.password = await hashPassword(user.password);
+          await user.save();
+        }
+      }
     }
 
     // Check if we have any tags
@@ -240,12 +325,9 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
 
 const getAllTags = async () => {
   try {
-    console.log('[TAG DEBUG SERVER] Getting all tags from database');
     // Get all tags from the dedicated Tag collection
     const tags = await Tag.find({}).sort({ name: 1 });
-    console.log('[TAG DEBUG SERVER] Raw tags from database:', tags);
     const tagNames = tags.map(tag => tag.name);
-    console.log('[TAG DEBUG SERVER] Returning tag names:', tagNames);
     return tagNames;
   } catch (error) {
     console.error('Error getting all tags:', error);
@@ -256,18 +338,15 @@ const getAllTags = async () => {
 // Function to process tags when creating or updating cards
 const processTags = async (tagsList) => {
   if (!tagsList || !Array.isArray(tagsList) || tagsList.length === 0) {
-    console.log('[TAG DEBUG SERVER] No tags to process');
     return;
   }
 
-  console.log('[TAG DEBUG SERVER] Processing tags:', tagsList);
 
   try {
     // Process each tag in the list
     for (const tagName of tagsList) {
       const trimmedTag = tagName.trim();
       if (!trimmedTag) {
-        console.log('[TAG DEBUG SERVER] Skipping empty tag');
         continue;
       }
 
@@ -275,14 +354,12 @@ const processTags = async (tagsList) => {
       const existingTag = await Tag.findOne({ name: trimmedTag });
 
       if (existingTag) {
-        console.log(`[TAG DEBUG SERVER] Found existing tag "${trimmedTag}", incrementing count`);
         // Increment the tag usage count
         await Tag.updateOne(
           { _id: existingTag._id },
           { $inc: { count: 1 } }
         );
       } else {
-        console.log(`[TAG DEBUG SERVER] Creating new tag "${trimmedTag}"`);
         // Create a new tag
         await Tag.create({
           name: trimmedTag,
@@ -331,14 +408,25 @@ const updateTagCounts = async (tagsList) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username, password });
+    const user = await User.findOne({ username });
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Verify the password using our scrypt helper
+    const isPasswordValid = await verifyPassword(user.password, password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
     const token = jwt.sign(
-      { id: user._id, username: user.username, role: user.role },
+      {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -348,6 +436,7 @@ app.post('/api/auth/login', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
+        email: user.email,
         role: user.role,
       },
     });
@@ -393,30 +482,29 @@ app.get('/api/cards', async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    // Convert relative URLs to absolute URLs
-    const baseUrl = getBaseUrl(req);
+    // Convert storage-specific file paths to public URLs
     const cardsWithAbsoluteUrls = cards.map(card => {
       const result = card.toObject();
-      
-      // Convert URLs based on card type
+
+      // Process URLs based on card type
       if (card.type === 'image') {
         if (card.preview) {
-          result.preview = baseUrl + card.preview;
+          result.preview = getFileUrl(card.preview);
         }
-        result.download = baseUrl + card.download;
+        result.download = getFileUrl(card.download);
       } else if (card.type === 'social') {
         if (card.preview) {
-          result.preview = baseUrl + card.preview;
+          result.preview = getFileUrl(card.preview);
         }
-        result.documentCopy = baseUrl + card.documentCopy;
+        result.documentCopy = getFileUrl(card.documentCopy);
       } else if (card.type === 'reel') {
         if (card.preview) {
-          result.preview = baseUrl + card.preview;
+          result.preview = getFileUrl(card.preview);
         }
-        result.movie = baseUrl + card.movie;
-        result.transcript = baseUrl + card.transcript;
+        result.movie = getFileUrl(card.movie);
+        result.transcript = getFileUrl(card.transcript);
       }
-      
+
       return result;
     });
 
@@ -442,27 +530,26 @@ app.get('/api/cards/:id', async (req, res) => {
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    // Convert relative URLs to absolute URLs
-    const baseUrl = getBaseUrl(req);
+    // Convert storage-specific file paths to public URLs
     const result = card.toObject();
-    
-    // Convert URLs based on card type
+
+    // Process URLs based on card type
     if (card.type === 'image') {
       if (card.preview) {
-        result.preview = baseUrl + card.preview;
+        result.preview = getFileUrl(card.preview);
       }
-      result.download = baseUrl + card.download;
+      result.download = getFileUrl(card.download);
     } else if (card.type === 'social') {
       if (card.preview) {
-        result.preview = baseUrl + card.preview;
+        result.preview = getFileUrl(card.preview);
       }
-      result.documentCopy = baseUrl + card.documentCopy;
+      result.documentCopy = getFileUrl(card.documentCopy);
     } else if (card.type === 'reel') {
       if (card.preview) {
-        result.preview = baseUrl + card.preview;
+        result.preview = getFileUrl(card.preview);
       }
-      result.movie = baseUrl + card.movie;
-      result.transcript = baseUrl + card.transcript;
+      result.movie = getFileUrl(card.movie);
+      result.transcript = getFileUrl(card.transcript);
     }
     
     res.json(result);
@@ -491,6 +578,23 @@ const validateFiles = (files, requiredFields) => {
     }
   }
   return { valid: true };
+};
+
+// Helper to extract and preserve the original filename
+const preserveOriginalFileName = (req, file, field, updateObj) => {
+  if (!updateObj.fileMetadata) {
+    updateObj.fileMetadata = {};
+  }
+
+  // Store the original filename in the appropriate field
+  const originalField = `${field}OriginalFileName`;
+  updateObj.fileMetadata[originalField] = file.originalname;
+
+  // Also store in the request for potential future use
+  if (!req.fileOriginalNames) {
+    req.fileOriginalNames = {};
+  }
+  req.fileOriginalNames[field] = file.originalname;
 };
 
 // Helper to validate card type based on fields
@@ -531,9 +635,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
     logReceivedFiles(req.files);
 
     const { type, description } = req.body;
-    console.log('[TAG DEBUG SERVER] Raw tags received from POST form:', req.body.tags);
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
-    console.log('[TAG DEBUG SERVER] Processed tags array for POST:', tags);
 
     // Extract date if provided in the form
     let date = req.body.date ? new Date(req.body.date) : new Date();
@@ -563,6 +665,18 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       }
     };
 
+    // Helper function to get file path from multer/multer-s3 file
+    const getFilePath = (file) => {
+      // If using S3, the file location is stored differently
+      if (isS3Configured && file) {
+        // For multer-s3, the path is in file.location
+        return file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
+      }
+
+      // For local storage
+      return file ? `/uploads/${file.filename}` : null;
+    };
+
     // Handle different card types
     if (type === 'image') {
       const validation = validateFiles(req.files, ['download']);
@@ -571,28 +685,54 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
           error: `Download image is required for image cards. Missing: ${validation.missingField}`
         });
       }
+
       if (req.files.preview && req.files.preview.length > 0) {
-        newCard.preview = `/uploads/${req.files.preview[0].filename}`;
-        // Extract metadata for preview image
-        const previewMetadata = await extractFileMetadata(newCard.preview, date);
-        // Only update dimensions and file size if they're not already set
-        if (!newCard.fileMetadata.width && previewMetadata.width) {
-          newCard.fileMetadata.width = previewMetadata.width;
-        }
-        if (!newCard.fileMetadata.height && previewMetadata.height) {
-          newCard.fileMetadata.height = previewMetadata.height;
-        }
-        if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
-          newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+        const previewFile = req.files.preview[0];
+        newCard.preview = getFilePath(previewFile);
+
+        // Store original filename in metadata
+        preserveOriginalFileName(req, previewFile, 'preview', newCard);
+
+        // Extract metadata for preview image if we can access the file
+        if (!isS3Configured) {
+          const previewMetadata = await extractFileMetadata(newCard.preview, date);
+          // Only update dimensions and file size if they're not already set
+          if (!newCard.fileMetadata.width && previewMetadata.width) {
+            newCard.fileMetadata.width = previewMetadata.width;
+          }
+          if (!newCard.fileMetadata.height && previewMetadata.height) {
+            newCard.fileMetadata.height = previewMetadata.height;
+          }
+          if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
+            newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+          }
+        } else {
+          // For S3, we can use the file size from the file object
+          if (previewFile.size) {
+            newCard.fileMetadata.fileSize = previewFile.size;
+          }
         }
       }
-      newCard.download = `/uploads/${req.files.download[0].filename}`;
-      // Extract metadata for download image
-      const downloadMetadata = await extractFileMetadata(newCard.download, date);
-      // Always use the downloadable image metadata over the preview
-      newCard.fileMetadata.width = downloadMetadata.width || newCard.fileMetadata.width;
-      newCard.fileMetadata.height = downloadMetadata.height || newCard.fileMetadata.height;
-      newCard.fileMetadata.fileSize = downloadMetadata.fileSize || newCard.fileMetadata.fileSize;
+
+      const downloadFile = req.files.download[0];
+      newCard.download = getFilePath(downloadFile);
+
+      // Store original filename in metadata
+      preserveOriginalFileName(req, downloadFile, 'download', newCard);
+
+      // Extract metadata if possible
+      if (!isS3Configured) {
+        const downloadMetadata = await extractFileMetadata(newCard.download, date);
+        // Always use the downloadable image metadata over the preview
+        newCard.fileMetadata.width = downloadMetadata.width || newCard.fileMetadata.width;
+        newCard.fileMetadata.height = downloadMetadata.height || newCard.fileMetadata.height;
+        newCard.fileMetadata.fileSize = downloadMetadata.fileSize || newCard.fileMetadata.fileSize;
+      } else {
+        // For S3, use the file size from the file object
+        if (downloadFile.size) {
+          newCard.fileMetadata.fileSize = downloadFile.size;
+        }
+      }
     } else if (type === 'social') {
       const validation = validateFiles(req.files, ['documentCopy']);
       if (!validation.valid) {
@@ -600,26 +740,52 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
           error: `Document copy is required for social cards. Missing: ${validation.missingField}`
         });
       }
+
       if (req.files.preview && req.files.preview.length > 0) {
-        newCard.preview = `/uploads/${req.files.preview[0].filename}`;
-        // Extract metadata for preview image
-        const previewMetadata = await extractFileMetadata(newCard.preview, date);
-        // Only update dimensions and file size if they're not already set
-        if (!newCard.fileMetadata.width && previewMetadata.width) {
-          newCard.fileMetadata.width = previewMetadata.width;
-        }
-        if (!newCard.fileMetadata.height && previewMetadata.height) {
-          newCard.fileMetadata.height = previewMetadata.height;
-        }
-        if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
-          newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+        const previewFile = req.files.preview[0];
+        newCard.preview = getFilePath(previewFile);
+
+        // Store original filename in metadata
+        preserveOriginalFileName(req, previewFile, 'preview', newCard);
+
+        // Extract metadata for preview image if we can access the file
+        if (!isS3Configured) {
+          const previewMetadata = await extractFileMetadata(newCard.preview, date);
+          // Only update dimensions and file size if they're not already set
+          if (!newCard.fileMetadata.width && previewMetadata.width) {
+            newCard.fileMetadata.width = previewMetadata.width;
+          }
+          if (!newCard.fileMetadata.height && previewMetadata.height) {
+            newCard.fileMetadata.height = previewMetadata.height;
+          }
+          if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
+            newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+          }
+        } else {
+          // For S3, use the file size from the file object
+          if (previewFile.size) {
+            newCard.fileMetadata.fileSize = previewFile.size;
+          }
         }
       }
-      newCard.documentCopy = `/uploads/${req.files.documentCopy[0].filename}`;
-      // Extract metadata for document copy
-      const documentMetadata = await extractFileMetadata(newCard.documentCopy, date);
-      // For documents, we mainly care about file size
-      newCard.fileMetadata.fileSize = documentMetadata.fileSize || newCard.fileMetadata.fileSize;
+
+      const documentFile = req.files.documentCopy[0];
+      newCard.documentCopy = getFilePath(documentFile);
+
+      // Store original filename in metadata
+      preserveOriginalFileName(req, documentFile, 'documentCopy', newCard);
+
+      // Update file size
+      if (!isS3Configured) {
+        const documentMetadata = await extractFileMetadata(newCard.documentCopy, date);
+        // For documents, we mainly care about file size
+        newCard.fileMetadata.fileSize = documentMetadata.fileSize || newCard.fileMetadata.fileSize;
+      } else {
+        // For S3, use the file size from the file object
+        if (req.files.documentCopy[0].size) {
+          newCard.fileMetadata.fileSize = req.files.documentCopy[0].size;
+        }
+      }
     } else if (type === 'reel') {
       const validation = validateFiles(req.files, ['movie', 'transcript']);
       if (!validation.valid) {
@@ -627,30 +793,60 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
           error: `Movie and transcript are required for reel cards. Missing: ${validation.missingField}`
         });
       }
+
       if (req.files.preview && req.files.preview.length > 0) {
-        newCard.preview = `/uploads/${req.files.preview[0].filename}`;
-        // Extract metadata for preview image
-        const previewMetadata = await extractFileMetadata(newCard.preview, date);
-        // Only update dimensions and file size if they're not already set
-        if (!newCard.fileMetadata.width && previewMetadata.width) {
-          newCard.fileMetadata.width = previewMetadata.width;
-        }
-        if (!newCard.fileMetadata.height && previewMetadata.height) {
-          newCard.fileMetadata.height = previewMetadata.height;
-        }
-        if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
-          newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+        const previewFile = req.files.preview[0];
+        newCard.preview = getFilePath(previewFile);
+
+        // Store original filename in metadata
+        preserveOriginalFileName(req, previewFile, 'preview', newCard);
+
+        // Extract metadata for preview image if we can access the file
+        if (!isS3Configured) {
+          const previewMetadata = await extractFileMetadata(newCard.preview, date);
+          // Only update dimensions and file size if they're not already set
+          if (!newCard.fileMetadata.width && previewMetadata.width) {
+            newCard.fileMetadata.width = previewMetadata.width;
+          }
+          if (!newCard.fileMetadata.height && previewMetadata.height) {
+            newCard.fileMetadata.height = previewMetadata.height;
+          }
+          if (!newCard.fileMetadata.fileSize && previewMetadata.fileSize) {
+            newCard.fileMetadata.fileSize = previewMetadata.fileSize;
+          }
+        } else {
+          // For S3, use the file size from the file object
+          if (previewFile.size) {
+            newCard.fileMetadata.fileSize = previewFile.size;
+          }
         }
       }
-      newCard.movie = `/uploads/${req.files.movie[0].filename}`;
-      // Extract metadata for movie file
-      const movieMetadata = await extractFileMetadata(newCard.movie, date);
-      // For videos, we want dimensions and file size
-      newCard.fileMetadata.width = movieMetadata.width || newCard.fileMetadata.width;
-      newCard.fileMetadata.height = movieMetadata.height || newCard.fileMetadata.height;
-      newCard.fileMetadata.fileSize = movieMetadata.fileSize || newCard.fileMetadata.fileSize;
 
-      newCard.transcript = `/uploads/${req.files.transcript[0].filename}`;
+      const movieFile = req.files.movie[0];
+      newCard.movie = getFilePath(movieFile);
+
+      // Store original filename in metadata
+      preserveOriginalFileName(req, movieFile, 'movie', newCard);
+
+      // Update file size and metadata
+      if (!isS3Configured) {
+        const movieMetadata = await extractFileMetadata(newCard.movie, date);
+        // For videos, we want dimensions and file size
+        newCard.fileMetadata.width = movieMetadata.width || newCard.fileMetadata.width;
+        newCard.fileMetadata.height = movieMetadata.height || newCard.fileMetadata.height;
+        newCard.fileMetadata.fileSize = movieMetadata.fileSize || newCard.fileMetadata.fileSize;
+      } else {
+        // For S3, use the file size from the file object
+        if (movieFile.size) {
+          newCard.fileMetadata.fileSize = movieFile.size;
+        }
+      }
+
+      const transcriptFile = req.files.transcript[0];
+      newCard.transcript = getFilePath(transcriptFile);
+
+      // Store original filename in metadata
+      preserveOriginalFileName(req, transcriptFile, 'transcript', newCard);
     } else {
       return res.status(400).json({ error: 'Invalid card type' });
     }
@@ -691,10 +887,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     }
 
     const { type, description } = req.body;
-    console.log('[TAG DEBUG SERVER] Raw tags received from PUT form:', req.body.tags);
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
-    console.log('[TAG DEBUG SERVER] Processed tags array for PUT:', tags);
-    console.log('[TAG DEBUG SERVER] Existing card tags before update:', card.tags);
 
     // Extract date if provided in the form, otherwise use existing or create new
     let date = req.body.date ? new Date(req.body.date) : (card.fileMetadata?.date || new Date());
@@ -735,29 +928,107 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       }
     };
 
+    // Helper function to get file path from multer/multer-s3 file
+    const getFilePath = (file) => {
+      // If using S3, the file location is stored differently
+      if (isS3Configured && file) {
+        // For multer-s3, the path is in file.location
+        return file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
+      }
+
+      // For local storage
+      return file ? `/uploads/${file.filename}` : null;
+    };
+
     // Handle file removal and update flags
     const handleFileField = async (field, currentValue) => {
       const removeFlag = req.body[`remove_${field}`] === 'true';
 
       if (removeFlag) {
-        console.log(`Removing ${field}`);
-        // We don't remove fileMetadata as it's a single object for the whole card
-        // But we could reset specific fields if needed
-        return undefined;
-      } else if (req.files && req.files[field] && req.files[field].length > 0) {
-        console.log(`Updating ${field} with new file: ${req.files[field][0].filename}`);
-        const newPath = `/uploads/${req.files[field][0].filename}`;
+        console.log(`Removing ${field} with flag: remove_${field}=${req.body[`remove_${field}`]}`);
 
-        // Extract metadata for the new file
-        const metadata = await extractFileMetadata(newPath, date);
-        if (!updatedCard.fileMetadata) {
-          updatedCard.fileMetadata = {};
+        // Check if the file is orphaned and delete if it is
+        if (currentValue) {
+          try {
+            const wasDeleted = await safeDeleteOrphanedFile(currentValue, Card);
+            if (wasDeleted) {
+              console.log(`Orphaned file ${currentValue} deleted successfully`);
+            } else {
+              console.log(`File ${currentValue} still in use by other cards, not deleted`);
+            }
+          } catch (err) {
+            console.error(`Error safely deleting file ${currentValue}:`, err);
+            // Continue even if file deletion fails
+          }
         }
 
-        // Update width, height and fileSize but keep the date we set earlier
-        if (metadata.width) updatedCard.fileMetadata.width = metadata.width;
-        if (metadata.height) updatedCard.fileMetadata.height = metadata.height;
-        if (metadata.fileSize) updatedCard.fileMetadata.fileSize = metadata.fileSize;
+        // Also reset corresponding field in fileMetadata if it exists
+        if (field === 'preview' && updatedCard.fileMetadata && updatedCard.fileMetadata.previewOriginalFileName) {
+          if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+          updatedCard.fileMetadata.previewOriginalFileName = null;
+        }
+
+        // MongoDB will only remove fields set to null or undefined in a $set operation
+        // We need to use $unset explicitly to remove fields from documents
+        return null; // Using null signals that we want to remove this field
+      } else if (req.files && req.files[field] && req.files[field].length > 0) {
+        const file = req.files[field][0];
+        console.log(`Updating ${field} with new file: ${file.filename || file.key || 'S3 file'}`);
+        const newPath = getFilePath(file);
+
+        // Check if the old file is orphaned after updating the database record
+        if (currentValue) {
+          try {
+            // Save current card ID to correctly check for orphaned files
+            const currentCardId = card._id.toString();
+
+            // First update database with the new file path (temporary update)
+            const oldCardData = await Card.findByIdAndUpdate(
+              currentCardId,
+              { [field]: newPath },
+              { new: false }  // return the old document
+            );
+
+            // Now check if the old file is orphaned
+            const wasDeleted = await safeDeleteOrphanedFile(currentValue, Card);
+            if (wasDeleted) {
+              console.log(`Orphaned previous file ${currentValue} deleted successfully`);
+            } else {
+              console.log(`Previous file ${currentValue} still in use by other cards, not deleted`);
+            }
+
+            // Revert the database change - full update will happen later
+            await Card.findByIdAndUpdate(currentCardId, oldCardData);
+          } catch (err) {
+            console.error(`Error safely deleting previous file ${currentValue}:`, err);
+            // Continue even if deletion fails
+          }
+        }
+
+        // Preserve the original filename
+        preserveOriginalFileName(req, file, field, updatedCard);
+
+        // Extract metadata for the new file if we can access it directly
+        if (!isS3Configured) {
+          const metadata = await extractFileMetadata(newPath, date);
+          if (!updatedCard.fileMetadata) {
+            updatedCard.fileMetadata = {};
+          }
+
+          // Update width, height and fileSize but keep the date we set earlier
+          if (metadata.width) updatedCard.fileMetadata.width = metadata.width;
+          if (metadata.height) updatedCard.fileMetadata.height = metadata.height;
+          if (metadata.fileSize) updatedCard.fileMetadata.fileSize = metadata.fileSize;
+        } else {
+          // For S3, use the file size from the file object
+          if (!updatedCard.fileMetadata) {
+            updatedCard.fileMetadata = {};
+          }
+
+          if (file.size) {
+            updatedCard.fileMetadata.fileSize = file.size;
+          }
+        }
 
         return newPath;
       } else if (currentValue) {
@@ -814,8 +1085,51 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       }
     }
 
+    // Get a copy of the original card for checking orphaned files
+    const originalCard = card.toObject();
+
+    // Log the update operation for debugging purposes
+    console.log('Updating card with the following data:', JSON.stringify(updatedCard, null, 2));
+
+    // Create an explicit $unset operation for any null fields
+    const unsetFields = {};
+    for (const [key, value] of Object.entries(updatedCard)) {
+      if (value === null) {
+        unsetFields[key] = "";
+        delete updatedCard[key]; // Remove from the $set operation
+      }
+    }
+
+    // Perform the update with both $set and $unset operations
+    const updateOperation = { $set: updatedCard };
+    if (Object.keys(unsetFields).length > 0) {
+      updateOperation.$unset = unsetFields;
+      console.log('Explicitly unsetting fields:', JSON.stringify(unsetFields, null, 2));
+    }
+
     // Update the card in the database
-    const updated = await Card.findByIdAndUpdate(cardId, updatedCard, { new: true });
+    const updated = await Card.findByIdAndUpdate(cardId, updateOperation, { new: true });
+
+    // Check if any files were replaced and are now orphaned
+    const fieldsToCheck = ['preview', 'download', 'documentCopy', 'movie', 'transcript'];
+    for (const field of fieldsToCheck) {
+      // Check if the field existed in the original card and was changed or removed
+      if (originalCard[field] &&
+         (updatedCard[field] !== originalCard[field] || !updatedCard[field])) {
+
+        // Check if the old file is now orphaned
+        try {
+          const wasDeleted = await safeDeleteOrphanedFile(originalCard[field], Card);
+          if (wasDeleted) {
+            console.log(`Orphaned file ${originalCard[field]} deleted successfully`);
+          } else {
+            console.log(`File ${originalCard[field]} still in use by other cards, not deleted`);
+          }
+        } catch (err) {
+          console.error(`Error safely deleting file ${originalCard[field]}:`, err);
+        }
+      }
+    }
 
     // Convert relative URLs to absolute URLs for response
     const baseUrl = getBaseUrl(req);
@@ -849,8 +1163,39 @@ app.delete('/api/cards/:id', authMiddleware, async (req, res) => {
       await updateTagCounts(card.tags);
     }
 
-    // Delete the card
+    // Delete the card first to ensure files become orphaned
     await Card.findByIdAndDelete(cardId);
+    console.log(`Card ${cardId} deleted from database`);
+
+    // Collect all files to check and delete if orphaned
+    const filesToCheck = [];
+
+    // Add files based on card type
+    if (card.preview) filesToCheck.push(card.preview);
+
+    if (card.type === 'image' && card.download) {
+      filesToCheck.push(card.download);
+    } else if (card.type === 'social' && card.documentCopy) {
+      filesToCheck.push(card.documentCopy);
+    } else if (card.type === 'reel') {
+      if (card.movie) filesToCheck.push(card.movie);
+      if (card.transcript) filesToCheck.push(card.transcript);
+    }
+
+    // Delete files if they are now orphaned
+    for (const file of filesToCheck) {
+      try {
+        const wasDeleted = await safeDeleteOrphanedFile(file, Card);
+        if (wasDeleted) {
+          console.log(`Orphaned file ${file} deleted successfully`);
+        } else {
+          console.log(`File ${file} still in use by other cards, not deleted`);
+        }
+      } catch (err) {
+        console.error(`Error checking/deleting file ${file}:`, err);
+        // Continue even if file deletion fails
+      }
+    }
 
     res.status(204).end();
   } catch (error) {
@@ -870,15 +1215,223 @@ app.get('/api/tags', async (req, res) => {
   }
 });
 
+// === USER MANAGEMENT ROUTES ===
+// These routes allow admins to manage users
+
+// Get all users (admin only)
+app.get('/api/users', authMiddleware, async (req, res) => {
+  try {
+    // Check if the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
+    }
+
+    // Fetch all users (excluding passwords)
+    const users = await User.find({}, { password: 0 });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get a single user by ID (admin only)
+app.get('/api/users/:id', authMiddleware, async (req, res) => {
+  try {
+    // Check if the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
+    }
+
+    const user = await User.findById(req.params.id, { password: 0 });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create a new user (admin only)
+app.post('/api/users', authMiddleware, async (req, res) => {
+  try {
+    // Check if the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
+    }
+
+    const { username, email, password, role } = req.body;
+
+    // Validate required fields
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+
+    // Check if username or email already exists
+    const existingUser = await User.findOne({
+      $or: [{ username }, { email }]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        error: 'Username or email already in use'
+      });
+    }
+
+    // Hash the password
+    const hashedPassword = await hashPassword(password);
+
+    // Create the user
+    const newUser = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      role: role || 'user' // Default to 'user' role if not specified
+    });
+
+    // Return the user without the password
+    const userResponse = newUser.toObject();
+    delete userResponse.password;
+
+    res.status(201).json(userResponse);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update a user (admin only)
+app.put('/api/users/:id', authMiddleware, async (req, res) => {
+  try {
+    // Check if the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
+    }
+
+    const userId = req.params.id;
+    const { username, email, password, role } = req.body;
+
+    // Find the user to update
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if username or email already exists (excluding the current user)
+    if (username || email) {
+      const existingUser = await User.findOne({
+        _id: { $ne: userId },
+        $or: [
+          ...(username ? [{ username }] : []),
+          ...(email ? [{ email }] : [])
+        ]
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          error: 'Username or email already in use'
+        });
+      }
+    }
+
+    // Prepare update object
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (password) {
+      updateData.password = await hashPassword(password);
+    }
+
+    // Update the user
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, select: '-password' }
+    );
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a user (admin only)
+app.delete('/api/users/:id', authMiddleware, async (req, res) => {
+  try {
+    // Check if the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
+    }
+
+    const userId = req.params.id;
+
+    // Don't allow deleting the last admin user
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    const userToDelete = await User.findById(userId);
+
+    if (!userToDelete) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (userToDelete.role === 'admin' && adminCount <= 1) {
+      return res.status(400).json({
+        error: 'Cannot delete the last admin user'
+      });
+    }
+
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.status(204).end();
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Helper function to reset the admin password
+async function resetAdminPassword() {
+  try {
+    const admin = await User.findOne({ username: 'admin' });
+    if (!admin) {
+      console.log('Admin user not found. Cannot reset password.');
+      return;
+    }
+
+    // Update the admin user with a new hashed password
+    const hashedPassword = await hashPassword(adminUser.password);
+
+    // Make sure email is present
+    if (!admin.email) {
+      admin.email = 'owner@shopzive.com';
+    }
+
+    admin.password = hashedPassword;
+    await admin.save();
+
+    console.log('Admin password has been reset successfully.');
+  } catch (error) {
+    console.error('Error resetting admin password:', error);
+  }
+}
+
 // Start the application
 async function startApp() {
   try {
     // Connect to MongoDB
     await connectToDatabase();
-    
+
     // Seed the database with initial data if empty
     await seedDatabase();
-    
+
+    // Uncomment this line to reset the admin password if needed
+    // await resetAdminPassword();
+
     // Start the server
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

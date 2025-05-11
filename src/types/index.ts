@@ -3,6 +3,12 @@ export interface FileMetadata {
   width?: number;
   height?: number;
   fileSize?: number;
+  originalFileName?: string;
+  previewOriginalFileName?: string;
+  downloadOriginalFileName?: string;
+  documentCopyOriginalFileName?: string;
+  movieOriginalFileName?: string;
+  transcriptOriginalFileName?: string;
 }
 
 export interface BaseCardProps {
@@ -14,6 +20,12 @@ export interface BaseCardProps {
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   isAdmin?: boolean;
+  // Add properties needed for download all functionality
+  preview?: string;
+  download?: string;
+  documentCopy?: string;
+  movie?: string;
+  transcript?: string;
 }
 
 export interface ImageCardProps extends BaseCardProps {

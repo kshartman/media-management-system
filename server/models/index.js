@@ -51,7 +51,13 @@ const cardSchema = new mongoose.Schema({
     },
     width: Number,  // For images and videos
     height: Number, // For images and videos
-    fileSize: Number // In bytes
+    fileSize: Number, // In bytes
+    originalFileName: String, // Store original filename for display
+    previewOriginalFileName: String, // For preview images
+    downloadOriginalFileName: String, // For downloadable files
+    documentCopyOriginalFileName: String, // For document copies (social cards)
+    movieOriginalFileName: String, // For movie files (reel cards)
+    transcriptOriginalFileName: String // For transcript files (reel cards)
   }
 }, { timestamps: true });
 
@@ -60,7 +66,16 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email address']
   },
   password: {
     type: String,

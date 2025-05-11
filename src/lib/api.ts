@@ -200,3 +200,63 @@ export const getAllTags = async (): Promise<string[]> => {
   const response = await request('/tags');
   return response;
 };
+
+// User Management API Functions
+export interface User {
+  id?: string;
+  _id?: string;
+  username: string;
+  email: string;
+  role: 'admin' | 'user';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UserCreateInput {
+  username: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'user';
+}
+
+export interface UserUpdateInput {
+  username?: string;
+  email?: string;
+  password?: string;
+  role?: 'admin' | 'user';
+}
+
+// Get all users (admin only)
+export const getUsers = async (): Promise<User[]> => {
+  const response = await request('/users');
+  return response;
+};
+
+// Get a single user by ID (admin only)
+export const getUserById = async (id: string): Promise<User> => {
+  const response = await request(`/users/${id}`);
+  return response;
+};
+
+// Create a new user (admin only)
+export const createUser = async (userData: UserCreateInput): Promise<User> => {
+  const response = await request('/users', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+  return response;
+};
+
+// Update a user (admin only)
+export const updateUser = async (id: string, userData: UserUpdateInput): Promise<User> => {
+  const response = await request(`/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  });
+  return response;
+};
+
+// Delete a user (admin only)
+export const deleteUser = async (id: string): Promise<void> => {
+  return request(`/users/${id}`, { method: 'DELETE' });
+};
