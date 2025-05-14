@@ -10,6 +10,7 @@ import SearchField from '../components/filters/SearchField';
 import LoginForm from '../components/auth/LoginForm';
 import AdminBar from '../components/admin/AdminBar';
 import CardUploadModal from '../components/admin/CardUploadModal';
+import CardGrid from '../components/layout/CardGrid';
 import { CardProps, ImageCardProps, SocialCardProps, ReelCardProps } from '../types';
 import { useAuth } from '../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags } from '../lib/api';
@@ -56,7 +57,7 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(['image']);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [currentSort, setCurrentSort] = useState<SortOption>('newest');
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,10 +111,10 @@ export default function Home() {
         setCards(cardsResponse.cards);
         setAvailableTags(tagsResponse);
 
-        // Filter to show only image cards by default and apply sorting
+        // Filter to show all card types by default and apply sorting
         const initialFiltered = applyFiltersAndSort(
           cardsResponse.cards,
-          ['image'],  // Default to image type
+          [],         // Empty array means all types (no type filter)
           [],         // No tags selected by default
           'newest',   // Default sort to newest
           ''          // No search term
@@ -123,10 +124,10 @@ export default function Home() {
         console.error('Error loading data:', error);
         // Fallback to sample cards if API fails
         setCards(SampleCards);
-        // Filter to show only image cards by default and apply sorting
+        // Filter to show all card types by default and apply sorting
         const initialFiltered = applyFiltersAndSort(
           SampleCards,
-          ['image'],  // Default to image type
+          [],         // Empty array means all types (no type filter)
           [],         // No tags selected by default
           'newest',   // Default sort to newest
           ''          // No search term
@@ -426,7 +427,7 @@ export default function Home() {
                 <AdminBar
                   onCardCreated={handleCardCreated}
                   availableTags={availableTags}
-                  selectedCardType={selectedTypes[0] || 'image'}
+                  selectedCardType={selectedTypes.length === 0 ? 'all' : selectedTypes[0]}
                 />
                 {console.log('Selected types in App:', selectedTypes)}
               </div>
@@ -488,24 +489,19 @@ export default function Home() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 pt-6">
-
         {loading ? (
           <div className="flex justify-center p-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredCards.map((card) => (
-              <div key={card.id}>
-                <CardFactory
-                  {...card}
-                  isAdmin={isAdmin}
-                  onEdit={isAdmin ? handleEditCard : undefined}
-                  onDelete={isAdmin ? handleDeleteCard : undefined}
-                />
-              </div>
-            ))}
-          </div>
+          <CardGrid
+            initialCards={filteredCards}
+            loadMore={async () => []} // We're not using infinite scroll in this implementation
+            isAdmin={isAdmin}
+            onEdit={isAdmin ? handleEditCard : undefined}
+            onDelete={isAdmin ? handleDeleteCard : undefined}
+            selectedTypes={selectedTypes}
+          />
         )}
       </main>
 

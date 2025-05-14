@@ -74,6 +74,17 @@ const processFileAndGetPath = async (file, options = {}) => {
         console.log(`Uploaded ${file.fieldname} to S3: ${s3Url}`);
         // Return the S3 URL for database storage
         dbPath = s3Url;
+        
+        // Clean up the local file after successful S3 upload
+        try {
+          if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+            console.log(`Deleted local file ${localFilePath} after S3 upload`);
+          }
+        } catch (cleanupError) {
+          console.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
+          // Continue even if cleanup fails - file will be stored in S3
+        }
       } else {
         console.error(`Failed to upload ${file.fieldname} to S3, using local path instead`);
         // Keep the local path if S3 upload failed
@@ -142,6 +153,17 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
       if (videoS3Url) {
         console.log(`Video uploaded to S3: ${videoS3Url}`);
         videoPath = videoS3Url;
+        
+        // Clean up the local file after successful S3 upload
+        try {
+          if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+            console.log(`Deleted local file ${localFilePath} after S3 upload`);
+          }
+        } catch (cleanupError) {
+          console.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
+          // Continue even if cleanup fails - file will be stored in S3
+        }
       } else {
         console.error('Failed to upload video to S3, keeping local path');
       }
@@ -1154,6 +1176,17 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
               if (s3Url) {
                 console.log(`Uploaded video to S3: ${s3Url}`);
                 newCard.movie = s3Url;
+                
+                // Clean up the local file after successful S3 upload
+                try {
+                  if (fs.existsSync(movieFullPath)) {
+                    fs.unlinkSync(movieFullPath);
+                    console.log(`Deleted local file ${movieFullPath} after S3 upload`);
+                  }
+                } catch (cleanupError) {
+                  console.error(`Error cleaning up local file ${movieFullPath}:`, cleanupError);
+                  // Continue even if cleanup fails - file will be stored in S3
+                }
               }
             } catch (s3Error) {
               console.error('Error uploading video to S3:', s3Error);
@@ -1170,6 +1203,17 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
               if (s3Url) {
                 console.log(`Uploaded video to S3: ${s3Url}`);
                 newCard.movie = s3Url;
+                
+                // Clean up the local file after successful S3 upload
+                try {
+                  if (fs.existsSync(movieFullPath)) {
+                    fs.unlinkSync(movieFullPath);
+                    console.log(`Deleted local file ${movieFullPath} after S3 upload`);
+                  }
+                } catch (cleanupError) {
+                  console.error(`Error cleaning up local file ${movieFullPath}:`, cleanupError);
+                  // Continue even if cleanup fails - file will be stored in S3
+                }
               }
             } catch (s3Error) {
               console.error('Error uploading video to S3:', s3Error);

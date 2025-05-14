@@ -14,12 +14,15 @@ interface AdminBarProps {
 const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], selectedCardType = 'image' }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
-  const [currentCardType, setCurrentCardType] = useState(selectedCardType);
+  
+  // If no type is selected (empty array), we're in "All" mode
+  const effectiveCardType = selectedCardType || 'all';
+  const [currentCardType, setCurrentCardType] = useState(effectiveCardType);
   
   // Update currentCardType when selectedCardType prop changes
   useEffect(() => {
     console.log('selectedCardType changed in AdminBar:', selectedCardType);
-    setCurrentCardType(selectedCardType);
+    setCurrentCardType(selectedCardType || 'all');
   }, [selectedCardType]);
 
   const handleCreateCard = async (formData: FormData) => {

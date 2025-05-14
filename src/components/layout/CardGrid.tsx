@@ -4,12 +4,20 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { CardProps } from '../../types';
 import CardFactory from '../cards/CardFactory';
 
+// Type mapping for section titles
+const TYPE_LABELS = {
+  'image': 'Images',
+  'social': 'Posts',
+  'reel': 'Reels'
+};
+
 interface CardGridProps {
   initialCards: CardProps[];
   loadMore: (page: number) => Promise<CardProps[]>;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   isAdmin?: boolean;
+  selectedTypes?: string[]; // Added to know whether to group by type
 }
 
 const CardGrid: React.FC<CardGridProps> = ({ 
@@ -17,7 +25,8 @@ const CardGrid: React.FC<CardGridProps> = ({
   loadMore, 
   onEdit, 
   onDelete,
-  isAdmin = false
+  isAdmin = false,
+  selectedTypes = []
 }) => {
   const [cards, setCards] = useState<CardProps[]>(initialCards);
   const [page, setPage] = useState(1);
@@ -68,35 +77,76 @@ const CardGrid: React.FC<CardGridProps> = ({
     if (node) observer.current.observe(node);
   }, [loading, hasMore, loadMoreCards]);
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {cards.map((card, index) => {
-        if (cards.length === index + 1) {
-          return (
-            <div key={card.id} ref={lastCardRef}>
-              <CardFactory 
-                {...card} 
-                onEdit={onEdit}
-                onDelete={onDelete}
-                isAdmin={isAdmin}
-              />
+  // Function to render a single card (with or without lastCardRef)
+  const renderCard = (card: CardProps, isLast: boolean = false) => {
+    return (
+      <div key={card.id} ref={isLast ? lastCardRef : undefined}>
+        <CardFactory 
+          {...card} 
+          onEdit={onEdit}
+          onDelete={onDelete}
+          isAdmin={isAdmin}
+        />
+      </div>
+    );
+  };
+
+  // Group cards by type if no specific type is selected (All Types view)
+  const renderGroupedCards = () => {
+    // If a specific type is selected, just render without grouping
+    if (selectedTypes.length > 0) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {cards.map((card, index) => renderCard(card, cards.length === index + 1))}
+        </div>
+      );
+    }
+
+    // For "All Types" view, group cards by type
+    const cardsByType: Record<string, CardProps[]> = {};
+    
+    // Group the cards by their type
+    cards.forEach(card => {
+      if (!cardsByType[card.type]) {
+        cardsByType[card.type] = [];
+      }
+      cardsByType[card.type].push(card);
+    });
+
+    // Order the types for consistent display
+    const orderedTypes = ['image', 'social', 'reel'].filter(type => cardsByType[type]?.length > 0);
+
+    // Render each group with a header
+    return (
+      <div className="space-y-8">
+        {orderedTypes.map((type, typeIndex) => (
+          <div key={type} className="space-y-4">
+            {/* Section header */}
+            <h2 className="text-2xl font-semibold text-gray-800 border-b border-gray-200 pb-2">
+              {TYPE_LABELS[type as keyof typeof TYPE_LABELS] || 'Other'}
+            </h2>
+            
+            {/* Card grid for this type */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {cardsByType[type].map((card, cardIndex) => {
+                // Set ref only for the very last card of the last type group
+                const isLastCard = (typeIndex === orderedTypes.length - 1) && 
+                                  (cardIndex === cardsByType[type].length - 1);
+                return renderCard(card, isLastCard);
+              })}
             </div>
-          );
-        }
-        return (
-          <div key={card.id}>
-            <CardFactory 
-              {...card}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              isAdmin={isAdmin}
-            />
           </div>
-        );
-      })}
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {renderGroupedCards()}
       
       {loading && (
-        <div className="col-span-full flex justify-center p-4">
+        <div className="flex justify-center p-4 mt-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       )}

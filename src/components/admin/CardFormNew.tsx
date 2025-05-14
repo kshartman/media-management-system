@@ -5,6 +5,13 @@ import { CardProps } from '../../types';
 import { getAllTags } from '../../lib/api';
 import MultiImageUploader from './MultiImageUploader';
 
+// Type labels for display
+const TYPE_LABELS = {
+  'image': 'Image',
+  'social': 'Post',
+  'reel': 'Reel'
+};
+
 
 interface CardFormProps {
   initialData?: CardProps;
@@ -24,8 +31,11 @@ const CardFormNew: React.FC<CardFormProps> = ({
   isSubmitting = false 
 }) => {
 
-  // Card type is fixed and cannot be changed after creation
-  const type = initialData?.type || initialCardType;
+  // Card type is now stored in state so it can be changed before creation
+  const [type, setType] = useState<"image" | "social" | "reel">(
+    (initialData?.type as "image" | "social" | "reel") || 
+    (initialCardType === 'all' ? 'image' : initialCardType as "image" | "social" | "reel")
+  );
   console.log('CardFormNew initialized with type:', type, 'initialCardType:', initialCardType);
   const [description, setDescription] = useState(initialData?.description || '');
   
@@ -663,27 +673,55 @@ const CardFormNew: React.FC<CardFormProps> = ({
       )}
       
       <form ref={formRef} onSubmit={handleSubmit}>
-        {!initialData && (
-          <div className="mb-4">
-            <h3 className="text-base font-medium mb-2">Card Type</h3>
-            <div className="flex gap-4">
+        <div className="mb-4">
+          <h3 className="text-base font-medium mb-2">Card Type</h3>
+          {initialData ? (
+            // For editing existing cards, just show the type
+            <div className="text-gray-700 py-1 font-medium">
+              {TYPE_LABELS[type as keyof typeof TYPE_LABELS]}
+            </div>
+          ) : (
+            // For new cards, show radio buttons only if initialCardType is 'all' (undefined)
+            initialCardType === 'all' ? (
+              <>
+                <div className="flex gap-4">
+                  {Object.entries(TYPE_LABELS).map(([typeValue, label]) => (
+                    <label 
+                      key={typeValue} 
+                      className="flex items-center cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="cardType"
+                        value={typeValue}
+                        checked={type === typeValue}
+                        onChange={() => {
+                          // Reset the form state when changing type
+                          // Ensure the typeValue is one of the allowed values
+                          if (typeValue === 'image' || typeValue === 'social' || typeValue === 'reel') {
+                            console.log('Changing card type to:', typeValue);
+                            setType(typeValue);
+                            setUploadedFiles({});
+                            setErrors({});
+                          }
+                        }}
+                        className="mr-2"
+                        disabled={isSubmitting}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Card type is fixed and cannot be changed after creation</p>
+              </>
+            ) : (
+              // For new cards with a specific type, just show the type
               <div className="text-gray-700 py-1">
-                {type === 'image' ? 'Image' : type === 'social' ? 'Social' : 'Reel'}
+                {TYPE_LABELS[type as keyof typeof TYPE_LABELS]}
               </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Card type is fixed and cannot be changed after creation</p>
-          </div>
-        )}
-        {initialData && (
-          <div className="mb-4">
-            <h3 className="text-base font-medium mb-2">Card Type</h3>
-            <div className="flex gap-4">
-              <div className="text-gray-700 py-1 font-medium">
-                {type === 'image' ? 'Image' : type === 'social' ? 'Social' : 'Reel'}
-              </div>
-            </div>
-          </div>
-        )}
+            )
+          )}
+        </div>
         
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" htmlFor="description">

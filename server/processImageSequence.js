@@ -54,6 +54,17 @@ async function processImageSequence(req, files, date, extractMetadata) {
           if (s3Url) {
             console.log(`Uploaded sequence image ${i} to S3: ${s3Url}`);
             storagePath = s3Url;
+            
+            // Clean up the local file after successful S3 upload
+            try {
+              if (fs.existsSync(localFilePath)) {
+                fs.unlinkSync(localFilePath);
+                console.log(`Deleted local file ${localFilePath} after S3 upload`);
+              }
+            } catch (cleanupError) {
+              console.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
+              // Continue even if cleanup fails - file will be stored in S3
+            }
           }
         } catch (s3Error) {
           console.error(`Error uploading sequence image ${i} to S3:`, s3Error);
