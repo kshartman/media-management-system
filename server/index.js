@@ -12,8 +12,147 @@ const sizeOf = require('image-size');
 const { connectToDatabase } = require('./db/connection');
 const { Card, User, Tag } = require('./models');
 const { getStorage, getFileUrl, getSignedFileUrl, deleteFile, getFilenameFromUrl,
-  isS3Configured, safeDeleteOrphanedFile } = require('./utils/s3Storage');
+  isS3Configured, safeDeleteOrphanedFile, uploadLocalFileToS3, isFileOrphaned } = require('./utils/s3Storage');
+const { extractVideoFrame, getVideoMetadata } = require('./utils/videoUtils');
+const { generateAndUploadPreview } = require('./generatePreview');
+const { processImageSequence } = require('./processImageSequence');
+const { createCardZip } = require('./utils/zipCardFiles');
+const { cleanupOrphanedZipFiles } = require('./utils/cleanupOrphanedFiles');
+const { VIDEO_DIMENSIONS } = require('./utils/mediaConstants');
 require('dotenv').config();
+
+/**
+ * Process a file and return its path
+ * 1. Files are always stored locally first (handled by multer)
+ * 2. Process file locally (extract metadata, generate thumbnails, etc.)
+ * 3. If S3 is configured, upload to S3 after processing - but only when told to do so
+ * 4. Return the appropriate path for storage in the database
+ *
+ * @param {object} file - The multer file object
+ * @param {object} options - Additional options
+ * @param {boolean} options.uploadToS3 - Whether to upload to S3 (default: depends on isS3Configured)
+ * @param {boolean} options.isVideo - Whether this is a video file (for special handling)
+ * @param {boolean} options.skipS3Upload - Whether to skip S3 upload completely, regardless of config
+ * @returns {Promise<string>} - The file path to store in the database
+ */
+const processFileAndGetPath = async (file, options = {}) => {
+  if (!file) return null;
+
+  console.log(`Processing file:`, {
+    originalname: file.originalname,
+    filename: file.filename,
+    mimetype: file.mimetype,
+    size: file.size,
+    fieldname: file.fieldname,
+    options: JSON.stringify(options)
+  });
+
+  // Get the local file path (multer always stores locally now)
+  const localFilePath = path.join(__dirname, 'uploads', file.filename);
+  let dbPath = `/uploads/${file.filename}`;
+  
+  // Special handling for videos - always keep local first for processing
+  if (options.isVideo) {
+    console.log(`Keeping video ${file.filename} local for processing first`);
+    return dbPath;
+  }
+  
+  // If instructed to skip S3 upload, return local path
+  if (options.skipS3Upload) {
+    console.log(`Skipping S3 upload for ${file.filename} as requested`);
+    return dbPath;
+  }
+  
+  // If S3 is configured and we should upload to S3, do so after processing
+  if (isS3Configured && options.uploadToS3 !== false) {
+    try {
+      // Upload to S3
+      console.log(`Uploading ${file.filename} to S3...`);
+      const s3Url = await uploadLocalFileToS3(localFilePath);
+      
+      if (s3Url) {
+        console.log(`Uploaded ${file.fieldname} to S3: ${s3Url}`);
+        // Return the S3 URL for database storage
+        dbPath = s3Url;
+      } else {
+        console.error(`Failed to upload ${file.fieldname} to S3, using local path instead`);
+        // Keep the local path if S3 upload failed
+      }
+    } catch (error) {
+      console.error(`Error uploading ${file.fieldname} to S3:`, error);
+    }
+  }
+
+  return dbPath;
+};
+
+/**
+ * Process a video file and generate preview
+ * 1. Keep the video file locally
+ * 2. Generate preview from the local file
+ * 3. Upload both to S3 if configured
+ * 4. Return paths for both video and preview
+ * 
+ * @param {object} file - The multer file object for the video
+ * @param {object} metadata - Metadata to update
+ * @returns {Promise<object>} - Object with video and preview paths
+ */
+const processVideoAndGeneratePreview = async (file, metadata = {}) => {
+  if (!file) return { videoPath: null, previewPath: null };
+  
+  console.log('Processing video and generating preview...');
+  
+  // Get the local file path
+  const localFilePath = path.join(__dirname, 'uploads', file.filename);
+  let videoPath = `/uploads/${file.filename}`;
+  let previewPath = null;
+  
+  // Make sure we have a metadata object
+  if (!metadata.fileMetadata) metadata.fileMetadata = {};
+  
+  // Store original filename
+  metadata.fileMetadata.movieOriginalFileName = file.originalname;
+  
+  // Step 1: Generate preview from local file
+  try {
+    const originalFilename = file.originalname;
+    console.log(`Generating preview for local video: ${localFilePath}`);
+    
+    // This will generate preview and upload it to S3 if configured
+    const previewUrl = await generateAndUploadPreview(localFilePath, originalFilename, true);
+    console.log(`Preview generated successfully: ${previewUrl}`);
+    
+    // Set preview path and metadata
+    previewPath = previewUrl;
+    metadata.fileMetadata.previewOriginalFileName = `Auto-generated for ${originalFilename}`;
+    metadata.fileMetadata.width = VIDEO_DIMENSIONS.WIDTH;
+    metadata.fileMetadata.height = VIDEO_DIMENSIONS.HEIGHT;
+    metadata.fileMetadata.fileSize = file.size;
+  } catch (previewError) {
+    console.error('Error generating preview:', previewError);
+    console.log('Continuing without preview');
+  }
+  
+  // Step 2: Upload video to S3 if configured (after preview generation)
+  if (isS3Configured) {
+    try {
+      console.log('Now uploading the actual video file to S3...');
+      const videoS3Url = await uploadLocalFileToS3(localFilePath);
+      
+      if (videoS3Url) {
+        console.log(`Video uploaded to S3: ${videoS3Url}`);
+        videoPath = videoS3Url;
+      } else {
+        console.error('Failed to upload video to S3, keeping local path');
+      }
+    } catch (uploadError) {
+      console.error('Error uploading video to S3:', uploadError);
+      console.log('Keeping local video path');
+    }
+  }
+  
+  return { videoPath, previewPath };
+};
 
 // Promisify crypto.scrypt and crypto.randomBytes
 const scrypt = util.promisify(crypto.scrypt);
@@ -27,6 +166,24 @@ async function hashPassword(password) {
   const derivedKey = await scrypt(password, salt, 64);
   // Return the salt and the hashed password
   return `${salt}:${derivedKey.toString('hex')}`;
+}
+
+// Helper function to extract filename from S3 URL
+function getFileNameFromS3Url(url) {
+  try {
+    // Remove query parameters if any
+    const urlWithoutQuery = url.split('?')[0];
+    
+    // Extract the last part of the path
+    const parts = urlWithoutQuery.split('/');
+    const fileName = parts[parts.length - 1];
+    
+    // Remove the extension
+    return path.basename(fileName, path.extname(fileName));
+  } catch (error) {
+    console.error('Error extracting filename from S3 URL:', error);
+    return 'video-preview';
+  }
 }
 
 async function verifyPassword(storedPassword, suppliedPassword) {
@@ -81,7 +238,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Get the configured storage engine from s3Storage utility
@@ -91,7 +249,7 @@ const storage = getStorage();
 const fileFilter = (req, file, cb) => {
   // Check if the file MIME type is allowed
   const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-  const allowedDocumentTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  const allowedDocumentTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.apple.pages', 'application/vnd.google-apps.document'];
   const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
 
   // Allow any of these file types
@@ -99,7 +257,7 @@ const fileFilter = (req, file, cb) => {
 
   // Some browsers don't properly set mime types, so check file extension as fallback
   const extension = path.extname(file.originalname).toLowerCase();
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf', '.txt', '.doc', '.docx', '.mp4', '.mov', '.avi', '.webm', '.srt'];
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf', '.txt', '.doc', '.docx', '.mp4', '.mov', '.avi', '.webm', '.srt', '.pages', '.gdoc'];
 
   // Accept either by MIME type or extension
   if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
@@ -114,7 +272,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
+    fileSize: 500 * 1024 * 1024 // 500MB limit
   }
 });
 
@@ -130,7 +288,7 @@ const sampleCards = [
   {
     type: 'social',
     preview: '/uploads/sample-social-preview.jpg',
-    documentCopy: '/uploads/sample-social-copy.pdf',
+    transcript: '/uploads/sample-reel-transcript.txt', // Reusing the sample transcript file
     tags: ['marketing', 'social media'],
     description: 'Social media post template for summer campaign',
   },
@@ -486,6 +644,11 @@ app.get('/api/cards', async (req, res) => {
     const cardsWithAbsoluteUrls = cards.map(card => {
       const result = card.toObject();
 
+      // Ensure imageSequence property exists for all card types (empty array for non-social)
+      if (!result.imageSequence) {
+        result.imageSequence = [];
+      }
+
       // Process URLs based on card type
       if (card.type === 'image') {
         if (card.preview) {
@@ -495,6 +658,10 @@ app.get('/api/cards', async (req, res) => {
       } else if (card.type === 'social') {
         if (card.preview) {
           result.preview = getFileUrl(card.preview);
+        }
+        // Process imageSequence for social cards
+        if (card.imageSequence && Array.isArray(card.imageSequence)) {
+          result.imageSequence = card.imageSequence.map(url => getFileUrl(url));
         }
         result.documentCopy = getFileUrl(card.documentCopy);
       } else if (card.type === 'reel') {
@@ -533,6 +700,11 @@ app.get('/api/cards/:id', async (req, res) => {
     // Convert storage-specific file paths to public URLs
     const result = card.toObject();
 
+    // Ensure imageSequence property exists for all card types (empty array for non-social)
+    if (!result.imageSequence) {
+      result.imageSequence = [];
+    }
+
     // Process URLs based on card type
     if (card.type === 'image') {
       if (card.preview) {
@@ -542,6 +714,10 @@ app.get('/api/cards/:id', async (req, res) => {
     } else if (card.type === 'social') {
       if (card.preview) {
         result.preview = getFileUrl(card.preview);
+      }
+      // Process imageSequence for social cards
+      if (card.imageSequence && Array.isArray(card.imageSequence)) {
+        result.imageSequence = card.imageSequence.map(url => getFileUrl(url));
       }
       result.documentCopy = getFileUrl(card.documentCopy);
     } else if (card.type === 'reel') {
@@ -559,14 +735,38 @@ app.get('/api/cards/:id', async (req, res) => {
   }
 });
 
-// Middleware to handle file uploads for different card types
-const handleCardUpload = upload.fields([
-  { name: 'preview', maxCount: 1 },
-  { name: 'download', maxCount: 1 },
-  { name: 'documentCopy', maxCount: 1 },
-  { name: 'movie', maxCount: 1 },
-  { name: 'transcript', maxCount: 1 },
-]);
+// Create a dynamic middleware to handle file uploads including sequence files
+const handleCardUpload = (req, res, next) => {
+  // We'll create a dynamic field configuration based on the request
+  const fieldConfig = [
+    { name: 'preview', maxCount: 1 },
+    { name: 'download', maxCount: 1 },
+    { name: 'movie', maxCount: 1 },
+    { name: 'transcript', maxCount: 1 },
+  ];
+  
+  // We can't reliably check headers for field names in advance
+  // Instead, we'll add a fixed set of potential image sequence fields
+  // This ensures Multer is prepared for any number of sequence images
+  for (let i = 0; i < 50; i++) { // Support up to 50 images in a sequence
+    fieldConfig.push({ name: `imageSequence_${i}`, maxCount: 1 });
+  }
+  
+  // Also add the imageSequenceCount field explicitly
+  fieldConfig.push({ name: 'imageSequenceCount', maxCount: 1 });
+  
+  // Add removal flags for all possible fields
+  fieldConfig.push({ name: 'remove_preview', maxCount: 1 });
+  fieldConfig.push({ name: 'remove_download', maxCount: 1 });
+  fieldConfig.push({ name: 'remove_movie', maxCount: 1 });
+  fieldConfig.push({ name: 'remove_transcript', maxCount: 1 });
+  
+  // Create a multer middleware with the dynamic field config
+  const dynamicUpload = upload.fields(fieldConfig);
+  
+  // Execute the middleware
+  dynamicUpload(req, res, next);
+};
 
 // Helper function to handle file upload validation
 const validateFiles = (files, requiredFields) => {
@@ -602,12 +802,11 @@ const validateCardType = (type, files) => {
   // Verify that the card type matches the provided files
   if (type === 'image' && (!files.download || files.download.length === 0)) {
     return { valid: false, message: 'Image cards require a download file' };
-  } else if (type === 'social' && (!files.documentCopy || files.documentCopy.length === 0)) {
-    return { valid: false, message: 'Social cards require a document copy file' };
-  } else if (type === 'reel' &&
-            (!files.movie || files.movie.length === 0 ||
-             !files.transcript || files.transcript.length === 0)) {
-    return { valid: false, message: 'Reel cards require both movie and transcript files' };
+  } else if (type === 'social') {
+    // Social cards only require image sequence which is handled separately
+    return { valid: true };
+  } else if (type === 'reel' && (!files.movie || files.movie.length === 0)) {
+    return { valid: false, message: 'Reel cards require a movie file' };
   }
 
   return { valid: true };
@@ -644,6 +843,15 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       return res.status(400).json({ error: 'Type and description are required' });
     }
 
+    // Check for special social card case when image sequence count is 0
+    if (type === 'social') {
+      const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
+      if (sequenceCount <= 0) {
+        console.log('Social card submission without image sequence detected');
+        return res.status(400).json({ error: 'At least one image is required for social cards' });
+      }
+    }
+
     // Validate card type and files
     const typeValidation = validateCardType(type, req.files || {});
     if (!typeValidation.valid) {
@@ -667,14 +875,30 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
 
     // Helper function to get file path from multer/multer-s3 file
     const getFilePath = (file) => {
+      console.log(`getFilePath called with file:`, file ? {
+        originalname: file.originalname,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size,
+        location: file.location,
+        key: file.key,
+        fieldname: file.fieldname,
+        bucket: file.bucket,
+        s3: !!file.s3
+      } : 'null');
+
       // If using S3, the file location is stored differently
       if (isS3Configured && file) {
         // For multer-s3, the path is in file.location
-        return file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
+        const path = file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
+        console.log(`getFilePath (S3): isS3Configured=${isS3Configured}, returning path: ${path}`);
+        return path;
       }
 
       // For local storage
-      return file ? `/uploads/${file.filename}` : null;
+      const path = file ? `/uploads/${file.filename}` : null;
+      console.log(`getFilePath (local): returning path: ${path}`);
+      return path;
     };
 
     // Handle different card types
@@ -688,7 +912,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
 
       if (req.files.preview && req.files.preview.length > 0) {
         const previewFile = req.files.preview[0];
-        newCard.preview = getFilePath(previewFile);
+        newCard.preview = await processFileAndGetPath(previewFile);
 
         // Store original filename in metadata
         preserveOriginalFileName(req, previewFile, 'preview', newCard);
@@ -715,7 +939,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       }
 
       const downloadFile = req.files.download[0];
-      newCard.download = getFilePath(downloadFile);
+      newCard.download = await processFileAndGetPath(downloadFile);
 
       // Store original filename in metadata
       preserveOriginalFileName(req, downloadFile, 'download', newCard);
@@ -734,16 +958,21 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
         }
       }
     } else if (type === 'social') {
-      const validation = validateFiles(req.files, ['documentCopy']);
-      if (!validation.valid) {
+      // Process image sequence - this is now the required field for social cards
+      const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
+      
+      if (sequenceCount <= 0) {
         return res.status(400).json({
-          error: `Document copy is required for social cards. Missing: ${validation.missingField}`
+          error: `At least one image is required in the sequence for social cards`
         });
       }
-
+      
+      console.log(`Processing social card with ${sequenceCount} images in sequence`);
+      
+      // Process optional preview image if provided
       if (req.files.preview && req.files.preview.length > 0) {
         const previewFile = req.files.preview[0];
-        newCard.preview = getFilePath(previewFile);
+        newCard.preview = await processFileAndGetPath(previewFile);
 
         // Store original filename in metadata
         preserveOriginalFileName(req, previewFile, 'preview', newCard);
@@ -768,43 +997,92 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
           }
         }
       }
+      
+      // Process all images in the sequence
+      const sequenceResult = await processImageSequence(req, req.files, date, extractFileMetadata);
+      
+      // Add the image sequence to the card
+      newCard.imageSequence = sequenceResult.imageSequence;
+      
+      // Add metadata for image sequence
+      if (!newCard.fileMetadata) newCard.fileMetadata = {};
+      newCard.fileMetadata.imageSequenceOriginalFileNames = sequenceResult.imageSequenceOriginalFileNames;
+      newCard.fileMetadata.imageSequenceFileSizes = sequenceResult.imageSequenceFileSizes;
+      newCard.fileMetadata.totalSequenceSize = sequenceResult.totalSequenceSize;
+      newCard.fileMetadata.imageSequenceCount = sequenceResult.imageSequenceCount;
+      
+      // If no preview was provided, use the first image in the sequence
+      if (!newCard.preview && newCard.imageSequence && newCard.imageSequence.length > 0) {
+        newCard.preview = newCard.imageSequence[0];
+        console.log(`Using first image in sequence as preview: ${newCard.preview}`);
+      }
+      
+      // Process optional document copy if provided
+      if (req.files.documentCopy && req.files.documentCopy.length > 0) {
+        const documentFile = req.files.documentCopy[0];
+        newCard.documentCopy = await processFileAndGetPath(documentFile);
 
-      const documentFile = req.files.documentCopy[0];
-      newCard.documentCopy = getFilePath(documentFile);
+        // Store original filename in metadata
+        preserveOriginalFileName(req, documentFile, 'documentCopy', newCard);
 
-      // Store original filename in metadata
-      preserveOriginalFileName(req, documentFile, 'documentCopy', newCard);
+        // Update document metadata
+        if (!isS3Configured) {
+          const documentMetadata = await extractFileMetadata(newCard.documentCopy, date);
+          // We don't update the card's overall fileSize since we're now tracking totalSequenceSize
+          newCard.fileMetadata.documentSize = documentMetadata.fileSize;
+        } else {
+          // For S3, use the file size from the file object
+          if (documentFile.size) {
+            newCard.fileMetadata.documentSize = documentFile.size;
+          }
+        }
+      }
+      
+      // Process optional transcript if provided for social cards
+      if (req.files.transcript && req.files.transcript.length > 0) {
+        const transcriptFile = req.files.transcript[0];
+        newCard.transcript = await processFileAndGetPath(transcriptFile);
 
-      // Update file size
-      if (!isS3Configured) {
-        const documentMetadata = await extractFileMetadata(newCard.documentCopy, date);
-        // For documents, we mainly care about file size
-        newCard.fileMetadata.fileSize = documentMetadata.fileSize || newCard.fileMetadata.fileSize;
-      } else {
-        // For S3, use the file size from the file object
-        if (req.files.documentCopy[0].size) {
-          newCard.fileMetadata.fileSize = req.files.documentCopy[0].size;
+        // Store original filename in metadata
+        preserveOriginalFileName(req, transcriptFile, 'transcript', newCard);
+
+        // Update transcript metadata
+        if (!isS3Configured) {
+          const transcriptMetadata = await extractFileMetadata(newCard.transcript, date);
+          // Save transcript size in metadata
+          newCard.fileMetadata.transcriptSize = transcriptMetadata.fileSize;
+        } else {
+          // For S3, use the file size from the file object
+          if (transcriptFile.size) {
+            newCard.fileMetadata.transcriptSize = transcriptFile.size;
+          }
         }
       }
     } else if (type === 'reel') {
-      const validation = validateFiles(req.files, ['movie', 'transcript']);
+      const validation = validateFiles(req.files, ['movie']);
       if (!validation.valid) {
         return res.status(400).json({
-          error: `Movie and transcript are required for reel cards. Missing: ${validation.missingField}`
+          error: `Movie file is required for reel cards. Missing: ${validation.missingField}`
         });
       }
 
+      const movieFile = req.files.movie[0];
+      
+      // Handle manual preview image upload if provided
+      let hasManualPreview = false;
       if (req.files.preview && req.files.preview.length > 0) {
+        console.log('Using manually uploaded preview image');
         const previewFile = req.files.preview[0];
-        newCard.preview = getFilePath(previewFile);
+        newCard.preview = await processFileAndGetPath(previewFile);
+        hasManualPreview = true;
 
         // Store original filename in metadata
         preserveOriginalFileName(req, previewFile, 'preview', newCard);
 
-        // Extract metadata for preview image if we can access the file
+        // Extract metadata for the preview image
         if (!isS3Configured) {
           const previewMetadata = await extractFileMetadata(newCard.preview, date);
-          // Only update dimensions and file size if they're not already set
+          // Update dimensions and file size
           if (!newCard.fileMetadata.width && previewMetadata.width) {
             newCard.fileMetadata.width = previewMetadata.width;
           }
@@ -821,32 +1099,93 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
           }
         }
       }
-
-      const movieFile = req.files.movie[0];
-      newCard.movie = getFilePath(movieFile);
-
-      // Store original filename in metadata
-      preserveOriginalFileName(req, movieFile, 'movie', newCard);
-
-      // Update file size and metadata
-      if (!isS3Configured) {
-        const movieMetadata = await extractFileMetadata(newCard.movie, date);
-        // For videos, we want dimensions and file size
-        newCard.fileMetadata.width = movieMetadata.width || newCard.fileMetadata.width;
-        newCard.fileMetadata.height = movieMetadata.height || newCard.fileMetadata.height;
-        newCard.fileMetadata.fileSize = movieMetadata.fileSize || newCard.fileMetadata.fileSize;
-      } else {
-        // For S3, use the file size from the file object
-        if (movieFile.size) {
+      
+      // Process the video and generate preview if no manual preview was provided
+      if (!hasManualPreview) {
+        console.log('No manual preview provided, will auto-generate one from video');
+        
+        // Use our helper function to process video and generate preview in one go
+        const { videoPath, previewPath } = await processVideoAndGeneratePreview(movieFile, newCard);
+        
+        if (videoPath) {
+          console.log(`Setting video path to: ${videoPath}`);
+          newCard.movie = videoPath;
+        } else {
+          // Fallback to local path if processing failed
+          console.log(`Video processing failed, using local path: /uploads/${movieFile.filename}`);
+          newCard.movie = `/uploads/${movieFile.filename}`;
+          preserveOriginalFileName(req, movieFile, 'movie', newCard);
+        }
+        
+        if (previewPath) {
+          console.log(`Setting preview path to: ${previewPath}`);
+          newCard.preview = previewPath;
+        }
+        
+        // Add file size metadata if not already present
+        if (!newCard.fileMetadata.fileSize && movieFile.size) {
           newCard.fileMetadata.fileSize = movieFile.size;
+        }
+      } else {
+        // If we have a manual preview, just process the video file normally
+        console.log('Using manual preview, processing video separately');
+        
+        // Keep the video local first
+        newCard.movie = `/uploads/${movieFile.filename}`;
+        preserveOriginalFileName(req, movieFile, 'movie', newCard);
+        
+        // Get detailed video metadata if possible
+        try {
+          const movieFullPath = path.join(__dirname, 'uploads', movieFile.filename);
+          const videoMetadata = await getVideoMetadata(movieFullPath);
+          
+          // Add video metadata
+          if (!newCard.fileMetadata) newCard.fileMetadata = {};
+          newCard.fileMetadata.fileSize = videoMetadata.size || movieFile.size;
+          newCard.fileMetadata.duration = videoMetadata.duration;
+          newCard.fileMetadata.videoCodec = videoMetadata.codec;
+          newCard.fileMetadata.fps = videoMetadata.fps;
+          newCard.fileMetadata.bitrate = videoMetadata.bitrate;
+          
+          // Now upload to S3 if configured
+          if (isS3Configured) {
+            try {
+              const s3Url = await uploadLocalFileToS3(movieFullPath);
+              if (s3Url) {
+                console.log(`Uploaded video to S3: ${s3Url}`);
+                newCard.movie = s3Url;
+              }
+            } catch (s3Error) {
+              console.error('Error uploading video to S3:', s3Error);
+            }
+          }
+        } catch (error) {
+          console.error('Error getting video metadata:', error);
+          
+          // Still try to upload to S3 if metadata extraction failed
+          if (isS3Configured) {
+            try {
+              const movieFullPath = path.join(__dirname, 'uploads', movieFile.filename);
+              const s3Url = await uploadLocalFileToS3(movieFullPath);
+              if (s3Url) {
+                console.log(`Uploaded video to S3: ${s3Url}`);
+                newCard.movie = s3Url;
+              }
+            } catch (s3Error) {
+              console.error('Error uploading video to S3:', s3Error);
+            }
+          }
         }
       }
 
-      const transcriptFile = req.files.transcript[0];
-      newCard.transcript = getFilePath(transcriptFile);
+      // Handle transcript file if provided (now optional)
+      if (req.files.transcript && req.files.transcript.length > 0) {
+        const transcriptFile = req.files.transcript[0];
+        newCard.transcript = await processFileAndGetPath(transcriptFile);
 
-      // Store original filename in metadata
-      preserveOriginalFileName(req, transcriptFile, 'transcript', newCard);
+        // Store original filename in metadata
+        preserveOriginalFileName(req, transcriptFile, 'transcript', newCard);
+      }
     } else {
       return res.status(400).json({ error: 'Invalid card type' });
     }
@@ -904,6 +1243,28 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         error: 'Card type cannot be changed after creation'
       });
     }
+    
+    // For reel cards, track if we need to auto-generate a preview
+    const needsAutoPreview = (type === 'reel' && 
+      (req.body.remove_preview === 'true' || !card.preview) && 
+      (!req.files || !req.files.preview || req.files.preview.length === 0));
+      
+    // Track if a new movie file was uploaded
+    const hasNewMovie = req.files && req.files.movie && req.files.movie.length > 0;
+    
+    // For logging
+    console.log('Update parameters:');
+    console.log(`- Card type: ${type}`);
+    console.log(`- Needs auto-preview: ${needsAutoPreview}`);
+    console.log(`- Has new movie: ${hasNewMovie}`);
+    console.log(`- Remove preview requested: ${req.body.remove_preview === 'true'}`);
+    console.log(`- Has preview files: ${!!(req.files && req.files.preview && req.files.preview.length > 0)}`);
+    console.log(`- S3 configured: ${isS3Configured}`);
+    
+    // In this updated workflow:
+    // 1. Files are always processed locally first
+    // 2. For videos, preview is generated from local file
+    // 3. Only after processing, files are uploaded to S3 if configured
 
     // Handle tag changes
     // 1. Find removed tags to update their counts
@@ -930,14 +1291,30 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
     // Helper function to get file path from multer/multer-s3 file
     const getFilePath = (file) => {
+      console.log(`getFilePath called with file:`, file ? {
+        originalname: file.originalname,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size,
+        location: file.location,
+        key: file.key,
+        fieldname: file.fieldname,
+        bucket: file.bucket,
+        s3: !!file.s3
+      } : 'null');
+
       // If using S3, the file location is stored differently
       if (isS3Configured && file) {
         // For multer-s3, the path is in file.location
-        return file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
+        const path = file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
+        console.log(`getFilePath (S3): isS3Configured=${isS3Configured}, returning path: ${path}`);
+        return path;
       }
 
       // For local storage
-      return file ? `/uploads/${file.filename}` : null;
+      const path = file ? `/uploads/${file.filename}` : null;
+      console.log(`getFilePath (local): returning path: ${path}`);
+      return path;
     };
 
     // Handle file removal and update flags
@@ -974,34 +1351,40 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       } else if (req.files && req.files[field] && req.files[field].length > 0) {
         const file = req.files[field][0];
         console.log(`Updating ${field} with new file: ${file.filename || file.key || 'S3 file'}`);
-        const newPath = getFilePath(file);
+        const newPath = await processFileAndGetPath(file);
 
-        // Check if the old file is orphaned after updating the database record
+        // For existing files, we need to check if they'll be orphaned
         if (currentValue) {
           try {
-            // Save current card ID to correctly check for orphaned files
-            const currentCardId = card._id.toString();
-
-            // First update database with the new file path (temporary update)
-            const oldCardData = await Card.findByIdAndUpdate(
-              currentCardId,
-              { [field]: newPath },
-              { new: false }  // return the old document
-            );
-
-            // Now check if the old file is orphaned
-            const wasDeleted = await safeDeleteOrphanedFile(currentValue, Card);
-            if (wasDeleted) {
-              console.log(`Orphaned previous file ${currentValue} deleted successfully`);
+            console.log(`Checking if file ${currentValue} will be orphaned after update`);
+            
+            // Create a copy of the current card with the updated field for orphan checking
+            const tempCard = { ...card.toObject() };
+            tempCard[field] = newPath;
+            
+            // Count how many other cards use this file
+            const otherCardCount = await Card.countDocuments({
+              _id: { $ne: card._id },
+              $or: [
+                { preview: currentValue },
+                { download: currentValue },
+                { documentCopy: currentValue },
+                { movie: currentValue },
+                { transcript: currentValue }
+              ]
+            });
+            
+            // If no other cards use this file, we can mark it for deletion
+            if (otherCardCount === 0) {
+              console.log(`File ${currentValue} will be orphaned - marking for deletion after update`);
+              req.filesToDeleteAfterUpdate = req.filesToDeleteAfterUpdate || [];
+              req.filesToDeleteAfterUpdate.push(currentValue);
             } else {
-              console.log(`Previous file ${currentValue} still in use by other cards, not deleted`);
+              console.log(`File ${currentValue} is used by ${otherCardCount} other cards - will not delete`);
             }
-
-            // Revert the database change - full update will happen later
-            await Card.findByIdAndUpdate(currentCardId, oldCardData);
           } catch (err) {
-            console.error(`Error safely deleting previous file ${currentValue}:`, err);
-            // Continue even if deletion fails
+            console.error(`Error checking file usage for ${currentValue}:`, err);
+            // Continue even if the check fails
           }
         }
 
@@ -1058,36 +1441,300 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       // Handle preview field (optional)
       updatedCard.preview = await handleFileField('preview', card.preview);
 
-      // Handle documentCopy field (required for social cards)
+      // Handle documentCopy field (now optional for social cards)
       updatedCard.documentCopy = await handleFileField('documentCopy', card.documentCopy);
-
-      // Ensure documentCopy field is present for social cards
-      if (!updatedCard.documentCopy) {
+      
+      // Handle transcript field (optional for social cards)
+      updatedCard.transcript = await handleFileField('transcript', card.transcript);
+      
+      // Process image sequence updates
+      const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
+      console.log(`Updating social card with ${sequenceCount} images in sequence`);
+      
+      if (sequenceCount > 0) {
+        // Process all images in the sequence
+        const date = updatedCard.fileMetadata?.date || new Date();
+        const sequenceResult = await processImageSequence(req, req.files, date, extractFileMetadata);
+        
+        // Add the image sequence to the card
+        updatedCard.imageSequence = sequenceResult.imageSequence;
+        
+        // Add metadata for image sequence
+        if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+        updatedCard.fileMetadata.imageSequenceOriginalFileNames = sequenceResult.imageSequenceOriginalFileNames;
+        updatedCard.fileMetadata.imageSequenceFileSizes = sequenceResult.imageSequenceFileSizes;
+        updatedCard.fileMetadata.totalSequenceSize = sequenceResult.totalSequenceSize;
+        updatedCard.fileMetadata.imageSequenceCount = sequenceResult.imageSequenceCount;
+        
+        // If no preview was provided and sequence exists, use the first image in the sequence as preview
+        if (!updatedCard.preview && updatedCard.imageSequence && updatedCard.imageSequence.length > 0) {
+          updatedCard.preview = updatedCard.imageSequence[0];
+          console.log(`Using first image in sequence as preview: ${updatedCard.preview}`);
+        }
+      } else if (!card.imageSequence || card.imageSequence.length === 0) {
+        // If no image sequence provided in update and none existed before, return error 
         return res.status(400).json({
-          error: 'Document copy is required for social cards. Please upload a new file.'
+          error: 'At least one image in the sequence is required for social cards. Please upload at least one image.'
         });
       }
+      // If no sequence is provided in the update but it exists in the card, keep existing sequence
     } else if (type === 'reel') {
       // Handle preview field (optional)
+      console.log('Reel update - handling preview field');
       updatedCard.preview = await handleFileField('preview', card.preview);
+      console.log('Reel update - preview result:', updatedCard.preview);
 
       // Handle movie field (required for reel cards)
-      updatedCard.movie = await handleFileField('movie', card.movie);
+      console.log('Reel update - handling movie field');
+      
+      // If a new movie was uploaded, process it using our optimized workflow
+      if (hasNewMovie) {
+        console.log('New movie file detected, processing with local-first approach');
+        const movieFile = req.files.movie[0];
+        
+        // Process the video with our helper function to properly generate preview and handle S3 upload
+        const { videoPath, previewPath } = await processVideoAndGeneratePreview(movieFile, updatedCard);
+        
+        if (videoPath) {
+          console.log(`Using processed video path: ${videoPath}`);
+          updatedCard.movie = videoPath;
+        } else {
+          // Fall back to standard method if our helper failed
+          console.log('Video processing helper failed, falling back to standard method');
+          updatedCard.movie = await handleFileField('movie', card.movie);
+        }
+        
+        // If auto-preview was generated and we need it, use it
+        if (previewPath && (needsAutoPreview || req.body.remove_preview === 'true')) {
+          console.log(`Using auto-generated preview from new video: ${previewPath}`);
+          updatedCard.preview = previewPath;
+        }
+      } else {
+        // Use standard method for existing movie file
+        updatedCard.movie = await handleFileField('movie', card.movie);
+      }
+      
+      console.log('Reel update - movie result:', updatedCard.movie);
 
-      // Handle transcript field (required for reel cards)
+      // Handle transcript field (optional for reel cards)
       updatedCard.transcript = await handleFileField('transcript', card.transcript);
 
       // Ensure required fields are present for reel cards
-      if (!updatedCard.movie || !updatedCard.transcript) {
+      if (!updatedCard.movie) {
         return res.status(400).json({
-          error: 'Movie and transcript are required for reel cards. Please upload new files.'
+          error: 'Movie file is required for reel cards. Please upload a new file.'
         });
       }
     }
 
     // Get a copy of the original card for checking orphaned files
     const originalCard = card.toObject();
+    
+    // Auto-generate preview image from video if needed
+    // We use our renamed 'needsAutoPreview' variable here (was 'needsLocalAutoPreview')
+    if (needsAutoPreview && card.movie) {
+      try {
+        console.log('Auto-generating preview image from video...');
+        const movieFullPath = path.join(__dirname, card.movie);
+        const uploadDir = path.join(__dirname, 'uploads');
+        
+        try {
+          // Check if the file is actually a video
+          const fileCheck = require('child_process').execSync(`file "${movieFullPath}"`).toString();
+          console.log(`File check result: ${fileCheck}`);
+          
+          if (fileCheck.includes('HTML') || !fileCheck.includes('video')) {
+            console.warn('Not a valid video file - using fallback colored preview');
+            throw new Error('Invalid video file format');
+          }
+          
+          // Extract a frame from the video
+          const previewPath = await extractVideoFrame(movieFullPath, uploadDir);
+          
+          // Get relative path for storage
+          const previewRelativePath = '/uploads/' + path.basename(previewPath);
+          console.log(`Generated preview image at ${previewRelativePath}`);
+          
+          // Update the card with the new preview
+          updatedCard.preview = previewRelativePath;
+          
+          // Store metadata indicating auto-generation
+          if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+          updatedCard.fileMetadata.previewOriginalFileName = `Auto-generated from ${path.basename(card.movie)}`;
+          
+          // Extract metadata for the preview image
+          const previewMetadata = await extractFileMetadata(previewRelativePath, date);
+          if (previewMetadata.width) updatedCard.fileMetadata.width = previewMetadata.width;
+          if (previewMetadata.height) updatedCard.fileMetadata.height = previewMetadata.height;
+        } catch (error) {
+          console.error('Error extracting preview frame from video:', error);
+          
+          // Create a fallback colored image using sharp
+          console.log('Creating fallback colored preview image...');
+          
+          // Generate a video-like preview with a play button
+          const width = 720;
+          const height = 1280;
+          const previewFilename = `${path.basename(movieFullPath, path.extname(movieFullPath))}-preview-fallback-${uuidv4().substring(0, 8)}.jpg`;
+          const previewPath = path.join(uploadDir, previewFilename);
+          
+          // Create a simple colored background
+          // Generate a random color
+          const r = Math.floor(Math.random() * 200) + 25; // 25-225 for better visibility
+          const g = Math.floor(Math.random() * 200) + 25;
+          const b = Math.floor(Math.random() * 200) + 25;
+          
+          console.log(`Using random color: rgb(${r},${g},${b})`);
+          
+          await sharp({
+            create: {
+              width: width,
+              height: height,
+              channels: 4,
+              background: { r, g, b, alpha: 1 }
+            }
+          })
+          .composite([
+            {
+              input: Buffer.from(`
+                <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100%" height="100%" fill="rgb(${r},${g},${b})" />
+                  <text x="${width/2}" y="${height/2}" text-anchor="middle" font-family="Arial" font-size="32" fill="white">${path.basename(movieFullPath, path.extname(movieFullPath))}</text>
+                </svg>
+              `),
+              top: 0,
+              left: 0
+            }
+          ])
+          .jpeg({ quality: 90 })
+          .toFile(previewPath);
+          
+          console.log(`Created fallback preview image at ${previewPath}`);
+          updatedCard.preview = '/uploads/' + previewFilename;
+          
+          // Add metadata
+          if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+          updatedCard.fileMetadata.previewOriginalFileName = `Auto-generated fallback for ${path.basename(card.movie)}`;
+          updatedCard.fileMetadata.width = width;
+          updatedCard.fileMetadata.height = height;
+        }
+      } catch (error) {
+        console.error('All preview generation attempts failed:', error);
+        // Continue without preview if generation fails
+      }
+    } else if (needsAutoPreview && isS3Configured && card.movie) {
+      // Handle S3-stored videos
+      try {
+        console.log('Creating preview for S3-stored video during edit...');
+        
+        // Get movie URL
+        const movieUrl = card.movie;
+        console.log('Movie URL:', movieUrl);
+        
+        if (!movieUrl) {
+          throw new Error('Cannot determine S3 location for the video file');
+        }
+        
+        // Extract the original filename from the metadata
+        const originalFilename = card.fileMetadata?.movieOriginalFileName || path.basename(movieUrl);
+        
+        // Generate and upload the preview
+        const previewUrl = await generateAndUploadPreview(movieUrl, originalFilename);
+        
+        // Set the preview URL in the card data
+        updatedCard.preview = previewUrl;
+        
+        // Update metadata
+        if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+        updatedCard.fileMetadata.previewOriginalFileName = `Auto-generated for ${originalFilename}`;
+        updatedCard.fileMetadata.width = 720; // Default width from the generator
+        updatedCard.fileMetadata.height = 1280; // Default height from the generator
+        
+        console.log('Successfully added preview URL to card:', previewUrl);
+      } catch (error) {
+        console.error('Error handling S3 video preview during edit:', error);
+      }
+    }
 
+    // Generate a preview for a newly uploaded movie to S3 when no preview was provided
+    console.log('================== S3 PREVIEW GENERATION CHECK ==================');
+    console.log('S3 preview check - isS3Configured:', isS3Configured);
+    console.log('S3 preview check - hasNewMovie:', hasNewMovie);
+    console.log('S3 preview check - type:', type);
+    console.log('S3 preview check - hasPreviewFiles:', !!(req.files && req.files.preview && req.files.preview.length > 0));
+    console.log('S3 preview check - updatedCard.preview:', updatedCard.preview);
+    console.log('S3 preview check - req.body.remove_preview:', req.body.remove_preview);
+    console.log('S3 preview check - shouldRemovePreview param:', req.body.remove_preview === 'true');
+    console.log('S3 preview check - updatedCard.movie:', updatedCard.movie);
+    console.log('S3 preview check - movie file exists:', !!(req.files && req.files.movie && req.files.movie.length > 0));
+    if (req.files && req.files.movie && req.files.movie.length > 0) {
+      console.log('S3 preview check - movie file details:', {
+        originalname: req.files.movie[0].originalname,
+        mimetype: req.files.movie[0].mimetype,
+        size: req.files.movie[0].size,
+        location: req.files.movie[0].location,
+        key: req.files.movie[0].key,
+        bucket: req.files.movie[0].bucket
+      });
+    }
+    
+    // We no longer need to check for preview removal as it's handled in our 
+    // optimized workflow with the processVideoAndGeneratePreview function
+    
+    console.log('================== FILE PROCESSING SUMMARY ==================');
+    console.log('File processing complete with the following results:');
+    console.log(`- Type: ${type}`);
+    console.log(`- Uses S3: ${isS3Configured ? 'Yes' : 'No'}`);
+    console.log(`- Changed movie file: ${hasNewMovie ? 'Yes' : 'No'}`);
+    console.log(`- Provided preview file: ${!!(req.files && req.files.preview && req.files.preview.length > 0) ? 'Yes' : 'No'}`);
+    console.log(`- Final movie path: ${updatedCard.movie || '(none)'}`);
+    console.log(`- Final preview path: ${updatedCard.preview || '(none)'}`);
+    console.log(`- Final transcript path: ${updatedCard.transcript || '(none)'}`);
+    
+    // Log movie file details for debugging
+    if (req.files && req.files.movie && req.files.movie.length > 0) {
+      console.log('S3 preview check - movie file exists:', true);
+      console.log('S3 preview check - movie file details:', {
+        originalname: req.files.movie[0].originalname,
+        mimetype: req.files.movie[0].mimetype,
+        size: req.files.movie[0].size,
+        location: req.files.movie[0].location,
+        key: req.files.movie[0].key,
+        bucket: req.files.movie[0].bucket
+      });
+    } else if (updatedCard.movie) {
+      console.log('S3 preview check - movie URL:', updatedCard.movie);
+    } else {
+      console.log('S3 preview check - movie file exists:', false);
+    }
+    
+    // Define conditions for generating a preview
+    const shouldRemovePreview = req.body.remove_preview === 'true';
+    const shouldGeneratePreview = isS3Configured && 
+                                 type === 'reel' && 
+                                 (hasNewMovie || shouldRemovePreview) && 
+                                 (!req.files || !req.files.preview || req.files.preview.length === 0);
+                                 
+    console.log('S3 preview generation conditions met:', shouldGeneratePreview);
+    console.log('Conditions breakdown:');
+    console.log('- isS3Configured:', isS3Configured);
+    console.log('- type === \'reel\':', type === 'reel');
+    console.log('- hasNewMovie || shouldRemovePreview:', hasNewMovie || shouldRemovePreview);
+    console.log('- !hasPreviewFiles:', !req.files || !req.files.preview || req.files.preview.length === 0);
+    // Preview generation is now handled in our optimized workflow
+    
+    // Generate preview if:
+    // 1. It's a reel card with S3 configured, AND
+    // 2. Either:
+    //    a. It's a new video without a preview uploaded, OR
+    //    b. User explicitly requested to remove/regenerate the preview
+    // We no longer need this preview generation logic as it's now handled by the
+    // processVideoAndGeneratePreview function, which properly follows the workflow:
+    // 1. Process videos locally first
+    // 2. Generate previews from local files
+    // 3. Upload files to S3 only after processing
+    console.log('================== END FILE PROCESSING ==================');
+    
     // Log the update operation for debugging purposes
     console.log('Updating card with the following data:', JSON.stringify(updatedCard, null, 2));
 
@@ -1108,30 +1755,107 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     }
 
     // Update the card in the database
-    const updated = await Card.findByIdAndUpdate(cardId, updateOperation, { new: true });
+    let updated;
+    try {
+      console.log(`Updating card ${cardId} in database with operation:`, JSON.stringify(updateOperation, null, 2));
+      updated = await Card.findByIdAndUpdate(cardId, updateOperation, { 
+        new: true,     // Return the updated document
+        runValidators: true  // Run mongoose validators
+      });
+      
+      if (!updated) {
+        throw new Error(`Failed to update card ${cardId} - no document returned`);
+      }
+      
+      console.log(`Card ${cardId} successfully updated`);
+    } catch (updateError) {
+      console.error('MongoDB update error:', updateError);
+      return res.status(500).json({ 
+        error: 'Failed to update card in database',
+        details: updateError.message 
+      });
+    }
 
-    // Check if any files were replaced and are now orphaned
-    const fieldsToCheck = ['preview', 'download', 'documentCopy', 'movie', 'transcript'];
-    for (const field of fieldsToCheck) {
-      // Check if the field existed in the original card and was changed or removed
-      if (originalCard[field] &&
-         (updatedCard[field] !== originalCard[field] || !updatedCard[field])) {
-
-        // Check if the old file is now orphaned
+    // Process any files marked for deletion during the update
+    if (req.filesToDeleteAfterUpdate && req.filesToDeleteAfterUpdate.length > 0) {
+      console.log(`Cleaning up ${req.filesToDeleteAfterUpdate.length} orphaned files after update`);
+      
+      for (const fileToDelete of req.filesToDeleteAfterUpdate) {
         try {
-          const wasDeleted = await safeDeleteOrphanedFile(originalCard[field], Card);
-          if (wasDeleted) {
-            console.log(`Orphaned file ${originalCard[field]} deleted successfully`);
+          // Double-check that the file is truly orphaned before deleting
+          const isOrphaned = await isFileOrphaned(fileToDelete, Card);
+          
+          if (isOrphaned) {
+            console.log(`Confirmed file ${fileToDelete} is orphaned, deleting...`);
+            await deleteFile(fileToDelete);
+            console.log(`Successfully deleted orphaned file: ${fileToDelete}`);
           } else {
-            console.log(`File ${originalCard[field]} still in use by other cards, not deleted`);
+            console.log(`File ${fileToDelete} is no longer orphaned, not deleting`);
           }
         } catch (err) {
-          console.error(`Error safely deleting file ${originalCard[field]}:`, err);
+          console.error(`Error deleting orphaned file ${fileToDelete}:`, err);
         }
       }
+    } else {
+      console.log('No orphaned files to clean up after update');
+    }
+    
+    // Final check for any files that might have been orphaned
+    if (updated) { // Only proceed if we have a valid updated card
+      const fieldsToCheck = ['preview', 'download', 'documentCopy', 'movie', 'transcript'];
+      
+      // Check regular fields
+      for (const field of fieldsToCheck) {
+        // Check if the field existed in the original card and was changed or removed
+        if (originalCard[field] &&
+           (updated[field] !== originalCard[field] || !updated[field])) {
+
+          // Check if the old file is now orphaned
+          try {
+            const wasDeleted = await safeDeleteOrphanedFile(originalCard[field], Card);
+            if (wasDeleted) {
+              console.log(`Orphaned file ${originalCard[field]} deleted successfully in final check`);
+            } else {
+              console.log(`File ${originalCard[field]} still in use by other cards, not deleted`);
+            }
+          } catch (err) {
+            console.error(`Error safely deleting file ${originalCard[field]}:`, err);
+          }
+        }
+      }
+      
+      // Special handling for image sequence fields
+      if (originalCard.type === 'social' && originalCard.imageSequence && Array.isArray(originalCard.imageSequence)) {
+        const currentImageSequence = updated.imageSequence || [];
+        
+        // Find files that were in the original sequence but not in the updated sequence
+        for (const imagePath of originalCard.imageSequence) {
+          if (imagePath && !currentImageSequence.includes(imagePath)) {
+            try {
+              console.log(`Checking if removed sequence image ${imagePath} is now orphaned`);
+              const wasDeleted = await safeDeleteOrphanedFile(imagePath, Card);
+              if (wasDeleted) {
+                console.log(`Orphaned sequence image ${imagePath} deleted successfully`);
+              } else {
+                console.log(`Sequence image ${imagePath} still in use by other cards, not deleted`);
+              }
+            } catch (err) {
+              console.error(`Error safely deleting sequence image ${imagePath}:`, err);
+            }
+          }
+        }
+      }
+    } else {
+      console.log('Skipping orphaned file check - no updated card available');
     }
 
     // Convert relative URLs to absolute URLs for response
+    if (!updated) {
+      // This should not happen as we've already returned an error if the update failed,
+      // but adding this as an additional safeguard
+      return res.status(500).json({ error: 'Card update failed' });
+    }
+    
     const baseUrl = getBaseUrl(req);
     const response = updated.toObject();
 
@@ -1158,6 +1882,21 @@ app.delete('/api/cards/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Card not found' });
     }
 
+    // Check if this is the last card of a type before deleting
+    // This is no longer necessary as we're allowing deletion of the last card of a type
+    /* 
+    const cardsOfSameType = await Card.countDocuments({ 
+      _id: { $ne: cardId }, 
+      type: card.type 
+    });
+    
+    if (cardsOfSameType === 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete the last ${card.type} card. At least one card of each type must remain.` 
+      });
+    }
+    */
+
     // Update tag counts before deleting the card
     if (card.tags && card.tags.length > 0) {
       await updateTagCounts(card.tags);
@@ -1175,8 +1914,15 @@ app.delete('/api/cards/:id', authMiddleware, async (req, res) => {
 
     if (card.type === 'image' && card.download) {
       filesToCheck.push(card.download);
-    } else if (card.type === 'social' && card.documentCopy) {
-      filesToCheck.push(card.documentCopy);
+    } else if (card.type === 'social') {
+      // Handle image sequence files
+      if (card.imageSequence && Array.isArray(card.imageSequence)) {
+        card.imageSequence.forEach(imagePath => {
+          if (imagePath) filesToCheck.push(imagePath);
+        });
+      }
+      // Handle optional transcript
+      if (card.transcript) filesToCheck.push(card.transcript);
     } else if (card.type === 'reel') {
       if (card.movie) filesToCheck.push(card.movie);
       if (card.transcript) filesToCheck.push(card.transcript);
@@ -1212,6 +1958,35 @@ app.get('/api/tags', async (req, res) => {
   } catch (error) {
     console.error('Error getting tags:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Route to download all card files as a ZIP
+app.get('/api/cards/:id/download-package', async (req, res) => {
+  try {
+    const cardId = req.params.id;
+    console.log(`Preparing download package for card ${cardId}`);
+    
+    // Get the card
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+    
+    console.log(`Creating download package for ${card.type} card`);
+    
+    // Make sure we're working with a plain object, not a Mongoose document
+    const cardData = card.toObject ? card.toObject() : JSON.parse(JSON.stringify(card));
+    
+    // Create the ZIP file with all card files
+    const zipPath = await createCardZip(cardData);
+    
+    // Return the path to the ZIP file
+    const zipUrl = getFileUrl(zipPath);
+    res.json({ downloadUrl: zipUrl });
+  } catch (error) {
+    console.error('Error creating download package:', error);
+    res.status(500).json({ error: 'Failed to create download package' });
   }
 });
 
@@ -1433,8 +2208,28 @@ async function startApp() {
     // await resetAdminPassword();
 
     // Start the server
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      console.log(`Max file upload size: 500MB`);
+      console.log(`Auto-preview generation for videos: Enabled (local & S3)`);
+      console.log(`Image sequence support: Enabled`);
+    });
+    
+    // Set longer timeout for large file uploads (10 minutes)
+    server.timeout = 600000;
+    
+    // Schedule cleanup of orphaned ZIP files daily
+    setInterval(async () => {
+      try {
+        await cleanupOrphanedZipFiles();
+      } catch (error) {
+        console.error('Error in scheduled ZIP cleanup:', error);
+      }
+    }, 24 * 60 * 60 * 1000); // Run every 24 hours
+    
+    // Run initial cleanup when starting
+    cleanupOrphanedZipFiles().catch(err => {
+      console.error('Error in initial ZIP cleanup:', err);
     });
   } catch (error) {
     console.error('Error starting application:', error);

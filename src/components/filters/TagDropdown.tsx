@@ -85,19 +85,19 @@ const TagDropdown: React.FC<TagDropdownProps> = ({ onFilterChange, selectedTags,
       
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10">
-          <div className="p-2">
+          <div className="p-2 relative">
             <input
               ref={inputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tags..."
+              placeholder="Search or create new tags..."
               className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-
+          
           <div className="max-h-60 overflow-y-auto">
-            {filteredTags.length > 0 ? (
+            {filteredTags.length > 0 && (
               filteredTags.map((tag) => (
                 <button
                   key={tag}
@@ -107,9 +107,11 @@ const TagDropdown: React.FC<TagDropdownProps> = ({ onFilterChange, selectedTags,
                   {tag}
                 </button>
               ))
-            ) : (
+            )}
+            
+            {filteredTags.length === 0 && !searchQuery && (
               <div className="px-4 py-2 text-sm text-gray-500">
-                {searchQuery ? "No matching tags found" : "No tags available"}
+                No tags available
               </div>
             )}
           </div>

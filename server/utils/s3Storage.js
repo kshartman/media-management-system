@@ -27,68 +27,40 @@ const isS3Configured = useS3Storage && s3Client && bucketName;
 // S3 folder path
 const s3FolderPath = 'dams';
 
-// Configure storage engine based on storage type
+// Configure storage engine to always store locally first
 const getStorage = () => {
-  // If S3 is enabled and configured, use S3 storage
-  if (isS3Configured) {
-    console.log(`Using S3 storage: bucket ${bucketName}/${s3FolderPath} in region ${process.env.AWS_REGION}`);
-    return multerS3({
-      s3: s3Client,
-      bucket: bucketName,
-      metadata: (req, file, cb) => {
-        cb(null, { fieldName: file.fieldname });
-      },
-      key: (req, file, cb) => {
-        // Sanitize the original filename to be safe for storage
-        const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const extension = path.extname(sanitizedName);
-        const baseName = path.basename(sanitizedName, extension);
+  // Always use local storage initially
+  console.log(isS3Configured ? 
+    'Using local storage first, then uploading to S3' :
+    'Using local file storage only');
+  
+  return multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(__dirname, '..', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      // Sanitize the original filename to be safe for storage
+      const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
 
-        // Use a timestamp prefix to help prevent collisions while preserving filename
-        const timestamp = Date.now();
-        const fileName = `${timestamp}-${sanitizedName}`;
+      // Use a timestamp prefix and a random string to guarantee uniqueness
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const fileName = `${timestamp}-${randomString}-${sanitizedName}`;
 
-        // Store in the dams folder
-        const fullPath = `${s3FolderPath}/${fileName}`;
+      // Store original filename in metadata for display
+      if (req.fileOriginalNames === undefined) {
+        req.fileOriginalNames = {};
+      }
+      req.fileOriginalNames[file.fieldname] = sanitizedName;
 
-        // Store original filename in metadata for display
-        if (req.fileOriginalNames === undefined) {
-          req.fileOriginalNames = {};
-        }
-        req.fileOriginalNames[file.fieldname] = sanitizedName;
-
-        cb(null, fullPath);
-      },
-    });
-  } else {
-    // Default to local storage
-    console.log('Using local file storage');
-    return multer.diskStorage({
-      destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '..', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-      },
-      filename: (req, file, cb) => {
-        // Sanitize the original filename to be safe for storage
-        const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-
-        // Use a timestamp prefix to help prevent collisions while preserving filename
-        const timestamp = Date.now();
-        const fileName = `${timestamp}-${sanitizedName}`;
-
-        // Store original filename in metadata for display
-        if (req.fileOriginalNames === undefined) {
-          req.fileOriginalNames = {};
-        }
-        req.fileOriginalNames[file.fieldname] = sanitizedName;
-
-        cb(null, fileName);
-      },
-    });
-  }
+      console.log(`Generating unique filename for upload: ${fileName}`);
+      cb(null, fileName);
+    },
+  });
 };
 
 // Get file URL (S3 or local)
@@ -250,7 +222,6 @@ const isFileOrphaned = async (fileUrl, Card) => {
       $or: [
         { preview: cleanFileUrl },
         { download: cleanFileUrl },
-        { documentCopy: cleanFileUrl },
         { movie: cleanFileUrl },
         { transcript: cleanFileUrl }
       ]
@@ -292,6 +263,93 @@ const safeDeleteOrphanedFile = async (fileUrl, Card) => {
   }
 };
 
+/**
+ * Uploads a local file to S3 and returns the S3, URL
+ * @param {string} localFilePath - Full path to the local file
+ * @param {string} customFilename - Optional custom filename to use in S3
+ * @returns {Promise<string|null>} - The S3 URL if successful, null if failed
+ */
+const uploadLocalFileToS3 = async (localFilePath, customFilename = null) => {
+  if (!isS3Configured || !localFilePath) return null;
+  
+  try {
+    console.log(`Uploading local file ${localFilePath} to S3...`);
+    
+    // Check if the file exists
+    if (!fs.existsSync(localFilePath)) {
+      console.error(`File ${localFilePath} does not exist`);
+      return null;
+    }
+    
+    // Read the file
+    const fileContent = fs.readFileSync(localFilePath);
+    const contentType = getContentTypeFromFilename(localFilePath);
+    
+    // Use custom filename or extract from path
+    let filename = customFilename || path.basename(localFilePath);
+    
+    // Ensure we have the S3 folder prefix
+    const s3Key = `${s3FolderPath}/${filename}`;
+    
+    // Create S3 upload parameters
+    const uploadParams = {
+      Bucket: bucketName,
+      Key: s3Key,
+      Body: fileContent,
+      ContentType: contentType
+    };
+    
+    // Upload to S3
+    console.log(`Uploading to S3: ${bucketName}/${s3Key} (${contentType})`);
+    const command = new PutObjectCommand(uploadParams);
+    await s3Client.send(command);
+    
+    // Return the S3 URL
+    if (s3CustomDomain) {
+      return `https://${s3CustomDomain}/${s3Key}`;
+    }
+    return `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+  } catch (error) {
+    console.error(`Error uploading ${localFilePath} to S3:`, error);
+    return null;
+  }
+};
+
+/**
+ * Determines content type based on file extension
+ * @param {string} filename - The filename to check
+ * @returns {string} - The content type
+ */
+const getContentTypeFromFilename = (filename) => {
+  const ext = path.extname(filename).toLowerCase();
+  
+  // Common content types
+  const contentTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.mp4': 'video/mp4',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    '.webm': 'video/webm',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.json': 'application/json',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+  };
+  
+  return contentTypes[ext] || 'application/octet-stream';
+};
+
 module.exports = {
   getStorage,
   getFileUrl,
@@ -301,4 +359,5 @@ module.exports = {
   isS3Configured,
   isFileOrphaned,
   safeDeleteOrphanedFile,
+  uploadLocalFileToS3,
 };

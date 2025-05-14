@@ -6,18 +6,20 @@ import { getAllTags } from '../../lib/api';
 
 interface CardFormProps {
   initialData?: CardProps;
+  initialCardType?: string;
   onSubmit: (formData: FormData) => Promise<void>;
   onCancel: () => void;
   availableTags?: string[];
 }
 
-const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, availableTags = [] }) => {
+const CardForm: React.FC<CardFormProps> = ({ initialData, initialCardType = 'image', onSubmit, onCancel, availableTags = [] }) => {
 
   // Card type is fixed and cannot be changed after creation
-  const type = initialData?.type || 'image';
+  const type = initialData?.type || initialCardType;
   const [description, setDescription] = useState(initialData?.description || '');
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
   const [newTag, setNewTag] = useState('');
+  // For handling date input with proper formatting
   const [date, setDate] = useState<string>(
     initialData?.fileMetadata?.date
       ? new Date(initialData.fileMetadata.date).toISOString().split('T')[0]
@@ -50,7 +52,7 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
     const typeSpecific = {
       image: ['download'],
       social: ['documentCopy'],
-      reel: ['movie', 'transcript'],
+      reel: ['movie'], // Transcript is now optional for reel cards
     };
 
     return [...common, ...typeSpecific[type]];
@@ -83,11 +85,12 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
 
-      // Check file size (max 50MB)
-      if (file.size > 50 * 1024 * 1024) {
+      // Check file size (max 500MB)
+      const maxSize = 500 * 1024 * 1024; // 500MB
+      if (file.size > maxSize) {
         setErrors(prev => ({
           ...prev,
-          [field]: 'File size exceeds 50MB limit'
+          [field]: 'File size exceeds 500MB limit'
         }));
         return;
       }
@@ -324,7 +327,7 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
             {field.includes('preview') || field.includes('download') ?
               'Supported formats: jpg, jpeg, png, gif, webp, svg' :
               field.includes('movie') || field.includes('video') ?
-                'Supported formats: mp4, mov, avi, webm' :
+                'Supported formats: mp4, mov, avi, webm (up to 500MB)' :
                 'Supported formats: pdf, txt, doc, docx, srt'
             }
           </small>
@@ -376,9 +379,9 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
       case 'reel':
         return (
           <>
-            {renderFileInput('preview', 'Thumbnail Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
+            {renderFileInput('preview', 'Thumbnail Image (auto-generated if not provided)', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
             {renderFileInput('movie', 'Video File', 'video/*,.mp4,.mov,.avi,.webm')}
-            {renderFileInput('transcript', 'Transcript', 'application/pdf,text/plain,.txt,.pdf,.srt')}
+            {renderFileInput('transcript', 'Transcript', 'application/pdf,text/plain,.txt,.pdf,.srt', true)}
           </>
         );
       default:
@@ -420,14 +423,46 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
           <label className="block text-sm font-medium mb-1" htmlFor="date">
             Date
           </label>
-          <input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full px-3 py-2 border rounded text-sm border-gray-300"
-          />
-          <p className="text-xs text-gray-500 mt-1">Date will be displayed in the metadata overlay</p>
+          <div className="relative">
+            <input
+              type="date"
+              id="date"
+              value={date}
+              onChange={(e) => {
+                // Process the input string
+                const inputVal = e.target.value;
+                
+                // Directly use the raw input when it's a complete date
+                if (/^\d{4}-\d{2}-\d{2}$/.test(inputVal)) {
+                  try {
+                    // Validate the date is within range
+                    const inputDate = new Date(inputVal);
+                    const year = inputDate.getFullYear();
+                    
+                    if (!isNaN(year) && year >= 1900 && year <= 2100) {
+                      setDate(inputVal);
+                    } else {
+                      // If year is out of range, keep existing value
+                      console.log(`Year ${year} out of range, keeping current value`);
+                    }
+                  } catch (err) {
+                    console.error("Error parsing date:", err);
+                  }
+                } else {
+                  // For partial inputs, let the browser handle it
+                  setDate(inputVal);
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              placeholder="YYYY-MM-DD"
+              // Limit date range
+              min="1900-01-01" 
+              max="2100-12-31"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Click to open date picker, or type in YYYY-MM-DD format
+          </p>
         </div>
         
         <div className="mb-4">
@@ -520,7 +555,7 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, av
                         );
                       })
                     ) : (
-                      <div className="px-3 py-2 text-sm text-gray-500">
+                      <div className="px-3 py-2 text-sm text-gray-500 hidden">
                         No matching tags. Type to create a new tag.
                       </div>
                     )}

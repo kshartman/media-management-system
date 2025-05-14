@@ -31,9 +31,19 @@ const cardSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.type === 'image'; } // Required for image type
   },
-  documentCopy: {
-    type: String,
-    required: function() { return this.type === 'social'; } // Required for social type
+  imageSequence: {
+    type: [String],
+    required: function() { return this.type === 'social'; }, // Required for social type
+    validate: {
+      validator: function(v) {
+        // For new social cards, require at least one image
+        // For existing social cards being updated, allow empty arrays
+        return this.type !== 'social' || 
+               (Array.isArray(v) && v.length > 0) || 
+               (this.isNew === false); // Skip validation for existing documents
+      },
+      message: props => 'At least one image is required in the image sequence for social cards'
+    }
   },
   movie: {
     type: String,
@@ -41,7 +51,7 @@ const cardSchema = new mongoose.Schema({
   },
   transcript: {
     type: String,
-    required: function() { return this.type === 'reel'; } // Required for reel type
+    // Transcript is now optional for reel cards
   },
   // File metadata
   fileMetadata: {
@@ -52,12 +62,15 @@ const cardSchema = new mongoose.Schema({
     width: Number,  // For images and videos
     height: Number, // For images and videos
     fileSize: Number, // In bytes
+    totalSequenceSize: Number, // Total size of all images in a sequence
+    imageSequenceCount: Number, // Number of images in the sequence
     originalFileName: String, // Store original filename for display
     previewOriginalFileName: String, // For preview images
     downloadOriginalFileName: String, // For downloadable files
-    documentCopyOriginalFileName: String, // For document copies (social cards)
     movieOriginalFileName: String, // For movie files (reel cards)
-    transcriptOriginalFileName: String // For transcript files (reel cards)
+    transcriptOriginalFileName: String, // For transcript files (reel and social cards)
+    imageSequenceOriginalFileNames: [String], // Original filenames for image sequence
+    imageSequenceFileSizes: [Number] // Sizes of each image in the sequence in bytes
   }
 }, { timestamps: true });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CardUploadModal from './CardUploadModal';
 import UserManagement from './UserManagement';
 import { createCard } from '../../lib/api';
@@ -8,21 +8,40 @@ import { createCard } from '../../lib/api';
 interface AdminBarProps {
   onCardCreated: () => void;
   availableTags?: string[];
+  selectedCardType?: string;
 }
 
-const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [] }) => {
+const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], selectedCardType = 'image' }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [currentCardType, setCurrentCardType] = useState(selectedCardType);
+  
+  // Update currentCardType when selectedCardType prop changes
+  useEffect(() => {
+    console.log('selectedCardType changed in AdminBar:', selectedCardType);
+    setCurrentCardType(selectedCardType);
+  }, [selectedCardType]);
 
   const handleCreateCard = async (formData: FormData) => {
     try {
+      console.log('Creating card with selectedCardType:', selectedCardType);
+      
+      // Social card validation - check if we have image sequence files
+      if (selectedCardType === 'social') {
+        const sequenceCount = formData.get('imageSequenceCount');
+        if (!sequenceCount || parseInt(sequenceCount as string, 10) <= 0) {
+          throw new Error('At least one image is required for social cards');
+        }
+      }
+      
       await createCard(formData);
       setIsModalOpen(false);
       // Notify parent to refresh cards
       onCardCreated();
     } catch (error) {
       console.error('Error creating card:', error);
-      alert('Error creating card: ' + (error as Error).message);
+      // Don't show alert - we'll handle errors in the modal
+      // Just propagate the error to the form component
       throw error;
     }
   };
@@ -31,7 +50,12 @@ const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [] }
     <div className="flex gap-2">
       {/* Add Card Button */}
       <button
-        onClick={() => setIsModalOpen(true)}
+        onClick={() => {
+          // Update current card type from selected type prop when opening modal
+          setCurrentCardType(selectedCardType);
+          console.log('Opening modal with card type:', selectedCardType);
+          setIsModalOpen(true);
+        }}
         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -54,9 +78,14 @@ const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [] }
       {/* Modals */}
       <CardUploadModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          // Ensure all form submit events are cleared when closing the modal
+          document.dispatchEvent(new Event('form-submit-end'));
+          setIsModalOpen(false);
+        }}
         onSubmit={handleCreateCard}
         availableTags={availableTags}
+        initialCardType={currentCardType}
       />
 
       <UserManagement

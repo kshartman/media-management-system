@@ -16,12 +16,20 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   type,
   preview,
   download,
-  documentCopy,
   movie,
   transcript,
+  imageSequence,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Helper function to extract file extension from URL
+  const getExtensionFromUrl = (url: string): string => {
+    if (!url) return '';
+    const filename = url.split('/').pop() || '';
+    const extension = filename.includes('.') ? filename.substring(filename.lastIndexOf('.')) : '';
+    return extension || '.jpg'; // Default to .jpg if no extension found
+  };
+  
   // Function to fetch a file and return it as an ArrayBuffer
   const fetchFileAsArrayBuffer = async (url: string): Promise<{ data: ArrayBuffer, filename: string }> => {
     if (!url) {
@@ -85,14 +93,19 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
     if (isDownloading) return;
 
     console.log('Starting ZIP download process for card type:', type);
-    console.log('Files available:', {
-      preview,
-      download,
-      documentCopy,
-      movie,
-      transcript,
-      fileMetadata
-    });
+    try {
+      console.log('Files available:', {
+        preview,
+        download,
+        movie,
+        transcript,
+        imageSequence: imageSequence || [],
+        fileMetadata
+      });
+    } catch (error) {
+      console.error('Error logging files:', error);
+      // Continue with download even if logging fails
+    }
 
     setIsDownloading(true);
 
@@ -121,12 +134,31 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
         }
       }
       else if (type === 'social') {
-        if (documentCopy) {
-          const docName = fileMetadata?.documentCopyOriginalFileName || documentCopy.split('/').pop() || 'document.pdf';
-          files.push({ url: documentCopy, name: docName });
+        // Include all image sequence files with original filenames when available
+        if (imageSequence && Array.isArray(imageSequence) && imageSequence.length > 0) {
+          const originalFilenames = fileMetadata?.imageSequenceOriginalFileNames || [];
+          
+          for (let i = 0; i < imageSequence.length; i++) {
+            const imageUrl = imageSequence[i];
+            if (!imageUrl) continue;
+            
+            // Use original filename if available, otherwise fallback to URL basename or generated name
+            const imageName = originalFilenames[i] || 
+                            imageUrl.split('/').pop() || 
+                            `image-${i+1}${getExtensionFromUrl(imageUrl)}`;
+            
+            files.push({ url: imageUrl, name: imageName });
+          }
         }
-        // Only include preview if it exists
-        if (preview) {
+        
+        // Include transcript if it exists
+        if (transcript) {
+          const transcriptName = fileMetadata?.transcriptOriginalFileName || transcript.split('/').pop() || 'transcript.txt';
+          files.push({ url: transcript, name: transcriptName });
+        }
+        
+        // Include preview if it exists and is not already in the image sequence
+        if (preview && (!imageSequence || !imageSequence.includes(preview))) {
           const previewName = fileMetadata?.previewOriginalFileName || preview.split('/').pop() || 'preview.jpg';
           files.push({ url: preview, name: previewName });
         }
@@ -260,8 +292,13 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
               </svg>
             </button>
             <button 
-              onClick={() => onDelete && onDelete(id)}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+                  onDelete && onDelete(id);
+                }
+              }}
               className="text-red-600 hover:text-red-800"
+              title="Delete item"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />

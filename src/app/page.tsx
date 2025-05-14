@@ -66,6 +66,36 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   
   // Fetch cards and tags from the API when the component mounts
+  // Event handler for image drop on social cards
+  useEffect(() => {
+    const handleImageDrop = (event: CustomEvent) => {
+      const { cardId, files } = event.detail;
+      if (!cardId || !files || !files.length) return;
+      
+      // Find the card to edit
+      const cardToEdit = cards.find(card => card.id === cardId);
+      if (!cardToEdit || cardToEdit.type !== 'social') return;
+
+      // Set as current edit card and open modal
+      setCurrentEditCard({...cardToEdit});
+      
+      // Store the actual File objects in a global variable for the MultiImageUploader to access
+      // This is necessary because we can't serialize File objects to sessionStorage
+      window.droppedFiles = files;
+      
+      // Open edit modal
+      setShowEditModal(true);
+    };
+
+    // Add event listener
+    document.addEventListener('socialcard:imagedrop', handleImageDrop as EventListener);
+    
+    // Remove event listener on cleanup
+    return () => {
+      document.removeEventListener('socialcard:imagedrop', handleImageDrop as EventListener);
+    };
+  }, [cards]);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -259,14 +289,49 @@ export default function Home() {
 
   const handleDeleteCard = async (id: string) => {
     try {
-      await deleteCard(id);
-      // Remove card from state after successful deletion
+      const cardToDelete = cards.find(card => card.id === id);
+      if (!cardToDelete) {
+        throw new Error('Card not found');
+      }
+      
+      // First update the UI - optimistic update
       const updatedCards = cards.filter(card => card.id !== id);
       setCards(updatedCards);
-      setFilteredCards(updatedCards);
+      
+      // Apply filters to the updated list
+      const updatedFilteredCards = applyFiltersAndSort(
+        updatedCards,
+        selectedTypes,
+        selectedTags,
+        currentSort,
+        searchTerm
+      );
+      setFilteredCards(updatedFilteredCards);
+      
+      // Then attempt the actual deletion
+      try {
+        await deleteCard(id);
+        console.log(`Card ${id} successfully deleted`);
+      } catch (apiError) {
+        console.error('Error deleting card:', apiError);
+        
+        // If the deletion failed, revert UI changes
+        setCards(cards);
+        const revertedFilteredCards = applyFiltersAndSort(
+          cards,
+          selectedTypes,
+          selectedTags,
+          currentSort,
+          searchTerm
+        );
+        setFilteredCards(revertedFilteredCards);
+        
+        // Show error to user
+        alert('Failed to delete card. Please try again.');
+      }
     } catch (error) {
-      console.error('Error deleting card:', error);
-      alert('Failed to delete card. Please try again.');
+      console.error('Error in delete handler:', error);
+      alert('An error occurred while trying to delete the card.');
     }
   };
 
@@ -361,7 +426,9 @@ export default function Home() {
                 <AdminBar
                   onCardCreated={handleCardCreated}
                   availableTags={availableTags}
+                  selectedCardType={selectedTypes[0] || 'image'}
                 />
+                {console.log('Selected types in App:', selectedTypes)}
               </div>
             )}
             <TypeDropdown

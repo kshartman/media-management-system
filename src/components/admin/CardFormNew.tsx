@@ -3,36 +3,134 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CardProps } from '../../types';
 import { getAllTags } from '../../lib/api';
+import MultiImageUploader from './MultiImageUploader';
+
 
 interface CardFormProps {
   initialData?: CardProps;
+  initialCardType?: string;
   onSubmit: (formData: FormData) => Promise<void>;
   onCancel: () => void;
   availableTags?: string[];
+  isSubmitting?: boolean;
 }
 
-const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel, availableTags = [] }) => {
+const CardFormNew: React.FC<CardFormProps> = ({ 
+  initialData, 
+  initialCardType = 'image', 
+  onSubmit, 
+  onCancel, 
+  availableTags = [],
+  isSubmitting = false 
+}) => {
 
   // Card type is fixed and cannot be changed after creation
-  const type = initialData?.type || 'image';
+  const type = initialData?.type || initialCardType;
+  console.log('CardFormNew initialized with type:', type, 'initialCardType:', initialCardType);
   const [description, setDescription] = useState(initialData?.description || '');
-  const [date, setDate] = useState<string>(
-    initialData?.fileMetadata?.date
-      ? new Date(initialData.fileMetadata.date).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0]
-  );
+  
+  // For handling date input with proper formatting
+  // Format initial date in MM/DD/YYYY format
+  const formatDateMMDDYYYY = (dateStr: string | Date): string => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return ''; // Invalid date
+    }
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  };
+
+  // Initial date value formatted as MM/DD/YYYY
+  const initialFormattedDate = initialData?.fileMetadata?.date
+    ? formatDateMMDDYYYY(initialData.fileMetadata.date)
+    : formatDateMMDDYYYY(new Date());
+
+  const [date, setDate] = useState<string>(initialFormattedDate);
+  // Track if date has been modified to handle Enter key behavior
+  const [isDateModified, setIsDateModified] = useState<boolean>(false);
+  
+  // Helper to reset date to today's date
+  const resetToToday = () => {
+    setDate(formatDateMMDDYYYY(new Date()));
+    setIsDateModified(false);
+  };
+  
+  // Helper to parse and format date input
+  const parseAndFormatDate = (inputDate: string): string => {
+    try {
+      // Handle various date formats (MM/DD/YYYY, YYYY-MM-DD, MM-DD-YYYY, etc.)
+      const rawInput = inputDate.trim();
+      
+      // Direct 4-digit year input - handle specially
+      if (/^\d{4}$/.test(rawInput)) {
+        const year = parseInt(rawInput, 10);
+        if (year >= 1900 && year <= 2100) {
+          // Use current month and day with specified year
+          const today = new Date();
+          const month = today.getMonth() + 1;
+          const day = today.getDate();
+          return `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}/${year}`;
+        } else {
+          // Invalid year, return today's date
+          return formatDateMMDDYYYY(new Date());
+        }
+      }
+      
+      // Try to parse various formats
+      let dateObj;
+      
+      // Check if it already matches our target format (MM/DD/YYYY)
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(rawInput)) {
+        const [month, day, year] = rawInput.split('/').map(part => parseInt(part, 10));
+        dateObj = new Date(year, month - 1, day);
+      }
+      // ISO format (YYYY-MM-DD)
+      else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(rawInput)) {
+        dateObj = new Date(rawInput);
+      }
+      // MM-DD-YYYY
+      else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(rawInput)) {
+        const [month, day, year] = rawInput.split('-').map(part => parseInt(part, 10));
+        dateObj = new Date(year, month - 1, day);
+      }
+      // All other formats - try JavaScript Date parsing
+      else {
+        dateObj = new Date(rawInput);
+      }
+      
+      // Validate the parsed date
+      if (!isNaN(dateObj.getTime())) {
+        const year = dateObj.getFullYear();
+        // Validate year range
+        if (year >= 1900 && year <= 2100) {
+          // Format as MM/DD/YYYY
+          const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+          const day = dateObj.getDate().toString().padStart(2, '0');
+          return `${month}/${day}/${year}`;
+        }
+      }
+      
+      // If all validation fails, return today's date
+      return formatDateMMDDYYYY(new Date());
+    } catch (error) {
+      console.error("Error parsing date:", error);
+      // If parsing fails, return today's date
+      return formatDateMMDDYYYY(new Date());
+    }
+  };
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
   const [newTag, setNewTag] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File | null | boolean>>({
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File | null | boolean | File[]>>({
     preview: null,
     download: null,
-    documentCopy: null,
     movie: null,
     transcript: null,
     remove_preview: false,
+    imageSequence: [],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // For tag autocomplete
   const [allAvailableTags, setAllAvailableTags] = useState<string[]>(availableTags);
@@ -47,6 +145,9 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
     const saveButton = document.getElementById('modal-submit-button');
     const handleSaveClick = () => {
       if (formRef.current) {
+        // If form is already submitting, don't trigger another submission
+        if (isSubmitting) return;
+        
         // Trigger form submission
         const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
         formRef.current.dispatchEvent(submitEvent);
@@ -59,7 +160,7 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
         saveButton.removeEventListener('click', handleSaveClick);
       };
     }
-  }, []);
+  }, [isSubmitting]);
 
   // Fetch available tags if not provided
   useEffect(() => {
@@ -110,8 +211,8 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
     const common = ['description'];
     const typeSpecific = {
       image: ['download'],
-      social: ['documentCopy'],
-      reel: ['movie', 'transcript'],
+      social: ['imageSequence'], // Now requires imageSequence instead of documentCopy
+      reel: ['movie'], // Transcript is now optional for reel cards
     };
 
     return [...common, ...typeSpecific[type]];
@@ -131,8 +232,24 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
     
     // Validate required files based on card type
     requiredFields.forEach(field => {
-      if (field !== 'description' && !uploadedFiles[field] && !initialData?.[field as keyof CardProps]) {
-        newErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+      if (field !== 'description') {
+        if (field === 'imageSequence') {
+          // For imageSequence, check if the array is empty
+          const sequenceFiles = uploadedFiles[field] as File[];
+          if (!sequenceFiles || sequenceFiles.length === 0) {
+            // New card - always require at least one image
+            if (!initialData) {
+              newErrors[field] = 'At least one image in the sequence is required';
+            } 
+            // Editing existing card - only show error if there are no images
+            else if (!initialData?.imageSequence || initialData.imageSequence.length === 0) {
+              newErrors[field] = 'At least one image in the sequence is required';
+            }
+            // If we're editing a card that already has images, allow submission without new images
+          }
+        } else if (!uploadedFiles[field] && !initialData?.[field as keyof CardProps]) {
+          newErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+        }
       }
     });
     
@@ -144,11 +261,12 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
 
-      // Check file size (max 50MB)
-      if (file.size > 50 * 1024 * 1024) {
+      // Check file size (max 500MB)
+      const maxSize = 500 * 1024 * 1024; // 500MB
+      if (file.size > maxSize) {
         setErrors(prev => ({
           ...prev,
-          [field]: 'File size exceeds 50MB limit'
+          [field]: 'File size exceeds 500MB limit'
         }));
         return;
       }
@@ -228,19 +346,46 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
+    // Double-check submission state to prevent multiple submissions
+    if (!validateForm() || isSubmitting) {
+      console.log('Form validation failed or already submitting, aborting submission');
       return;
     }
 
-    setIsSubmitting(true);
     // Dispatch event for the modal to show loading state
+    console.log('Starting form submission, dispatching form-submit-start event');
     document.dispatchEvent(new Event('form-submit-start'));
 
     try {
       const formData = new FormData();
+      console.log('Submitting form with type:', type);
       formData.append('type', type);
       formData.append('description', description);
-      formData.append('date', date);
+      
+      // Convert MM/DD/YYYY to YYYY-MM-DD for server storage
+      try {
+        if (date) {
+          const parts = date.split('/');
+          if (parts.length === 3) {
+            const month = parts[0].padStart(2, '0');
+            const day = parts[1].padStart(2, '0');
+            const year = parts[2];
+            // Store as YYYY-MM-DD for the server
+            formData.append('date', `${year}-${month}-${day}`);
+          } else {
+            // Fallback if date is not in expected format
+            formData.append('date', new Date().toISOString().split('T')[0]);
+          }
+        } else {
+          // No date provided, use today
+          formData.append('date', new Date().toISOString().split('T')[0]);
+        }
+      } catch (error) {
+        console.error("Error formatting date for submission:", error);
+        // Fallback to today's date
+        formData.append('date', new Date().toISOString().split('T')[0]);
+      }
+      
       formData.append('tags', tags.join(','));
 
       // Append files and removal flags
@@ -252,6 +397,14 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
           const actualField = field.replace('remove_', '');
           console.log(`Adding remove flag for ${actualField}`);
           formData.append(`remove_${actualField}`, 'true');
+        } else if (field === 'imageSequence' && Array.isArray(value)) {
+          // Handle image sequence files
+          console.log(`Appending ${value.length} files for image sequence`);
+          value.forEach((file, index) => {
+            formData.append(`imageSequence_${index}`, file);
+          });
+          // Add the count so the server knows how many files to process
+          formData.append('imageSequenceCount', value.length.toString());
         } else if (value instanceof File) {
           console.log(`Appending file for ${field}`);
           formData.append(field, value);
@@ -261,14 +414,31 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
       await onSubmit(formData);
     } catch (error) {
       console.error('Error submitting form:', error);
+      
+      // Get the error message from the error
+      let errorMessage = 'An error occurred while saving. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       setErrors(prev => ({
         ...prev,
-        form: 'An error occurred while saving. Please try again.',
+        form: errorMessage,
       }));
-    } finally {
-      setIsSubmitting(false);
-      // Dispatch event for the modal to hide loading state
+      
+      // Dispatch event for the modal to handle the error
+      const errorEvent = new CustomEvent('form-submit-error', { 
+        detail: errorMessage 
+      });
+      document.dispatchEvent(errorEvent);
+      
+      // Also dispatch the normal end event to hide loading state
       document.dispatchEvent(new Event('form-submit-end'));
+    } finally {
+      // This ensures the loading state is always cleared
+      setTimeout(() => {
+        document.dispatchEvent(new Event('form-submit-end'));
+      }, 500);
     }
   };
 
@@ -340,8 +510,9 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
           <div className="flex items-center">
             <button
               type="button"
-              onClick={handleFileInputClick(fileInputId)}
-              className="px-4 py-2 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center gap-2"
+              onClick={isSubmitting ? undefined : handleFileInputClick(fileInputId)}
+              className={`px-4 py-2 bg-blue-50 border border-blue-200 rounded flex items-center gap-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-100 transition-colors'}`}
+              disabled={isSubmitting}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -356,9 +527,10 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                 </span>
                 <button
                   type="button"
-                  onClick={handleRemoveFile(field)}
-                  className="text-red-500 hover:text-red-700"
+                  onClick={isSubmitting ? undefined : handleRemoveFile(field)}
+                  className={`text-red-500 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-700'}`}
                   title="Remove file"
+                  disabled={isSubmitting}
                 >
                   ✕
                 </button>
@@ -415,8 +587,10 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
             {field.includes('preview') || field.includes('download') ?
               'Supported formats: jpg, jpeg, png, gif, webp, svg' :
               field.includes('movie') || field.includes('video') ?
-                'Supported formats: mp4, mov, avi, webm' :
-                'Supported formats: pdf, txt, doc, docx, srt'
+                'Supported formats: mp4, mov, avi, webm (up to 500MB)' :
+                field === 'transcript' ?
+                  'Supported formats: txt, srt, pdf, docx, Pages, Google Docs - For transcriptions, subtitles, or dialogue text' :
+                  'Supported formats: pdf, txt, doc, docx, srt'
             }
           </small>
         </div>
@@ -441,16 +615,38 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
       case 'social':
         return (
           <>
-            {renderFileInput('preview', 'Preview Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
-            {renderFileInput('documentCopy', 'Document Copy', 'application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,.pdf,.doc,.docx')}
+            {renderFileInput('preview', 'Preview Image (optional)', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
+            <MultiImageUploader 
+              onChange={(files) => {
+                setUploadedFiles(prev => ({
+                  ...prev,
+                  imageSequence: files
+                }));
+                // Clear any errors
+                if (errors.imageSequence) {
+                  setErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.imageSequence;
+                    return newErrors;
+                  });
+                }
+              }}
+              isSubmitting={isSubmitting}
+            />
+            {errors.imageSequence && (
+              <div className="mt-1 text-sm text-red-500">
+                {errors.imageSequence}
+              </div>
+            )}
+            {renderFileInput('transcript', 'Transcript/Subtitles (optional)', 'application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.apple.pages,application/vnd.google-apps.document,.txt,.pdf,.srt,.docx,.pages,.gdoc', true)}
           </>
         );
       case 'reel':
         return (
           <>
-            {renderFileInput('preview', 'Thumbnail Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
+            {renderFileInput('preview', 'Thumbnail Image (auto-generated if not provided)', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
             {renderFileInput('movie', 'Video File', 'video/*,.mp4,.mov,.avi,.webm')}
-            {renderFileInput('transcript', 'Transcript', 'application/pdf,text/plain,.txt,.pdf,.srt')}
+            {renderFileInput('transcript', 'Transcript', 'application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.apple.pages,application/vnd.google-apps.document,.txt,.pdf,.srt,.docx,.pages,.gdoc', true)}
           </>
         );
       default:
@@ -471,7 +667,9 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
           <div className="mb-4">
             <h3 className="text-base font-medium mb-2">Card Type</h3>
             <div className="flex gap-4">
-              <div className="text-gray-700 py-1">Image</div>
+              <div className="text-gray-700 py-1">
+                {type === 'image' ? 'Image' : type === 'social' ? 'Social' : 'Reel'}
+              </div>
             </div>
             <p className="text-xs text-gray-500 mt-1">Card type is fixed and cannot be changed after creation</p>
           </div>
@@ -495,8 +693,9 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className={`w-full px-3 py-2 border rounded text-sm ${errors.description ? 'border-red-500' : 'border-gray-300'}`}
+            className={`w-full px-3 py-2 border rounded text-sm ${errors.description ? 'border-red-500' : 'border-gray-300'} ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
             rows={3}
+            disabled={isSubmitting}
           />
           {errors.description && (
             <div className="mt-1 text-sm text-red-500">
@@ -510,12 +709,47 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
             Date
           </label>
           <input
-            type="date"
+            type="text"
             id="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+            onChange={(e) => {
+              // Store raw input
+              setDate(e.target.value);
+              // Mark date as modified for Enter key handling
+              setIsDateModified(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent form submission
+                
+                if (isDateModified) {
+                  // Parse and format the date
+                  const formattedDate = parseAndFormatDate(date);
+                  setDate(formattedDate);
+                  setIsDateModified(false);
+                } else {
+                  // If date hasn't been modified, submit the form
+                  formRef.current?.dispatchEvent(
+                    new Event('submit', { cancelable: true, bubbles: true })
+                  );
+                }
+              }
+            }}
+            onBlur={() => {
+              // On blur, parse the date and reformat if valid
+              if (isDateModified) {
+                const formattedDate = parseAndFormatDate(date);
+                setDate(formattedDate);
+                setIsDateModified(false);
+              }
+            }}
+            className={`w-full px-3 py-2 border border-gray-300 rounded text-sm ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={isSubmitting}
+            placeholder="MM/DD/YYYY"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter Date MM/DD/YYYY
+          </p>
         </div>
         
         <div className="mb-4">
@@ -530,7 +764,8 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                     value={newTag}
                     onChange={handleTagInput}
                     placeholder="Type to search or add a new tag"
-                    className="w-full mr-2 px-3 py-2 pr-10 border border-gray-300 rounded text-sm"
+                    className={`w-full mr-2 px-3 py-2 pr-10 border border-gray-300 rounded text-sm ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    disabled={isSubmitting}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -570,13 +805,16 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                   <button
                     type="button"
                     onClick={() => {
-                      setIsTagsDropdownOpen(!isTagsDropdownOpen);
-                      if (tagInputRef.current) {
-                        tagInputRef.current.focus();
+                      if (!isSubmitting) {
+                        setIsTagsDropdownOpen(!isTagsDropdownOpen);
+                        if (tagInputRef.current) {
+                          tagInputRef.current.focus();
+                        }
                       }
                     }}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 p-1 rounded ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:text-gray-600 hover:bg-gray-100'}`}
                     aria-label={isTagsDropdownOpen ? "Close tag options" : "Show tag options"}
+                    disabled={isSubmitting}
                   >
                     <svg 
                       xmlns="http://www.w3.org/2000/svg" 
@@ -635,9 +873,16 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                           );
                         })
                       ) : (
-                        <div className="px-3 py-2 text-sm text-gray-500">
-                          No matching tags. Type to create a new tag.
-                        </div>
+                        newTag.length > 0 ? (
+                          <div className="px-3 py-2 text-sm flex">
+                            <span className="text-blue-600 font-medium">{newTag}</span>
+                            <span className="text-gray-500 ml-1">(Press Enter to add)</span>
+                          </div>
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            No matching tags found
+                          </div>
+                        )
                       )}
                     </div>
                   )}
@@ -659,7 +904,8 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                     handleTagAdd();
                   }
                 }}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm whitespace-nowrap"
+                className={`px-3 py-2 bg-blue-600 text-white rounded text-sm whitespace-nowrap ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                disabled={isSubmitting}
               >
                 Add Tag
               </button>
@@ -675,8 +921,9 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
                 {tag}
                 <button
                   type="button"
-                  onClick={() => handleTagDelete(tag)}
-                  className="ml-1.5 text-blue-600 hover:text-blue-800"
+                  onClick={() => !isSubmitting && handleTagDelete(tag)}
+                  className={`ml-1.5 text-blue-600 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:text-blue-800'}`}
+                  disabled={isSubmitting}
                 >
                   &times;
                 </button>
@@ -701,14 +948,15 @@ const CardFormNew: React.FC<CardFormProps> = ({ initialData, onSubmit, onCancel,
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+            disabled={isSubmitting}
+            className={`px-4 py-2 border border-gray-300 text-gray-700 rounded ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+            className={`px-4 py-2 bg-blue-600 text-white rounded ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
           >
             {isSubmitting ? 'Saving...' : (initialData ? 'Update' : 'Create')}
           </button>

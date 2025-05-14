@@ -22,7 +22,6 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
     headers,
   };
 
-
   try {
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...config,
@@ -35,8 +34,26 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
       throw new Error(`API Error: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
+    // For DELETE requests that return 204 No Content, don't try to parse JSON
+    if (options.method === 'DELETE' && response.status === 204) {
+      return;
+    }
+
+    // For all other responses, try to parse JSON
+    try {
+      const data = await response.json();
+      return data;
+    } catch (jsonError) {
+      // If JSON parsing fails, it might be an empty response
+      if (response.status === 200 || response.status === 201 || response.status === 202) {
+        // Successful response but no JSON content
+        return {};
+      }
+      
+      // If it's an actual error, throw it
+      console.error(`JSON parsing error for ${endpoint}:`, jsonError);
+      throw new Error('Invalid response format from server');
+    }
   } catch (error) {
     console.error(`API Error for ${endpoint}:`, error);
     // Add more detailed error information for debugging
@@ -179,7 +196,14 @@ export const updateCard = async (id: string, cardData: FormData): Promise<CardPr
 };
 
 export const deleteCard = async (id: string): Promise<void> => {
-  return request(`/cards/${id}`, { method: 'DELETE' });
+  try {
+    return await request(`/cards/${id}`, { method: 'DELETE' });
+  } catch (error) {
+    console.error(`Error deleting card ${id}:`, error);
+    
+    // Rethrow the error so it can be handled by the caller
+    throw new Error('Failed to delete card. Please try again.');
+  }
 };
 
 export const login = async (credentials: { username: string; password: string }): Promise<{ token: string; user: { id: string; username: string; role: string } }> => {

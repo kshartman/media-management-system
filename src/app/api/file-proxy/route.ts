@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '../route.config';
+
+export { config };
 
 /**
  * Proxies requests to S3 or other file storage to avoid CORS issues

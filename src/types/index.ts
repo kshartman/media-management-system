@@ -3,12 +3,14 @@ export interface FileMetadata {
   width?: number;
   height?: number;
   fileSize?: number;
+  totalSequenceSize?: number; // Total size of all files in an image sequence
   originalFileName?: string;
   previewOriginalFileName?: string;
   downloadOriginalFileName?: string;
-  documentCopyOriginalFileName?: string;
   movieOriginalFileName?: string;
-  transcriptOriginalFileName?: string;
+  transcriptOriginalFileName?: string; // For transcript files in both reel and social cards
+  imageSequenceOriginalFileNames?: string[]; // Array of original filenames for image sequence
+  imageSequenceFileSizes?: number[]; // Array of file sizes for each image in the sequence
 }
 
 export interface BaseCardProps {
@@ -23,9 +25,9 @@ export interface BaseCardProps {
   // Add properties needed for download all functionality
   preview?: string;
   download?: string;
-  documentCopy?: string;
   movie?: string;
   transcript?: string;
+  imageSequence?: string[];
 }
 
 export interface ImageCardProps extends BaseCardProps {
@@ -37,7 +39,8 @@ export interface ImageCardProps extends BaseCardProps {
 export interface SocialCardProps extends BaseCardProps {
   type: "social";
   preview?: string;
-  documentCopy: string;
+  imageSequence: string[]; // Array of image URLs 
+  transcript?: string; // Optional transcript
 }
 
 export interface ReelCardProps extends BaseCardProps {

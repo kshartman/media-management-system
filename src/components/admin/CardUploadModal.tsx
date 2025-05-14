@@ -10,6 +10,7 @@ interface CardUploadModalProps {
   onSubmit: (formData: FormData) => Promise<void>;
   initialData?: CardProps;
   availableTags?: string[];
+  initialCardType?: string;
 }
 
 const CardUploadModal: React.FC<CardUploadModalProps> = ({
@@ -18,22 +19,47 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
   onSubmit,
   initialData,
   availableTags = [],
+  initialCardType = 'image',
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Reset states whenever the modal opens or closes
+  useEffect(() => {
+    // If modal is opening, make sure we clear states
+    if (isOpen) {
+      setIsSubmitting(false);
+      setFormError(null);
+    }
+  }, [isOpen]);
 
   // Monitor form submission status
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleSubmitStart = () => setIsSubmitting(true);
-    const handleSubmitEnd = () => setIsSubmitting(false);
+    const handleSubmitStart = () => {
+      setIsSubmitting(true);
+      setFormError(null); // Clear previous errors when starting submission
+    };
+    
+    const handleSubmitEnd = () => {
+      setIsSubmitting(false);
+    };
+
+    const handleSubmitError = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setFormError(customEvent.detail);
+      setIsSubmitting(false);
+    };
 
     document.addEventListener('form-submit-start', handleSubmitStart);
     document.addEventListener('form-submit-end', handleSubmitEnd);
+    document.addEventListener('form-submit-error', handleSubmitError);
 
     return () => {
       document.removeEventListener('form-submit-start', handleSubmitStart);
       document.removeEventListener('form-submit-end', handleSubmitEnd);
+      document.removeEventListener('form-submit-error', handleSubmitError);
     };
   }, [isOpen]);
 
@@ -58,20 +84,49 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-auto" style={{ backdropFilter: 'blur(2px)' }}>
+      {/* Backdrop for closing modal */}
       <div
         className="fixed inset-0 bg-black bg-opacity-30"
-        onClick={onClose}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
+        onClick={isSubmitting ? undefined : onClose}
+        role={isSubmitting ? undefined : "button"}
+        tabIndex={isSubmitting ? undefined : 0}
+        onKeyDown={isSubmitting ? undefined : (e) => {
           if (e.key === 'Enter' || e.key === 'Escape') {
             onClose();
           }
         }}
-        aria-label="Close modal"
+        aria-label={isSubmitting ? undefined : "Close modal"}
       ></div>
+      
+      {/* Loading overlay - appears when submitting */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[60] bg-white bg-opacity-70 flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
+          <p className="text-gray-800 text-lg font-semibold">Saving card...</p>
+          <p className="text-gray-600 mt-2">This may take several seconds for video uploads.</p>
+        </div>
+      )}
+
       <div className="relative mx-auto mt-16 mb-16 max-w-3xl">
         <div className="bg-white rounded-lg shadow-2xl border border-gray-200">
+          {/* Show error message if there is one */}
+          {formError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-t-lg relative" role="alert">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{formError}</span>
+              <span className="absolute top-0 bottom-0 right-0 px-4 py-3">
+                <button 
+                  onClick={() => setFormError(null)} 
+                  className="text-red-600 hover:text-red-800"
+                  aria-label="Close error message"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 8.586L6.707 5.293a1 1 0 00-1.414 1.414L8.586 10l-3.293 3.293a1 1 0 101.414 1.414L10 11.414l3.293 3.293a1 1 0 001.414-1.414L11.414 10l3.293-3.293a1 1 0 00-1.414-1.414L10 8.586z" clipRule="evenodd"/>
+                  </svg>
+                </button>
+              </span>
+            </div>
+          )}
           <div className="sticky top-0 z-50 bg-white px-6 py-4 border-b flex justify-between items-center rounded-t-lg">
             <h3 className="text-xl font-semibold text-gray-900">
               {initialData ? 'Edit Card' : 'Upload New Card'}
@@ -149,9 +204,11 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
             <CardFormNew
               key={initialData?.id || 'new'} // Using key to force recreation when card changes
               initialData={initialData}
+              initialCardType={initialCardType}
               onSubmit={onSubmit}
               onCancel={onClose}
               availableTags={availableTags}
+              isSubmitting={isSubmitting}
             />
           </div>
         </div>
