@@ -174,6 +174,19 @@ const CardGrid: React.FC<CardGridProps> = ({
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       )}
+      
+      {!loading && !hasMore && cards.length > 0 && (
+        <div className="text-center text-gray-500 mt-8 mb-4 text-sm">
+          All cards loaded
+        </div>
+      )}
+      
+      {!loading && cards.length === 0 && (
+        <div className="text-center text-gray-500 mt-8 p-8">
+          <p className="text-lg">No cards found matching your filters.</p>
+          <p className="text-sm mt-2">Try changing your filter settings or search criteria.</p>
+        </div>
+      )}
     </div>
   );
 };

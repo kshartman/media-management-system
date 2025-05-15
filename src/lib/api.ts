@@ -4,7 +4,7 @@ import { CardProps } from '../types';
 
 // Use the API proxy through Next.js rewrites
 const API_URL = '/api';
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 12; // Standard page size - we'll use pagination for more
 
 // Helper function for API requests
 const request = async (endpoint: string, options: RequestInit = {}) => {
@@ -68,13 +68,14 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
 // API functions
 export const fetchCards = async (
   page = 1,
-  filters = { type: [], tags: [], search: '' }
+  filters = { type: [], tags: [], search: '' },
+  limit = PAGE_SIZE
 ): Promise<{ cards: CardProps[]; availableTags: string[]; totalCount: number }> => {
   console.log('fetchCards: Called with filters:', filters);
   
   const queryParams = new URLSearchParams();
   queryParams.append('page', page.toString());
-  queryParams.append('limit', PAGE_SIZE.toString());
+  queryParams.append('limit', limit.toString());
 
   if (filters.search) {
     queryParams.append('search', filters.search);

@@ -72,6 +72,7 @@ export default function Home() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastEditedCardId, setLastEditedCardId] = useState<string | null>(null);
+  const [totalCardCount, setTotalCardCount] = useState<number>(0);
   
   // Fetch cards and tags from the API when the component mounts
   // Event handler for image drop on social cards
@@ -115,12 +116,17 @@ export default function Home() {
       try {
         setLoading(true);
 
-        // Load cards and tags concurrently
+        // Load cards and tags concurrently - using standard pagination
         const [cardsResponse, tagsResponse] = await Promise.all([
           fetchCards(1, { type: [], tags: [], search: '' }),
           getAllTags()
         ]);
-
+        
+        // Log total count vs received cards
+        console.log(`Total cards in database: ${cardsResponse.totalCount}, Retrieved: ${cardsResponse.cards.length} (Page 1)`);
+        
+        // Save the total count for display
+        setTotalCardCount(cardsResponse.totalCount);
         setCards(cardsResponse.cards);
         setAvailableTags(tagsResponse);
 
@@ -279,7 +285,7 @@ export default function Home() {
       
       console.log('Home: Applying filters with types:', types);
       
-      // Fetch filtered cards directly from the server for type filters
+      // Fetch filtered cards directly from the server for type filters - first page only
       if (filters.type !== undefined) {
         const response = await fetchCards(1, {
           type: types,
@@ -287,9 +293,10 @@ export default function Home() {
           search: searchTerm
         });
         
-        // Update all cards and available tags
+        // Update all cards, available tags, and total count
         setCards(response.cards);
-        console.log('Home: Fetched cards from server:', response.cards.length);
+        setTotalCardCount(response.totalCount);
+        console.log('Home: Fetched cards from server:', response.cards.length, 'of', response.totalCount, 'total');
         console.log('Home: Card types from server:', response.cards.map(c => c.type));
         
         // Apply client-side sort only - we already have server-side filtered cards
@@ -328,15 +335,16 @@ export default function Home() {
     try {
       setSearchTerm(search);
 
-      // Fetch results from server with all current filters
+      // Fetch results from server with all current filters - first page only
       const response = await fetchCards(1, {
         type: selectedTypes,
         tags: selectedTags,
         search: search
       });
       
-      // Update cards with search results
+      // Update cards with search results and total count
       setCards(response.cards);
+      setTotalCardCount(response.totalCount);
       
       // Apply client-side sorting while preserving server-side filtering
       const sorted = applyFiltersAndSort(response.cards, selectedTypes, selectedTags, currentSort, '');
@@ -582,6 +590,14 @@ export default function Home() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 pt-6">
+        {/* Card count display */}
+        {!loading && totalCardCount > 0 && (
+          <div className="mb-4 text-gray-600 text-sm">
+            Showing {filteredCards.length} of {totalCardCount} cards
+            {selectedTypes.length > 0 && ` (filtered by ${selectedTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')})`}
+          </div>
+        )}
+        
         {loading ? (
           <div className="flex justify-center p-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -589,7 +605,20 @@ export default function Home() {
         ) : (
           <CardGrid
             initialCards={filteredCards}
-            loadMore={async () => []} // We're not using infinite scroll in this implementation
+            loadMore={async (page) => {
+              // Implement pagination with the current filters
+              try {
+                const response = await fetchCards(page, {
+                  type: selectedTypes,
+                  tags: selectedTags,
+                  search: searchTerm
+                });
+                return response.cards;
+              } catch (error) {
+                console.error('Error loading more cards:', error);
+                return [];
+              }
+            }}
             isAdmin={isAdmin}
             onEdit={isAdmin ? handleEditCard : undefined}
             onDelete={isAdmin ? handleDeleteCard : undefined}
