@@ -68,8 +68,10 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
 // API functions
 export const fetchCards = async (
   page = 1,
-  filters: { type: string[]; tags: string[]; search: string } = { type: [], tags: [], search: '' }
+  filters = { type: [], tags: [], search: '' }
 ): Promise<{ cards: CardProps[]; availableTags: string[]; totalCount: number }> => {
+  console.log('fetchCards: Called with filters:', filters);
+  
   const queryParams = new URLSearchParams();
   queryParams.append('page', page.toString());
   queryParams.append('limit', PAGE_SIZE.toString());
@@ -79,14 +81,25 @@ export const fetchCards = async (
   }
 
   if (filters.type && filters.type.length > 0) {
+    console.log('fetchCards: Adding type filters to query:', filters.type);
     filters.type.forEach(type => queryParams.append('type', type));
   }
 
   if (filters.tags && filters.tags.length > 0) {
     filters.tags.forEach(tag => queryParams.append('tag', tag));
   }
+  
+  const queryString = queryParams.toString();
+  console.log('fetchCards: Final query string:', queryString);
 
-  const response = await request(`/cards?${queryParams.toString()}`);
+  const response = await request(`/cards?${queryString}`);
+  console.log('fetchCards: Response received with', response.cards.length, 'cards');
+  console.log('fetchCards: Card types in response:', response.cards.map((c: any) => c.type));
+  
+  // Log more detailed information about each card's type for debugging
+  response.cards.forEach((card: any, index: number) => {
+    console.log(`Card ${index} - id: ${card._id || card.id}, type: "${card.type}" (${typeof card.type})`);
+  });
 
   // Map MongoDB _id to id for client-side compatibility
   const mappedCards = response.cards.map((card: any) => {

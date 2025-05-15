@@ -15,6 +15,7 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
+  // Make sure type IDs exactly match the database model's enum values 
   const typeOptions = [
     { id: 'all', label: 'All Types' },
     { id: 'image', label: 'Images' },
@@ -23,8 +24,10 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   ];
 
   const handleTypeChange = (typeId: string) => {
+    console.log('TypeDropdown: Selected type:', typeId);
     // If 'all' is selected, clear the type filter (empty array)
     const newTypes = typeId === 'all' ? [] : [typeId];
+    console.log('TypeDropdown: Setting filter to:', newTypes);
     onFilterChange({ type: newTypes });
     setIsOpen(false);
   };

@@ -117,7 +117,7 @@ export default function Home() {
 
         // Load cards and tags concurrently
         const [cardsResponse, tagsResponse] = await Promise.all([
-          fetchCards(),
+          fetchCards(1, { type: [], tags: [], search: '' }),
           getAllTags()
         ]);
 
@@ -162,12 +162,24 @@ export default function Home() {
     sort: SortOption,
     search: string = ''
   ) => {
+    console.log('applyFiltersAndSort: Starting with', allCards.length, 'cards');
+    console.log('applyFiltersAndSort: Filtering by types:', types);
+    
     // Apply filters
     let filtered = [...allCards];
 
     // Filter by type if any types are selected
     if (types.length > 0) {
-      filtered = filtered.filter(card => types.includes(card.type));
+      console.log('applyFiltersAndSort: Filtering by type:', types);
+      filtered = filtered.filter(card => {
+        // Add a case-insensitive match for better compatibility
+        const cardType = card.type?.toLowerCase();
+        const typeMatches = types.some(t => t.toLowerCase() === cardType);
+        console.log(`Card type "${card.type}" (${typeof card.type}) ${typeMatches ? 'matches' : 'does not match'} filter "${types}"`);
+        return typeMatches;
+      });
+      console.log('applyFiltersAndSort: After type filtering:', filtered.length, 'cards remain');
+      console.log('applyFiltersAndSort: Remaining card types:', filtered.map(c => c.type));
     }
 
     // Filter by tags if any tags are selected
@@ -245,24 +257,60 @@ export default function Home() {
     return filtered;
   };
 
-  const handleFilterChange = (filters: { type?: string[], tags?: string[] }) => {
-    // Update selected types if provided
-    if (filters.type !== undefined) {
-      setSelectedTypes(filters.type);
+  const handleFilterChange = async (filters: { type?: string[], tags?: string[] }) => {
+    console.log('Home: Filter change received:', filters);
+    setLoading(true);
+    
+    try {
+      // Update selected types if provided
+      if (filters.type !== undefined) {
+        console.log('Home: Setting selectedTypes from', selectedTypes, 'to', filters.type);
+        setSelectedTypes(filters.type);
+      }
+
+      // Update selected tags if provided
+      if (filters.tags !== undefined) {
+        setSelectedTags(filters.tags);
+      }
+
+      // Get current filter states (using the updated values)
+      const types = filters.type !== undefined ? filters.type : selectedTypes;
+      const tags = filters.tags !== undefined ? filters.tags : selectedTags;
+      
+      console.log('Home: Applying filters with types:', types);
+      
+      // Fetch filtered cards directly from the server for type filters
+      if (filters.type !== undefined) {
+        const response = await fetchCards(1, {
+          type: types,
+          tags: tags,
+          search: searchTerm
+        });
+        
+        // Update all cards and available tags
+        setCards(response.cards);
+        console.log('Home: Fetched cards from server:', response.cards.length);
+        console.log('Home: Card types from server:', response.cards.map(c => c.type));
+        
+        // Apply client-side sort only - we already have server-side filtered cards
+        // Preserve the type filter from the server, but apply client-side sorting
+        const sorted = applyFiltersAndSort(response.cards, types, tags, currentSort, '');
+        setFilteredCards(sorted);
+      } else {
+        // For other filters, use client-side filtering
+        console.log('Home: All cards before filtering:', cards.map(c => ({ id: c.id, type: c.type })));
+        
+        // Apply filters and sort
+        const filteredAndSorted = applyFiltersAndSort(cards, types, tags, currentSort, searchTerm);
+        console.log('Home: Filtered cards count:', filteredAndSorted.length);
+        console.log('Home: Filtered card types:', filteredAndSorted.map(c => c.type));
+        setFilteredCards(filteredAndSorted);
+      }
+    } catch (error) {
+      console.error('Error applying filters:', error);
+    } finally {
+      setLoading(false);
     }
-
-    // Update selected tags if provided
-    if (filters.tags !== undefined) {
-      setSelectedTags(filters.tags);
-    }
-
-    // Get current filter states (using the updated values)
-    const types = filters.type !== undefined ? filters.type : selectedTypes;
-    const tags = filters.tags !== undefined ? filters.tags : selectedTags;
-
-    // Apply filters and sort
-    const filteredAndSorted = applyFiltersAndSort(cards, types, tags, currentSort, searchTerm);
-    setFilteredCards(filteredAndSorted);
   };
 
   // Handle sorting change
@@ -275,12 +323,29 @@ export default function Home() {
   };
 
   // Handle search changes
-  const handleSearch = (search: string) => {
-    setSearchTerm(search);
+  const handleSearch = async (search: string) => {
+    setLoading(true);
+    try {
+      setSearchTerm(search);
 
-    // Re-apply current filters with new search term
-    const filteredAndSorted = applyFiltersAndSort(cards, selectedTypes, selectedTags, currentSort, search);
-    setFilteredCards(filteredAndSorted);
+      // Fetch results from server with all current filters
+      const response = await fetchCards(1, {
+        type: selectedTypes,
+        tags: selectedTags,
+        search: search
+      });
+      
+      // Update cards with search results
+      setCards(response.cards);
+      
+      // Apply client-side sorting while preserving server-side filtering
+      const sorted = applyFiltersAndSort(response.cards, selectedTypes, selectedTags, currentSort, '');
+      setFilteredCards(sorted);
+    } catch (error) {
+      console.error('Error searching cards:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLoginClick = () => {
