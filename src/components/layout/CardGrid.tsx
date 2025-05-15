@@ -18,6 +18,7 @@ interface CardGridProps {
   onDelete?: (id: string) => void;
   isAdmin?: boolean;
   selectedTypes?: string[]; // Added to know whether to group by type
+  lastEditedCardId?: string | null; // To track the last edited card
 }
 
 const CardGrid: React.FC<CardGridProps> = ({ 
@@ -26,8 +27,11 @@ const CardGrid: React.FC<CardGridProps> = ({
   onEdit, 
   onDelete,
   isAdmin = false,
-  selectedTypes = []
+  selectedTypes = [],
+  lastEditedCardId = null
 }) => {
+  // Create a ref map to keep track of each card's DOM element
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [cards, setCards] = useState<CardProps[]>(initialCards);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -77,10 +81,30 @@ const CardGrid: React.FC<CardGridProps> = ({
     if (node) observer.current.observe(node);
   }, [loading, hasMore, loadMoreCards]);
 
+  // Function to handle refs for each card
+  const setCardRef = useCallback((id: string, element: HTMLDivElement | null) => {
+    if (element) {
+      cardRefs.current.set(id, element);
+    } else {
+      cardRefs.current.delete(id);
+    }
+  }, []);
+
   // Function to render a single card (with or without lastCardRef)
   const renderCard = (card: CardProps, isLast: boolean = false) => {
+    const isLastEdited = card.id === lastEditedCardId;
+    
     return (
-      <div key={card.id} ref={isLast ? lastCardRef : undefined}>
+      <div 
+        key={card.id} 
+        ref={(el) => {
+          // Set the card ref for scroll restoration
+          if (el) setCardRef(card.id, el);
+          // Also set the infinite scroll ref if this is the last card
+          if (isLast) lastCardRef(el);
+        }}
+        className={isLastEdited ? 'scroll-mt-24 relative' : 'relative'}
+      >
         <CardFactory 
           {...card} 
           onEdit={onEdit}

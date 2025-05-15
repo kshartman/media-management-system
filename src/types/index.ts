@@ -9,8 +9,11 @@ export interface FileMetadata {
   downloadOriginalFileName?: string;
   movieOriginalFileName?: string;
   transcriptOriginalFileName?: string; // For transcript files in both reel and social cards
+  instagramCopyOriginalFileName?: string; // For Instagram copy
+  facebookCopyOriginalFileName?: string; // For Facebook copy
   imageSequenceOriginalFileNames?: string[]; // Array of original filenames for image sequence
   imageSequenceFileSizes?: number[]; // Array of file sizes for each image in the sequence
+  imageSequenceCaptions?: string[]; // Array of captions for each image in the sequence
 }
 
 export interface BaseCardProps {
@@ -28,6 +31,8 @@ export interface BaseCardProps {
   movie?: string;
   transcript?: string;
   imageSequence?: string[];
+  instagramCopy?: string;
+  facebookCopy?: string;
 }
 
 export interface ImageCardProps extends BaseCardProps {
@@ -41,6 +46,8 @@ export interface SocialCardProps extends BaseCardProps {
   preview?: string;
   imageSequence: string[]; // Array of image URLs 
   transcript?: string; // Optional transcript
+  instagramCopy?: string; // Instagram copy content
+  facebookCopy?: string; // Facebook copy content
 }
 
 export interface ReelCardProps extends BaseCardProps {
@@ -48,6 +55,8 @@ export interface ReelCardProps extends BaseCardProps {
   preview?: string;
   movie: string;
   transcript: string;
+  instagramCopy?: string; // Instagram copy content
+  facebookCopy?: string; // Facebook copy content
 }
 
 export type CardProps = ImageCardProps | SocialCardProps | ReelCardProps;

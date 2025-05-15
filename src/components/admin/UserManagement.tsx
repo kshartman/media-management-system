@@ -38,10 +38,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleCreateUser = async (userData: UserCreateInput) => {
+  const handleCreateUser = async (userData: UserCreateInput | UserUpdateInput) => {
     try {
       setIsSubmitting(true);
-      await createUser(userData);
+      // Type assertion to ensure we have all required fields for UserCreateInput
+      await createUser(userData as UserCreateInput);
       setShowCreateForm(false);
       setSuccessMessage('User created successfully');
       fetchUsers(); // Refresh the user list

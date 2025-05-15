@@ -68,6 +68,25 @@ const extractFrameFromVideo = (videoPath, outputPath) => {
   return new Promise((resolve, reject) => {
     console.log(`Extracting frame from video at ${videoPath}`);
     
+    // Verify the video file exists
+    if (!fs.existsSync(videoPath)) {
+      console.error(`Video file does not exist: ${videoPath}`);
+      return reject(new Error(`Video file does not exist: ${videoPath}`));
+    }
+    
+    // Also check that the file has content
+    try {
+      const stats = fs.statSync(videoPath);
+      if (stats.size === 0) {
+        console.error(`Video file is empty (0 bytes): ${videoPath}`);
+        return reject(new Error(`Video file is empty (0 bytes): ${videoPath}`));
+      }
+      console.log(`Video file exists and has content: ${videoPath}, size: ${stats.size} bytes`);
+    } catch (statError) {
+      console.error(`Error checking video file stats: ${statError.message}`);
+      return reject(statError);
+    }
+    
     ffmpeg(videoPath)
       .on('start', cmdline => {
         console.log(`Running ffmpeg command: ${cmdline}`);

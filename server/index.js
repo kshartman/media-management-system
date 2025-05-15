@@ -108,15 +108,120 @@ const processFileAndGetPath = async (file, options = {}) => {
  * @param {object} metadata - Metadata to update
  * @returns {Promise<object>} - Object with video and preview paths
  */
+/**
+ * Downloads a file from a URL to a local destination path
+ * @param {string} url - URL to download
+ * @param {string} destPath - Local destination path
+ * @returns {Promise<boolean>} - Whether the download was successful
+ */
+const downloadFile = (url, destPath) => {
+  return new Promise((resolve, reject) => {
+    console.log(`Downloading file from ${url} to ${destPath}`);
+    
+    // Validate URL
+    if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+      console.error(`Invalid URL format: ${url}`);
+      return reject(new Error(`Invalid URL format: ${url}`));
+    }
+    
+    // Make sure destination directory exists
+    const destDir = path.dirname(destPath);
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+      console.log(`Created destination directory: ${destDir}`);
+    }
+    
+    const file = fs.createWriteStream(destPath);
+    
+    // Parse URL to handle it properly
+    try {
+      // Create a proper URL object
+      const parsedUrl = new URL(url);
+      
+      // Choose the right protocol
+      let protocol;
+      if (parsedUrl.protocol === 'https:') {
+        protocol = require('https');
+      } else if (parsedUrl.protocol === 'http:') {
+        protocol = require('http');
+      } else {
+        throw new Error(`Unsupported protocol: ${parsedUrl.protocol}`);
+      }
+      
+      console.log(`Using ${parsedUrl.protocol} protocol to download from ${parsedUrl.hostname}`);
+      console.log(`Full path: ${parsedUrl.pathname}${parsedUrl.search || ''}`);
+    
+      const options = {
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.pathname + (parsedUrl.search || ''),
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Media-Management-System/1.0'
+        }
+      };
+      
+      const request = protocol.request(options, response => {
+        if (response.statusCode !== 200) {
+          console.error(`Failed to download file: HTTP status code ${response.statusCode}`);
+          file.close();
+          fs.unlink(destPath, () => {}); // Clean up
+          resolve(false);
+          return;
+        }
+        
+        response.pipe(file);
+        
+        file.on('finish', () => {
+          file.close();
+          console.log(`Download complete, file saved to ${destPath}`);
+          resolve(true);
+        });
+        
+        file.on('error', err => {
+          fs.unlink(destPath, () => {});
+          console.error(`Error saving file: ${err.message}`);
+          resolve(false);
+        });
+      });
+      
+      request.on('error', err => {
+        fs.unlink(destPath, () => {});
+        console.error(`Error downloading file: ${err.message}`);
+        resolve(false);
+      });
+      
+      // Actually send the request
+      request.end();
+    } catch (error) {
+      console.error(`Error setting up download: ${error.message}`);
+      resolve(false);
+    }
+  });
+};
+
 const processVideoAndGeneratePreview = async (file, metadata = {}) => {
   if (!file) return { videoPath: null, previewPath: null };
   
   console.log('Processing video and generating preview...');
+  console.log('File data:', { 
+    filename: file.filename,
+    originalname: file.originalname,
+    size: file.size,
+    path: file.path
+  });
   
   // Get the local file path
-  const localFilePath = path.join(__dirname, 'uploads', file.filename);
+  const localFilePath = file.path || path.join(__dirname, 'uploads', file.filename);
   let videoPath = `/uploads/${file.filename}`;
   let previewPath = null;
+  
+  // Verify the file exists
+  if (!fs.existsSync(localFilePath)) {
+    console.error(`Error: Video file does not exist at path: ${localFilePath}`);
+    return { videoPath, previewPath };
+  }
+  
+  console.log(`Verified video file exists at: ${localFilePath}, size: ${fs.statSync(localFilePath).size} bytes`);
   
   // Make sure we have a metadata object
   if (!metadata.fileMetadata) metadata.fileMetadata = {};
@@ -135,7 +240,8 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
     
     // Set preview path and metadata
     previewPath = previewUrl;
-    metadata.fileMetadata.previewOriginalFileName = `Auto-generated for ${originalFilename}`;
+    metadata.fileMetadata.previewOriginalFileName = "Auto-generated from video frame";
+    metadata.fileMetadata.isPreviewGenerated = true;
     metadata.fileMetadata.width = VIDEO_DIMENSIONS.WIDTH;
     metadata.fileMetadata.height = VIDEO_DIMENSIONS.HEIGHT;
     metadata.fileMetadata.fileSize = file.size;
@@ -639,7 +745,11 @@ app.get('/api/cards', async (req, res) => {
     const filter = {};
     
     if (search) {
-      filter.description = { $regex: search, $options: 'i' };
+      // Search in both description and tags
+      filter.$or = [
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ];
     }
     
     if (types.length > 0) {
@@ -855,7 +965,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
     // Log all received files for debugging
     logReceivedFiles(req.files);
 
-    const { type, description } = req.body;
+    const { type, description, instagramCopy, facebookCopy } = req.body;
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
 
     // Extract date if provided in the form
@@ -894,6 +1004,15 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
         fileSize: null
       }
     };
+    
+    // Add social copy fields if provided for reel or social cards
+    if ((type === 'reel' || type === 'social') && instagramCopy) {
+      newCard.instagramCopy = instagramCopy;
+    }
+    
+    if ((type === 'reel' || type === 'social') && facebookCopy) {
+      newCard.facebookCopy = facebookCopy;
+    }
 
     // Helper function to get file path from multer/multer-s3 file
     const getFilePath = (file) => {
@@ -1269,7 +1388,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    const { type, description } = req.body;
+    const { type, description, instagramCopy, facebookCopy } = req.body;
     const tags = req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [];
 
     // Extract date if provided in the form, otherwise use existing or create new
@@ -1290,11 +1409,14 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     
     // For reel cards, track if we need to auto-generate a preview
     const needsAutoPreview = (type === 'reel' && 
-      (req.body.remove_preview === 'true' || !card.preview) && 
+      (req.body.remove_preview === 'true' || !card.preview || req.body.generatePreview === 'true') && 
       (!req.files || !req.files.preview || req.files.preview.length === 0));
       
     // Track if a new movie file was uploaded
     const hasNewMovie = req.files && req.files.movie && req.files.movie.length > 0;
+    
+    // Track if we need to regenerate preview for existing video
+    const shouldRegeneratePreview = req.body.generatePreview === 'true' && !hasNewMovie && card.movie;
     
     // For logging
     console.log('Update parameters:');
@@ -1332,6 +1454,19 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         date: date // Update the date in fileMetadata
       }
     };
+    
+    // Handle social copy fields for reel and social cards
+    if ((type === 'reel' || type === 'social')) {
+      // If instagramCopy is explicitly provided, update it
+      if (instagramCopy !== undefined) {
+        updatedCard.instagramCopy = instagramCopy;
+      }
+      
+      // If facebookCopy is explicitly provided, update it
+      if (facebookCopy !== undefined) {
+        updatedCard.facebookCopy = facebookCopy;
+      }
+    }
 
     // Helper function to get file path from multer/multer-s3 file
     const getFilePath = (file) => {
@@ -1495,27 +1630,27 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
       console.log(`Updating social card with ${sequenceCount} images in sequence`);
       
-      if (sequenceCount > 0) {
-        // Process all images in the sequence
-        const date = updatedCard.fileMetadata?.date || new Date();
-        const sequenceResult = await processImageSequence(req, req.files, date, extractFileMetadata);
-        
-        // Add the image sequence to the card
-        updatedCard.imageSequence = sequenceResult.imageSequence;
-        
-        // Add metadata for image sequence
-        if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
-        updatedCard.fileMetadata.imageSequenceOriginalFileNames = sequenceResult.imageSequenceOriginalFileNames;
-        updatedCard.fileMetadata.imageSequenceFileSizes = sequenceResult.imageSequenceFileSizes;
-        updatedCard.fileMetadata.totalSequenceSize = sequenceResult.totalSequenceSize;
-        updatedCard.fileMetadata.imageSequenceCount = sequenceResult.imageSequenceCount;
-        
-        // If no preview was provided and sequence exists, use the first image in the sequence as preview
-        if (!updatedCard.preview && updatedCard.imageSequence && updatedCard.imageSequence.length > 0) {
-          updatedCard.preview = updatedCard.imageSequence[0];
-          console.log(`Using first image in sequence as preview: ${updatedCard.preview}`);
-        }
-      } else if (!card.imageSequence || card.imageSequence.length === 0) {
+      // Process all images in the sequence (both new and existing)
+      const date = updatedCard.fileMetadata?.date || new Date();
+      const sequenceResult = await processImageSequence(req, req.files, date, extractFileMetadata, card);
+      
+      // Add the image sequence to the card
+      updatedCard.imageSequence = sequenceResult.imageSequence;
+      
+      // Add metadata for image sequence
+      if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+      updatedCard.fileMetadata.imageSequenceOriginalFileNames = sequenceResult.imageSequenceOriginalFileNames;
+      updatedCard.fileMetadata.imageSequenceFileSizes = sequenceResult.imageSequenceFileSizes;
+      updatedCard.fileMetadata.totalSequenceSize = sequenceResult.totalSequenceSize;
+      updatedCard.fileMetadata.imageSequenceCount = sequenceResult.imageSequenceCount;
+      
+      // If no preview was provided and sequence exists, use the first image in the sequence as preview
+      if (!updatedCard.preview && updatedCard.imageSequence && updatedCard.imageSequence.length > 0) {
+        updatedCard.preview = updatedCard.imageSequence[0];
+        console.log(`Using first image in sequence as preview: ${updatedCard.preview}`);
+      }
+      
+      if (updatedCard.imageSequence.length === 0 && (!card.imageSequence || card.imageSequence.length === 0)) {
         // If no image sequence provided in update and none existed before, return error 
         return res.status(400).json({
           error: 'At least one image in the sequence is required for social cards. Please upload at least one image.'
@@ -1553,6 +1688,87 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           console.log(`Using auto-generated preview from new video: ${previewPath}`);
           updatedCard.preview = previewPath;
         }
+      } else if (shouldRegeneratePreview) {
+        // Regenerate preview for existing video
+        console.log('Regenerating preview for existing video');
+        
+        // Get the movie URL from the card
+        const movieUrl = card.movie;
+        
+        try {
+          // Make sure we have the uploads directory path
+          const uploadDir = path.join(__dirname, 'uploads');
+          
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          
+          // Download the video file first
+          const timestamp = Date.now();
+          const tempVideoFilename = `${timestamp}-temp-video${path.extname(movieUrl) || '.mp4'}`;
+          const tempVideoPath = path.join(uploadDir, tempVideoFilename);
+          
+          // Create a temporary file object to pass to the processor
+          const tempFile = {
+            filename: tempVideoFilename,
+            originalname: card.fileMetadata?.movieOriginalFileName || path.basename(movieUrl),
+            path: tempVideoPath,
+            size: card.fileMetadata?.fileSize || 0
+          };
+          
+          // Download the file
+          console.log(`Attempting to download video from ${movieUrl} to ${tempVideoPath}`);
+          const downloaded = await downloadFile(movieUrl, tempVideoPath);
+          
+          if (downloaded) {
+            console.log('Successfully downloaded video file for preview generation');
+            
+            // Verify the file exists and has content
+            try {
+              const stats = fs.statSync(tempVideoPath);
+              console.log(`Downloaded file size: ${stats.size} bytes`);
+              
+              if (stats.size === 0) {
+                console.error("Downloaded file is empty");
+                throw new Error("Downloaded file is empty");
+              }
+            } catch (statError) {
+              console.error(`Error checking downloaded file: ${statError.message}`);
+              throw statError;
+            }
+            
+            // Now generate a preview from the downloaded file
+            tempFile.path = tempVideoPath; // Ensure the path is correct
+            console.log(`Using tempFile for preview generation:`, tempFile);
+            const { previewPath } = await processVideoAndGeneratePreview(tempFile, updatedCard);
+            
+            if (previewPath) {
+              console.log(`Using regenerated preview: ${previewPath}`);
+              updatedCard.preview = previewPath;
+              
+              // Mark the preview as autogenerated
+              if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+              updatedCard.fileMetadata.isPreviewGenerated = true;
+              updatedCard.fileMetadata.previewOriginalFileName = "Auto-generated from video frame";
+            }
+            
+            // Clean up the temp file
+            try {
+              fs.unlinkSync(tempVideoPath);
+              console.log('Temporary video file cleaned up');
+            } catch (cleanupError) {
+              console.error('Error cleaning up temp file:', cleanupError);
+            }
+          } else {
+            console.error('Failed to download video file for preview generation');
+          }
+        } catch (previewError) {
+          console.error('Error regenerating preview:', previewError);
+        }
+        
+        // Keep existing movie file unchanged
+        updatedCard.movie = card.movie;
       } else {
         // Use standard method for existing movie file
         updatedCard.movie = await handleFileField('movie', card.movie);
@@ -1579,21 +1795,64 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     if (needsAutoPreview && card.movie) {
       try {
         console.log('Auto-generating preview image from video...');
-        const movieFullPath = path.join(__dirname, card.movie);
+        // Don't prepend paths to URLs
+        const moviePath = card.movie.startsWith('http') ? card.movie : path.join(__dirname, card.movie);
         const uploadDir = path.join(__dirname, 'uploads');
         
+        // Create a temporary local file if it's a URL
+        let localVideoPath;
+        let needsCleanup = false;
+        
+        if (card.movie.startsWith('http')) {
+          // For URLs, we need to download to a temp file first
+          const tempDir = path.join(__dirname, PREVIEW_SETTINGS.TEMP_DIR);
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          
+          const tempFileName = `temp-video-${Date.now()}.mp4`;
+          localVideoPath = path.join(tempDir, tempFileName);
+          
+          try {
+            // Download the file
+            console.log(`Downloading video from ${moviePath} to ${localVideoPath}`);
+            await downloadFile(moviePath, localVideoPath);
+            needsCleanup = true;
+          } catch (dlError) {
+            console.error('Error downloading video file:', dlError);
+            throw new Error('Failed to download video file');
+          }
+        } else {
+          // For local files, use the path directly
+          localVideoPath = moviePath;
+        }
+        
         try {
+          // Check if the local file exists and is a video
+          if (!fs.existsSync(localVideoPath)) {
+            throw new Error(`Video file does not exist: ${localVideoPath}`);
+          }
+          
           // Check if the file is actually a video
-          const fileCheck = require('child_process').execSync(`file "${movieFullPath}"`).toString();
+          const fileCheck = require('child_process').execSync(`file "${localVideoPath}"`).toString();
           console.log(`File check result: ${fileCheck}`);
           
           if (fileCheck.includes('HTML') || !fileCheck.includes('video')) {
             console.warn('Not a valid video file - using fallback colored preview');
+            // Clean up temp file if needed before continuing
+            if (needsCleanup && fs.existsSync(localVideoPath)) {
+              try {
+                fs.unlinkSync(localVideoPath);
+                console.log(`Cleaned up invalid video file: ${localVideoPath}`);
+              } catch (cleanupErr) {
+                console.warn(`Failed to clean up temp file: ${cleanupErr.message}`);
+              }
+            }
             throw new Error('Invalid video file format');
           }
           
           // Extract a frame from the video
-          const previewPath = await extractVideoFrame(movieFullPath, uploadDir);
+          const previewPath = await extractVideoFrame(localVideoPath, uploadDir);
           
           // Get relative path for storage
           const previewRelativePath = '/uploads/' + path.basename(previewPath);
@@ -1613,13 +1872,24 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         } catch (error) {
           console.error('Error extracting preview frame from video:', error);
           
+          // Clean up temp file if it exists
+          if (needsCleanup && fs.existsSync(localVideoPath)) {
+            try {
+              fs.unlinkSync(localVideoPath);
+              console.log(`Cleaned up temp file after error: ${localVideoPath}`);
+            } catch (cleanupErr) {
+              console.warn(`Failed to clean up temp file: ${cleanupErr.message}`);
+            }
+          }
+          
           // Create a fallback colored image using sharp
           console.log('Creating fallback colored preview image...');
           
           // Generate a video-like preview with a play button
           const width = 720;
           const height = 1280;
-          const previewFilename = `${path.basename(movieFullPath, path.extname(movieFullPath))}-preview-fallback-${uuidv4().substring(0, 8)}.jpg`;
+          const originalName = path.basename(card.movie, path.extname(card.movie));
+          const previewFilename = `${originalName}-preview-fallback-${uuidv4().substring(0, 8)}.jpg`;
           const previewPath = path.join(uploadDir, previewFilename);
           
           // Create a simple colored background
@@ -1754,16 +2024,25 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     
     // Define conditions for generating a preview
     const shouldRemovePreview = req.body.remove_preview === 'true';
-    const shouldGeneratePreview = isS3Configured && 
-                                 type === 'reel' && 
-                                 (hasNewMovie || shouldRemovePreview) && 
+    const generatePreviewFlag = req.body.generatePreview === 'true';
+    // If we already regenerated the preview earlier, don't try again
+    const previewAlreadyGenerated = updatedCard.preview && 
+                                    updatedCard.fileMetadata && 
+                                    updatedCard.fileMetadata.isPreviewGenerated === true;
+    
+    const shouldGeneratePreview = type === 'reel' && 
+                                 (hasNewMovie || shouldRemovePreview || generatePreviewFlag) && 
                                  (!req.files || !req.files.preview || req.files.preview.length === 0);
                                  
     console.log('S3 preview generation conditions met:', shouldGeneratePreview);
     console.log('Conditions breakdown:');
     console.log('- isS3Configured:', isS3Configured);
     console.log('- type === \'reel\':', type === 'reel');
-    console.log('- hasNewMovie || shouldRemovePreview:', hasNewMovie || shouldRemovePreview);
+    console.log('- hasNewMovie:', hasNewMovie);
+    console.log('- shouldRemovePreview:', shouldRemovePreview);
+    console.log('- generatePreviewFlag:', generatePreviewFlag);
+    console.log('- previewAlreadyGenerated:', previewAlreadyGenerated);
+    console.log('- Current preview:', updatedCard.preview);
     console.log('- !hasPreviewFiles:', !req.files || !req.files.preview || req.files.preview.length === 0);
     // Preview generation is now handled in our optimized workflow
     
@@ -1772,8 +2051,90 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     // 2. Either:
     //    a. It's a new video without a preview uploaded, OR
     //    b. User explicitly requested to remove/regenerate the preview
-    // We no longer need this preview generation logic as it's now handled by the
-    // processVideoAndGeneratePreview function, which properly follows the workflow:
+    // 3. No preview file was uploaded
+    
+    // If we need to generate a preview but haven't already done so, do it now
+    if (shouldGeneratePreview && updatedCard.movie) {
+      console.log('Conditions met for preview generation from existing movie:', updatedCard.movie);
+      
+      try {
+        console.log('================== PREVIEW REGENERATION START ==================');
+        console.log(`Source movie URL: ${updatedCard.movie}`);
+        
+        // Create a temp directory if needed
+        const tempDir = path.join(__dirname, PREVIEW_SETTINGS.TEMP_DIR);
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+          console.log(`Created temp directory: ${tempDir}`);
+        }
+        
+        // Create a unique filename for the temp file
+        const uuid = require('uuid').v4();
+        const tempVideoPath = path.join(tempDir, `temp-download-${uuid.substring(0, 8)}${path.extname(updatedCard.movie) || '.mp4'}`);
+        
+        // Download the movie to a temp file
+        console.log(`Downloading movie from ${updatedCard.movie} to ${tempVideoPath}`);
+        await downloadFile(updatedCard.movie, tempVideoPath);
+        
+        // Check if the download worked
+        if (!fs.existsSync(tempVideoPath)) {
+          throw new Error(`Failed to download movie file: File does not exist at ${tempVideoPath}`);
+        }
+        
+        const fileSize = fs.statSync(tempVideoPath).size;
+        if (fileSize === 0) {
+          throw new Error(`Downloaded movie file is empty (0 bytes)`);
+        }
+        
+        console.log(`Downloaded movie file successfully, size: ${fileSize} bytes`);
+        
+        // Create a temp file object that mimics multer's file object
+        const tempFile = {
+          filename: path.basename(tempVideoPath),
+          originalname: updatedCard.fileMetadata?.movieOriginalFileName || path.basename(updatedCard.movie),
+          path: tempVideoPath,
+          size: fileSize
+        };
+        
+        console.log('Temp file object created:', tempFile);
+        
+        // Generate the preview
+        console.log('Calling processVideoAndGeneratePreview...');
+        const { previewPath } = await processVideoAndGeneratePreview(tempFile, updatedCard);
+        
+        if (!previewPath) {
+          throw new Error('Failed to generate preview - no preview path returned');
+        }
+        
+        console.log(`Generated preview successfully: ${previewPath}`);
+        updatedCard.preview = previewPath;
+        
+        // Mark the preview as autogenerated
+        if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
+        updatedCard.fileMetadata.isPreviewGenerated = true;
+        updatedCard.fileMetadata.previewOriginalFileName = "Auto-generated from video frame";
+        console.log('Updated card metadata for autogenerated preview');
+        
+        // Clean up the temp file
+        try {
+          fs.unlinkSync(tempVideoPath);
+          console.log('Temporary video file cleaned up');
+        } catch (cleanupError) {
+          console.error('Error cleaning up temp file:', cleanupError);
+          // Continue even if cleanup fails
+        }
+        
+        console.log('================== PREVIEW REGENERATION SUCCESS ==================');
+      } catch (previewError) {
+        console.error('================== PREVIEW REGENERATION ERROR ==================');
+        console.error('Error generating preview from existing movie:', previewError);
+        console.error('Error stack:', previewError.stack);
+        console.error('================== END PREVIEW REGENERATION ERROR ==================');
+        // Continue without failing the whole update
+      }
+    }
+    
+    // Rest of the workflow is handled by the processVideoAndGeneratePreview function:
     // 1. Process videos locally first
     // 2. Generate previews from local files
     // 3. Upload files to S3 only after processing
@@ -2209,6 +2570,67 @@ app.delete('/api/users/:id', authMiddleware, async (req, res) => {
     res.status(204).end();
   } catch (error) {
     console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update only social copy fields for a card
+app.patch('/api/cards/:id/social-copy', authMiddleware, async (req, res) => {
+  try {
+    const cardId = req.params.id;
+    const { instagramCopy, facebookCopy } = req.body;
+    
+    // Validate input - at least one field must be provided
+    if (instagramCopy === undefined && facebookCopy === undefined) {
+      return res.status(400).json({ 
+        error: 'At least one of instagramCopy or facebookCopy must be provided' 
+      });
+    }
+    
+    // Find the card first to check if it exists
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+    
+    // Check if card type supports social copy
+    if (card.type !== 'social' && card.type !== 'reel') {
+      return res.status(400).json({ 
+        error: 'Social copy can only be updated for social and reel card types' 
+      });
+    }
+    
+    // Prepare update object with only the provided fields
+    const updateData = {};
+    if (instagramCopy !== undefined) {
+      updateData.instagramCopy = instagramCopy;
+    }
+    if (facebookCopy !== undefined) {
+      updateData.facebookCopy = facebookCopy;
+    }
+    
+    // Update the card with just the social copy fields
+    const updatedCard = await Card.findByIdAndUpdate(
+      cardId,
+      { $set: updateData },
+      { new: true } // Return the updated document
+    );
+    
+    // Convert relative URLs to absolute URLs for response
+    const baseUrl = getBaseUrl(req);
+    const response = updatedCard.toObject();
+    
+    Object.keys(response).forEach(key => {
+      if (key !== '_id' && key !== 'type' && key !== 'tags' && key !== 'description' &&
+          key !== 'metadata' && key !== 'date' && key !== 'createdAt' && key !== 'updatedAt' && 
+          key !== 'instagramCopy' && key !== 'facebookCopy' && response[key]) {
+        response[key] = baseUrl + response[key];
+      }
+    });
+    
+    res.json(response);
+  } catch (error) {
+    console.error('Error updating social copy:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

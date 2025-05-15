@@ -132,7 +132,14 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
   };
 
   return (
-    <BaseCard {...baseProps} preview={props.preview} transcript={props.transcript} imageSequence={props.imageSequence}>
+    <BaseCard 
+      {...baseProps} 
+      preview={props.preview} 
+      transcript={props.transcript} 
+      imageSequence={props.imageSequence} 
+      instagramCopy={props.instagramCopy} 
+      facebookCopy={props.facebookCopy}
+    >
       {/* Lightbox Component */}
       {props.imageSequence && props.imageSequence.length > 0 && (
         <Lightbox

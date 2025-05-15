@@ -49,13 +49,13 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, initialCardType = 'ima
   // Set up the required fields based on card type
   const getRequiredFields = () => {
     const common = ['description'];
-    const typeSpecific = {
+    const typeSpecific: Record<string, string[]> = {
       image: ['download'],
-      social: ['documentCopy'],
+      social: ['imageSequence'], // Updated from documentCopy to imageSequence
       reel: ['movie'], // Transcript is now optional for reel cards
     };
 
-    return [...common, ...typeSpecific[type]];
+    return [...common, ...typeSpecific[type as keyof typeof typeSpecific] || []];
   };
 
   const validateForm = () => {

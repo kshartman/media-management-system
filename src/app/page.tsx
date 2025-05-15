@@ -13,6 +13,7 @@ import CardUploadModal from '../components/admin/CardUploadModal';
 import CardGrid from '../components/layout/CardGrid';
 import { CardProps, ImageCardProps, SocialCardProps, ReelCardProps } from '../types';
 import { useAuth } from '../lib/authContext';
+import { useScroll } from '../contexts/ScrollContext';
 import { fetchCards, deleteCard, updateCard, getAllTags } from '../lib/api';
 
 // Sample cards for testing (fallback if API fails)
@@ -29,7 +30,9 @@ const SampleCards: CardProps[] = [
     id: '2',
     type: 'social',
     preview: 'https://placehold.co/600x400/e74c3c/FFFFFF/png?text=Social+Media',
-    documentCopy: 'https://example.com/social-media-copy.pdf',
+    imageSequence: ['https://placehold.co/600x400/e74c3c/FFFFFF/png?text=Social+Media'],
+    instagramCopy: '<p>Example Instagram copy</p>',
+    facebookCopy: '<p>Example Facebook copy</p>',
     tags: ['marketing', 'social media'],
     description: 'Social media post template for summer campaign',
   },
@@ -39,6 +42,8 @@ const SampleCards: CardProps[] = [
     preview: 'https://placehold.co/600x400/f39c12/FFFFFF/png?text=Video+Testimonial',
     movie: 'https://example.com/video.mp4',
     transcript: 'https://example.com/transcript.txt',
+    instagramCopy: '<p>Example Instagram copy for reel</p>',
+    facebookCopy: '<p>Example Facebook copy for reel</p>',
     tags: ['video', 'testimonial'],
     description: 'Customer testimonial about our services',
   },
@@ -53,7 +58,8 @@ const SampleCards: CardProps[] = [
 ];
 
 export default function Home() {
-  const { isAdmin, _login, logout } = useAuth();
+  const { isAdmin, login, logout } = useAuth();
+  const { storeScrollPosition, restoreScrollPosition } = useScroll();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -65,6 +71,7 @@ export default function Home() {
   const [cards, setCards] = useState<CardProps[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastEditedCardId, setLastEditedCardId] = useState<string | null>(null);
   
   // Fetch cards and tags from the API when the component mounts
   // Event handler for image drop on social cards
@@ -77,6 +84,12 @@ export default function Home() {
       const cardToEdit = cards.find(card => card.id === cardId);
       if (!cardToEdit || cardToEdit.type !== 'social') return;
 
+      // Store scroll position before opening modal
+      storeScrollPosition();
+      
+      // Save the ID of the card being edited
+      setLastEditedCardId(cardId);
+      
       // Set as current edit card and open modal
       setCurrentEditCard({...cardToEdit});
       
@@ -95,7 +108,7 @@ export default function Home() {
     return () => {
       document.removeEventListener('socialcard:imagedrop', handleImageDrop as EventListener);
     };
-  }, [cards]);
+  }, [cards, storeScrollPosition]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -191,7 +204,11 @@ export default function Home() {
           if (card.type === 'image') {
             files.push((card as unknown as ImageCardProps).download);
           } else if (card.type === 'social') {
-            files.push((card as unknown as SocialCardProps).documentCopy);
+            // For social cards, add all the images in the sequence
+            const socialCard = (card as unknown as SocialCardProps);
+            if (socialCard.imageSequence && socialCard.imageSequence.length > 0) {
+              files.push(...socialCard.imageSequence);
+            }
           } else if (card.type === 'reel') {
             files.push((card as unknown as ReelCardProps).movie);
             files.push((card as unknown as ReelCardProps).transcript);
@@ -281,6 +298,12 @@ export default function Home() {
   const handleEditCard = (id: string) => {
     const cardToEdit = cards.find(card => card.id === id);
     if (cardToEdit) {
+      // Store scroll position before opening modal
+      storeScrollPosition();
+      
+      // Save the ID of the card being edited
+      setLastEditedCardId(id);
+      
       // Re-create the card object to ensure React detects the change
       const cardCopy = {...cardToEdit};
       setCurrentEditCard(cardCopy);
@@ -386,6 +409,12 @@ export default function Home() {
         searchTerm
       );
       setFilteredCards(filteredAndSorted);
+      
+      // After cards are updated, restore the scroll position
+      setTimeout(() => {
+        restoreScrollPosition();
+      }, 100);
+      
     } catch (error) {
       console.error('Error updating card:', error);
       alert('Failed to update card. Please try again.');
@@ -429,7 +458,6 @@ export default function Home() {
                   availableTags={availableTags}
                   selectedCardType={selectedTypes.length === 0 ? 'all' : selectedTypes[0]}
                 />
-                {console.log('Selected types in App:', selectedTypes)}
               </div>
             )}
             <TypeDropdown
@@ -501,6 +529,7 @@ export default function Home() {
             onEdit={isAdmin ? handleEditCard : undefined}
             onDelete={isAdmin ? handleDeleteCard : undefined}
             selectedTypes={selectedTypes}
+            lastEditedCardId={lastEditedCardId}
           />
         )}
       </main>
@@ -528,7 +557,19 @@ export default function Home() {
       {showEditModal && currentEditCard && (
         <CardUploadModal
           isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
+          onClose={() => {
+            setShowEditModal(false);
+            
+            // Restore scroll position on modal close
+            setTimeout(() => {
+              restoreScrollPosition();
+              
+              // Clear the last edited card ID after restoring scroll
+              setTimeout(() => {
+                setLastEditedCardId(null);
+              }, 300);
+            }, 100);
+          }}
           onSubmit={handleCardUpdated}
           initialData={currentEditCard}
           availableTags={availableTags}

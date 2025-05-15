@@ -11,13 +11,49 @@ const { uploadLocalFileToS3, isS3Configured } = require('./utils/s3Storage');
  * @param {object} files - Multer files object
  * @param {Date} date - Date to associate with the images
  * @param {function} extractMetadata - Function to extract metadata from files
+ * @param {object} existingCardData - Optional existing card data when updating
  * @returns {Promise<object>} - Object with paths and metadata
  */
-async function processImageSequence(req, files, date, extractMetadata) {
+async function processImageSequence(req, files, date, extractMetadata, existingCardData = null) {
   // Get the sequence count from the request body
   const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
   
-  if (sequenceCount <= 0) {
+  // Check for existing image sequence when updating a card
+  const hasExistingSequence = req.body.existingImageSequence && 
+    req.method === 'PUT' && 
+    existingCardData && 
+    existingCardData.imageSequence;
+  
+  // Parse existing image sequence from request if available
+  let existingImageSequence = [];
+  let existingOriginalFileNames = [];
+  let existingFileSizes = [];
+  let existingTotalSize = 0;
+  
+  if (hasExistingSequence) {
+    try {
+      // Parse the existingImageSequence JSON string
+      existingImageSequence = JSON.parse(req.body.existingImageSequence);
+      console.log(`Found ${existingImageSequence.length} existing images in sequence`);
+      
+      // Get existing metadata if available
+      if (existingCardData.fileMetadata) {
+        existingOriginalFileNames = existingCardData.fileMetadata.imageSequenceOriginalFileNames || [];
+        existingFileSizes = existingCardData.fileMetadata.imageSequenceFileSizes || [];
+        existingTotalSize = existingCardData.fileMetadata.totalSequenceSize || 0;
+      }
+    } catch (error) {
+      console.error('Error parsing existingImageSequence:', error);
+      // Default to empty arrays if parsing fails
+      existingImageSequence = [];
+      existingOriginalFileNames = [];
+      existingFileSizes = [];
+      existingTotalSize = 0;
+    }
+  }
+  
+  // If no new files and no existing files, return empty arrays
+  if (sequenceCount <= 0 && existingImageSequence.length === 0) {
     console.log('No image sequence files detected');
     return {
       imageSequence: [],
@@ -28,13 +64,13 @@ async function processImageSequence(req, files, date, extractMetadata) {
     };
   }
   
-  console.log(`Processing ${sequenceCount} image sequence files`);
-  const sequencePaths = [];
-  const originalFileNames = [];
-  const fileSizes = [];
-  let totalSize = 0;
+  console.log(`Processing ${sequenceCount} new image sequence files (plus ${existingImageSequence.length} existing files)`);
+  const sequencePaths = [...existingImageSequence]; // Start with existing images
+  const originalFileNames = [...existingOriginalFileNames];
+  const fileSizes = [...existingFileSizes];
+  let totalSize = existingTotalSize;
   
-  // Process each image in the sequence
+  // Process each new image in the sequence
   for (let i = 0; i < sequenceCount; i++) {
     const fieldName = `imageSequence_${i}`;
     console.log(`Looking for field: ${fieldName}`);
@@ -93,7 +129,7 @@ async function processImageSequence(req, files, date, extractMetadata) {
     }
   }
   
-  console.log(`Processed ${sequencePaths.length} images in sequence, total size: ${totalSize} bytes`);
+  console.log(`Processed total of ${sequencePaths.length} images in sequence (${sequencePaths.length - existingImageSequence.length} new, ${existingImageSequence.length} existing), total size: ${totalSize} bytes`);
   
   return {
     imageSequence: sequencePaths,

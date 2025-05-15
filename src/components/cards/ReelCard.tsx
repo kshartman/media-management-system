@@ -27,7 +27,14 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
   };
 
   return (
-    <BaseCard {...baseProps} preview={props.preview} movie={props.movie} transcript={props.transcript}>
+    <BaseCard 
+      {...baseProps} 
+      preview={props.preview} 
+      movie={props.movie} 
+      transcript={props.transcript} 
+      instagramCopy={props.instagramCopy} 
+      facebookCopy={props.facebookCopy}
+    >
       <div className="relative group">
         <div 
           className="w-full aspect-[9/16] relative cursor-pointer" 

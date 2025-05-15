@@ -53,6 +53,14 @@ const cardSchema = new mongoose.Schema({
     type: String,
     // Transcript is now optional for reel cards
   },
+  instagramCopy: {
+    type: String,
+    // Optional rich text content for Instagram posts
+  },
+  facebookCopy: {
+    type: String,
+    // Optional rich text content for Facebook posts
+  },
   // File metadata
   fileMetadata: {
     date: {
@@ -69,6 +77,8 @@ const cardSchema = new mongoose.Schema({
     downloadOriginalFileName: String, // For downloadable files
     movieOriginalFileName: String, // For movie files (reel cards)
     transcriptOriginalFileName: String, // For transcript files (reel and social cards)
+    instagramCopyOriginalFileName: String, // For Instagram copy
+    facebookCopyOriginalFileName: String, // For Facebook copy
     imageSequenceOriginalFileNames: [String], // Original filenames for image sequence
     imageSequenceFileSizes: [Number] // Sizes of each image in the sequence in bytes
   }

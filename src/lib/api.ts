@@ -89,7 +89,7 @@ export const fetchCards = async (
   const response = await request(`/cards?${queryParams.toString()}`);
 
   // Map MongoDB _id to id for client-side compatibility
-  const mappedCards = response.cards.map(card => {
+  const mappedCards = response.cards.map((card: any) => {
     if ('_id' in card && !('id' in card)) {
       return {
         ...card,
@@ -223,6 +223,29 @@ export const logout = (): void => {
 export const getAllTags = async (): Promise<string[]> => {
   const response = await request('/tags');
   return response;
+};
+
+// Update only the social copy without updating the entire card
+export const updateSocialCopy = async (id: string, data: { instagramCopy?: string, facebookCopy?: string }): Promise<CardProps> => {
+  try {
+    const response = await request(`/cards/${id}/social-copy`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    
+    // Map MongoDB _id to id for client-side compatibility
+    if ('_id' in response && !('id' in response)) {
+      return {
+        ...response,
+        id: response._id,
+      };
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error updating social copy:', error);
+    throw error;
+  }
 };
 
 // User Management API Functions

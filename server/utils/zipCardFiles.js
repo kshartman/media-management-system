@@ -7,6 +7,10 @@ const JSZip = require('jszip');
 const { getFileUrl, getSignedFileUrl, getFilenameFromUrl } = require('./s3Storage');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const { htmlToText } = require('html-to-text');
+const HtmlToRtf = require('html-to-rtf');
+const pdf = require('html-pdf');
+const { promisify } = require('util');
 
 /**
  * Get the original filename from card metadata, or use a placeholder name
@@ -26,6 +30,209 @@ function getOriginalFilename(cardMetadata, fieldName, filePath) {
   // Otherwise extract from the path or use a placeholder
   const extension = path.extname(filePath);
   return `${fieldName}${extension}`;
+}
+
+/**
+ * Convert HTML content to plain text
+ * @param {string} htmlContent - HTML content to convert
+ * @returns {string} - Plain text content
+ */
+function convertHtmlToText(htmlContent) {
+  if (!htmlContent) return '';
+  
+  return htmlToText(htmlContent, {
+    wordwrap: 130,
+    selectors: [
+      { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
+      { selector: 'img', format: 'skip' }
+    ]
+  });
+}
+
+/**
+ * Convert HTML content to RTF format
+ * @param {string} htmlContent - HTML content to convert
+ * @returns {string} - RTF content
+ */
+function convertHtmlToRtf(htmlContent) {
+  if (!htmlContent) return '';
+  
+  return HtmlToRtf.convertHtmlToRtf(htmlContent);
+}
+
+/**
+ * Convert HTML content to PDF
+ * @param {string} htmlContent - HTML content to convert
+ * @returns {Promise<Buffer>} - PDF content as buffer
+ */
+function convertHtmlToPdf(htmlContent) {
+  if (!htmlContent) return Promise.resolve(Buffer.from(''));
+  
+  return new Promise((resolve, reject) => {
+    const options = {
+      format: 'A4',
+      border: {
+        top: '15mm',
+        right: '15mm',
+        bottom: '15mm',
+        left: '15mm'
+      }
+    };
+    
+    pdf.create(htmlContent, options).toBuffer((err, buffer) => {
+      if (err) {
+        console.error('Error generating PDF:', err);
+        reject(err);
+      } else {
+        resolve(buffer);
+      }
+    });
+  });
+}
+
+/**
+ * Add HTML content converted to different formats to the zip archive
+ * @param {JSZip} zip - JSZip instance
+ * @param {string} htmlContent - HTML content to convert
+ * @param {string} baseFilename - Base name for the generated files (without extension)
+ * @returns {Promise<void>}
+ */
+async function addHtmlContentToZip(zip, htmlContent, baseFilename) {
+  if (!htmlContent) return;
+  
+  try {
+    // Convert HTML to plain text
+    const textContent = convertHtmlToText(htmlContent);
+    zip.file(`${baseFilename}.txt`, textContent);
+    console.log(`Added ${baseFilename}.txt to ZIP`);
+    
+    // Convert HTML to RTF
+    const rtfContent = convertHtmlToRtf(htmlContent);
+    zip.file(`${baseFilename}.rtf`, rtfContent);
+    console.log(`Added ${baseFilename}.rtf to ZIP`);
+    
+    // Convert HTML to PDF
+    const pdfBuffer = await convertHtmlToPdf(htmlContent);
+    zip.file(`${baseFilename}.pdf`, pdfBuffer);
+    console.log(`Added ${baseFilename}.pdf to ZIP`);
+  } catch (error) {
+    console.error(`Error converting HTML content for ${baseFilename}:`, error);
+    // Continue with other conversions
+  }
+}
+
+/**
+ * Convert HTML content to plain text
+ * @param {string} html - HTML content
+ * @returns {string} - Plain text version
+ */
+function convertHtmlToText(html) {
+  if (!html) return '';
+  
+  return htmlToText(html, {
+    wordwrap: 80,
+    selectors: [
+      { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
+      { selector: 'img', format: 'skip' }
+    ]
+  });
+}
+
+/**
+ * Convert HTML content to RTF format
+ * @param {string} html - HTML content
+ * @returns {string} - RTF content
+ */
+function convertHtmlToRtf(html) {
+  if (!html) return '';
+  
+  try {
+    return HtmlToRtf.convertHtmlToRtf(html);
+  } catch (error) {
+    console.error('Error converting HTML to RTF:', error);
+    return '';
+  }
+}
+
+/**
+ * Convert HTML content to PDF
+ * @param {string} html - HTML content
+ * @returns {Promise<Buffer>} - PDF buffer
+ */
+function convertHtmlToPdf(html) {
+  if (!html) return Promise.resolve(Buffer.from(''));
+  
+  return new Promise((resolve, reject) => {
+    const options = {
+      format: 'A4',
+      border: {
+        top: '0.5in',
+        right: '0.5in',
+        bottom: '0.5in',
+        left: '0.5in'
+      }
+    };
+    
+    // Wrap HTML in basic styling
+    const styledHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; }
+          p { margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        ${html}
+      </body>
+      </html>
+    `;
+    
+    pdf.create(styledHtml, options).toBuffer((err, buffer) => {
+      if (err) {
+        console.error('Error creating PDF:', err);
+        reject(err);
+      } else {
+        resolve(buffer);
+      }
+    });
+  });
+}
+
+/**
+ * Add HTML content to ZIP in multiple formats (TXT, RTF, PDF)
+ * @param {JSZip} zip - JSZip instance
+ * @param {string} html - HTML content
+ * @param {string} baseName - Base filename (without extension)
+ * @returns {Promise<void>}
+ */
+async function addHtmlContentToZip(zip, html, baseName) {
+  if (!html || !zip || !baseName) return;
+  
+  try {
+    // Convert to plain text
+    const textContent = convertHtmlToText(html);
+    zip.file(`${baseName}.txt`, textContent);
+    
+    // Convert to RTF
+    const rtfContent = convertHtmlToRtf(html);
+    zip.file(`${baseName}.rtf`, rtfContent);
+    
+    // Convert to PDF
+    try {
+      const pdfBuffer = await convertHtmlToPdf(html);
+      zip.file(`${baseName}.pdf`, pdfBuffer);
+    } catch (pdfError) {
+      console.error(`Error creating PDF for ${baseName}:`, pdfError);
+      // Continue without PDF
+    }
+    
+    console.log(`Added ${baseName} content in multiple formats to ZIP`);
+  } catch (error) {
+    console.error(`Error adding HTML content to ZIP: ${baseName}`, error);
+    // Continue with other files
+  }
 }
 
 /**
@@ -141,6 +348,16 @@ async function createCardZip(card) {
         const filename = getOriginalFilename(card.fileMetadata, 'transcript', card.transcript);
         await addFileToZip(zip, card.transcript, filename);
       }
+      
+      // Add Instagram copy in multiple formats
+      if (card.instagramCopy) {
+        await addHtmlContentToZip(zip, card.instagramCopy, 'instagram_copy');
+      }
+      
+      // Add Facebook copy in multiple formats
+      if (card.facebookCopy) {
+        await addHtmlContentToZip(zip, card.facebookCopy, 'facebook_copy');
+      }
     } else if (card.type === 'social') {
       // For social cards: image sequence, optional preview and transcript
       if (card.preview) {
@@ -173,6 +390,16 @@ async function createCardZip(card) {
         const filename = getOriginalFilename(card.fileMetadata, 'transcript', card.transcript);
         await addFileToZip(zip, card.transcript, filename);
       }
+      
+      // Add Instagram copy in multiple formats
+      if (card.instagramCopy) {
+        await addHtmlContentToZip(zip, card.instagramCopy, 'instagram_copy');
+      }
+      
+      // Add Facebook copy in multiple formats
+      if (card.facebookCopy) {
+        await addHtmlContentToZip(zip, card.facebookCopy, 'facebook_copy');
+      }
     }
   } catch (error) {
     console.error('Error processing card files for ZIP:', error);
@@ -194,4 +421,10 @@ async function createCardZip(card) {
   });
 }
 
-module.exports = { createCardZip };
+module.exports = { 
+  createCardZip,
+  convertHtmlToText,
+  convertHtmlToRtf,
+  convertHtmlToPdf,
+  addHtmlContentToZip
+};

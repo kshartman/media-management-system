@@ -5,20 +5,30 @@ import React, { useState, useRef, useEffect } from 'react';
 interface MultiImageUploaderProps {
   initialImages?: string[];
   onChange: (files: File[]) => void;
+  onExistingImagesChange?: (urls: string[]) => void;
   isSubmitting?: boolean;
 }
 
 const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({ 
   initialImages = [], 
   onChange,
+  onExistingImagesChange,
   isSubmitting = false
 }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>(initialImages);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   
+  // Initialize with existing images from initialImages prop
+  useEffect(() => {
+    setExistingImageUrls(initialImages);
+  }, [initialImages]);
+
   // Check for dropped files from the SocialCard component
   useEffect(() => {
     // Check if we have dropped files from a SocialCard
@@ -121,6 +131,41 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
     // Notify parent component
     onChange(newFiles);
   };
+  
+  // Handle removal of existing image
+  const handleRemoveExistingImage = (index: number) => {
+    // Create new array without the removed image
+    const newExistingUrls = existingImageUrls.filter((_, i) => i !== index);
+    setExistingImageUrls(newExistingUrls);
+    
+    // Notify parent component if callback was provided
+    if (onExistingImagesChange) {
+      onExistingImagesChange(newExistingUrls);
+    }
+  };
+  
+  // Handle showing the lightbox
+  const handleShowLightbox = (imageUrl: string) => {
+    setLightboxImage(imageUrl);
+    setShowLightbox(true);
+  };
+  
+  // Safe handler for mouse up to prevent errors when element is removed
+  const handleSafeMouseUp = (e: React.MouseEvent) => {
+    // Store a reference to the current element
+    const element = e.currentTarget;
+    // Small delay to prevent lightbox from showing during drag operations
+    setTimeout(() => {
+      try {
+        // Check if element is still in the DOM
+        if (element && document.body.contains(element)) {
+          element.removeAttribute('dragging');
+        }
+      } catch (error) {
+        console.log('Element may have been removed from DOM:', error);
+      }
+    }, 100);
+  };
 
   // Handle file drop on the drop zone
   const handleContainerDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -188,45 +233,139 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
   };
 
   // Handle reordering with drag and drop
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData('text/plain', index.toString());
+  const handleDragStart = (e: React.DragEvent, index: number, isExisting: boolean = false) => {
+    // Store both the index and whether it's an existing image
+    e.dataTransfer.setData('text/plain', JSON.stringify({ index, isExisting }));
+    
+    // Add a dragging class to visually indicate the dragged item
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.add('dragging');
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
+  
+  const handleDragEnd = (e: React.DragEvent) => {
+    try {
+      // Remove the dragging class when drag ends
+      if (e.currentTarget instanceof HTMLElement && document.body.contains(e.currentTarget)) {
+        e.currentTarget.classList.remove('dragging');
+        e.currentTarget.removeAttribute('dragging');
+      }
+    } catch (error) {
+      console.log('Error in drag end handler:', error);
+    }
+  };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleDrop = (e: React.DragEvent, dropIndex: number, dropIsExisting: boolean = false) => {
     e.preventDefault();
     
     // Check if this is a reordering operation (has text/plain data)
     if (e.dataTransfer.types.includes('text/plain')) {
-      const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
-      
-      if (dragIndex === dropIndex) return;
-      
-      // Reorder the files
-      const newFiles = [...selectedFiles];
-      const newUrls = [...previewUrls];
-      
-      // Remove from original position
-      const [draggedFile] = newFiles.splice(dragIndex, 1);
-      const [draggedUrl] = newUrls.splice(dragIndex, 1);
-      
-      // Insert at new position
-      newFiles.splice(dropIndex, 0, draggedFile);
-      newUrls.splice(dropIndex, 0, draggedUrl);
-      
-      setSelectedFiles(newFiles);
-      setPreviewUrls(newUrls);
-      
-      // Notify parent component
-      onChange(newFiles);
+      try {
+        // Get the drag info with index and whether it's an existing image
+        const dragInfo = JSON.parse(e.dataTransfer.getData('text/plain'));
+        const dragIndex = dragInfo.index;
+        const dragIsExisting = dragInfo.isExisting;
+        
+        // If dropping on self, do nothing
+        if (dragIsExisting === dropIsExisting && dragIndex === dropIndex) return;
+        
+        if (dragIsExisting && dropIsExisting) {
+          // Both are existing images, reorder within existing images
+          const newExistingUrls = [...existingImageUrls];
+          
+          // Remove from original position
+          const [draggedUrl] = newExistingUrls.splice(dragIndex, 1);
+          
+          // Insert at new position
+          newExistingUrls.splice(dropIndex, 0, draggedUrl);
+          
+          setExistingImageUrls(newExistingUrls);
+          
+          // Notify parent component
+          if (onExistingImagesChange) {
+            onExistingImagesChange(newExistingUrls);
+          }
+        } else if (!dragIsExisting && !dropIsExisting) {
+          // Both are new images, reorder within new images
+          const newFiles = [...selectedFiles];
+          const newUrls = [...previewUrls];
+          
+          // Remove from original position
+          const [draggedFile] = newFiles.splice(dragIndex, 1);
+          const [draggedUrl] = newUrls.splice(dragIndex, 1);
+          
+          // Insert at new position
+          newFiles.splice(dropIndex, 0, draggedFile);
+          newUrls.splice(dropIndex, 0, draggedUrl);
+          
+          setSelectedFiles(newFiles);
+          setPreviewUrls(newUrls);
+          
+          // Notify parent component
+          onChange(newFiles);
+        } else if (dragIsExisting && !dropIsExisting) {
+          // Dragging from existing to new - this would require moving an URL to a File
+          // This is not directly possible, so we'll skip this case
+          console.warn('Dragging from existing to new images is not supported');
+        } else if (!dragIsExisting && dropIsExisting) {
+          // Dragging from new to existing - this would require moving a File to an URL
+          // This is not directly possible, so we'll skip this case
+          console.warn('Dragging from new to existing images is not supported');
+        }
+      } catch (error) {
+        console.error('Error handling drop:', error);
+      }
     }
   };
 
+  // Add some CSS for drag and drop operations
+  useEffect(() => {
+    // Add styles for dragging state
+    const styleEl = document.createElement('style');
+    styleEl.innerHTML = `
+      .dragging {
+        opacity: 0.5;
+        border: 2px dashed #3b82f6 !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+    
+    return () => {
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+  
   return (
     <div className="mb-4">
+      {/* Lightbox */}
+      {showLightbox && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowLightbox(false)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] overflow-auto">
+            <button
+              className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70"
+              onClick={() => setShowLightbox(false)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img 
+              src={lightboxImage} 
+              alt="Enlarged preview" 
+              className="max-w-full max-h-[85vh] object-contain"
+              onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on image
+            />
+          </div>
+        </div>
+      )}
+      
       <div className="font-medium mb-1 text-sm">
         Image Sequence (at least one image required)
       </div>
@@ -256,7 +395,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
       </button>
       
       <div className="text-xs text-gray-500 mb-2">
-        Drag images to reorder them in the sequence. First image will be used as preview if no preview image is provided.
+        Drag images to reorder them in the sequence. These images will be included in the download zip.
       </div>
       
       {/* Preview area with drop zone */}
@@ -285,16 +424,26 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
           </div>
         )}
         
-        {selectedFiles.length > 0 ? (
+        {selectedFiles.length > 0 || existingImageUrls.length > 0 ? (
           <div className="flex flex-wrap gap-2 p-4 relative">
+            {/* New selected files with local previews */}
             {previewUrls.map((url, index) => (
               <div 
-                key={`${url}-${index}`}
+                key={`new-${url}-${index}`}
                 className="relative w-20 h-20 border border-gray-200 rounded overflow-hidden cursor-move"
                 draggable={!isSubmitting}
-                onDragStart={(e) => handleDragStart(e, index)}
+                onDragStart={(e) => handleDragStart(e, index, false)}
                 onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, index)}
+                onDrop={(e) => handleDrop(e, index, false)}
+                onDragEnd={handleDragEnd}
+                onClick={(e) => {
+                  // If not dragging, show lightbox
+                  if (!e.currentTarget.hasAttribute('dragging')) {
+                    handleShowLightbox(url);
+                  }
+                }}
+                onMouseDown={(e) => e.currentTarget.setAttribute('dragging', 'true')}
+                onMouseUp={handleSafeMouseUp}
               >
                 <img 
                   src={url} 
@@ -303,7 +452,10 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={() => handleRemoveFile(index)}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent lightbox from opening
+                    handleRemoveFile(index);
+                  }}
                   className={`absolute top-0.5 right-0.5 bg-black bg-opacity-50 rounded-full p-0.5 text-white ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-70'}`}
                   title="Remove image"
                   disabled={isSubmitting}
@@ -313,6 +465,50 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                   </svg>
                 </button>
                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-0.5 text-[0.6rem] text-center">
+                  {index + 1}
+                </div>
+              </div>
+            ))}
+            
+            {/* Existing images from server */}
+            {existingImageUrls.map((url, index) => (
+              <div 
+                key={`existing-${index}`}
+                className="relative w-20 h-20 border border-blue-200 rounded overflow-hidden cursor-move"
+                draggable={!isSubmitting}
+                onDragStart={(e) => handleDragStart(e, index, true)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index, true)}
+                onDragEnd={handleDragEnd}
+                onClick={(e) => {
+                  // If not dragging, show lightbox
+                  if (!e.currentTarget.hasAttribute('dragging')) {
+                    handleShowLightbox(url);
+                  }
+                }}
+                onMouseDown={(e) => e.currentTarget.setAttribute('dragging', 'true')}
+                onMouseUp={handleSafeMouseUp}
+              >
+                <img 
+                  src={url} 
+                  alt={`Existing image ${index + 1}`} 
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent lightbox from opening
+                    handleRemoveExistingImage(index);
+                  }}
+                  className={`absolute top-0.5 right-0.5 bg-black bg-opacity-50 rounded-full p-0.5 text-white ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-70'}`}
+                  title="Remove image"
+                  disabled={isSubmitting}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-blue-600 bg-opacity-70 text-white py-0.5 text-[0.6rem] text-center">
                   {index + 1}
                 </div>
               </div>
