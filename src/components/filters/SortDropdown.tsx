@@ -46,7 +46,7 @@ const SortDropdown: React.FC<SortDropdownProps> = ({ onSortChange, currentSort }
   return (
     <div className="w-44 relative" ref={dropdownRef}>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-700 whitespace-nowrap">Sort:</span>
+        <span className="text-sm text-gray-700 whitespace-nowrap hidden sm:inline">Sort:</span>
         <button 
           onClick={() => setIsOpen(!isOpen)}
           className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 flex items-center justify-between gap-2 whitespace-nowrap"

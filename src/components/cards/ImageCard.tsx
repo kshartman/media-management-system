@@ -1,18 +1,64 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
+import { useAuth } from '../../lib/authContext';
 
 const ImageCard: React.FC<ImageCardProps> = (props) => {
   // Don't destructure preview and download here since we need to pass them to BaseCard
   const { ...baseProps } = props;
+  const { isAdmin } = useAuth();
+  const [isDragging, setIsDragging] = useState(false);
+  const imageRef = useRef<HTMLDivElement>(null);
+  
+  // Handle drag events
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+  
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    setIsDragging(false);
+    
+    // Get the dropped files
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    
+    // Check that files are images
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+    
+    // Custom event for image drop
+    const event = new CustomEvent('imagecard:imagedrop', {
+      detail: {
+        cardId: props.id,
+        files: imageFiles
+      }
+    });
+    
+    // Dispatch the event to be handled by the parent component
+    document.dispatchEvent(event);
+  };
 
   return (
     <BaseCard {...baseProps} preview={props.preview} download={props.download}>
       <div className="relative group">
-        <div className="w-full h-56 relative">
+        <div 
+          ref={imageRef}
+          className={`w-full h-56 relative ${isAdmin ? 'cursor-pointer' : ''} ${isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           {props.preview ? (
             <Image 
               src={props.preview}
@@ -40,6 +86,18 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
                 )}
               </div>
             </>
+          )}
+          
+          {/* Drop zone indicator (only visible when dragging and admin) */}
+          {isAdmin && isDragging && (
+            <div className="absolute inset-0 bg-blue-100 bg-opacity-70 flex items-center justify-center z-10">
+              <div className="bg-white p-3 rounded-lg shadow-md flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700">Drop to replace image</span>
+              </div>
+            </div>
           )}
           
           {/* Download Icon Overlay */}

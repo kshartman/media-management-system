@@ -59,7 +59,6 @@ const SampleCards: CardProps[] = [
 
 export default function Home() {
   const { isAdmin, login, logout } = useAuth();
-  const { storeScrollPosition, restoreScrollPosition } = useScroll();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -83,42 +82,52 @@ export default function Home() {
       
       // Find the card to edit
       const cardToEdit = cards.find(card => card.id === cardId);
-      if (!cardToEdit || cardToEdit.type !== 'social') return;
-
-      // Store scroll position before opening modal
-      storeScrollPosition();
+      if (!cardToEdit) return;
       
-      // Save the ID of the card being edited
+      // Just save the ID of the card being edited
       setLastEditedCardId(cardId);
       
       // Set as current edit card and open modal
       setCurrentEditCard({...cardToEdit});
       
-      // Store the actual File objects in a global variable for the MultiImageUploader to access
-      // This is necessary because we can't serialize File objects to sessionStorage
-      window.droppedFiles = files;
+      // Prepare files based on card type
+      if (cardToEdit.type === 'social') {
+        // For social cards, files go into the image sequence
+        window.droppedFiles = files;
+      } else if (cardToEdit.type === 'image') {
+        // For image cards, create a FormData object with the new preview/download
+        const formData = new FormData();
+        
+        // Add file as preview (the CardForm will handle it appropriately as either preview or download)
+        formData.append('preview', files[0]);
+        
+        // Store the FormData object for the CardUploadModal to use
+        window.imageCardFormData = formData;
+      }
       
       // Open edit modal
       setShowEditModal(true);
     };
 
-    // Add event listener
+    // Add event listeners for both social and image card drops
     document.addEventListener('socialcard:imagedrop', handleImageDrop as EventListener);
+    document.addEventListener('imagecard:imagedrop', handleImageDrop as EventListener);
     
-    // Remove event listener on cleanup
+    // Remove event listeners on cleanup
     return () => {
       document.removeEventListener('socialcard:imagedrop', handleImageDrop as EventListener);
+      document.removeEventListener('imagecard:imagedrop', handleImageDrop as EventListener);
     };
-  }, [cards, storeScrollPosition]);
+  }, [cards]);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
 
-        // Load cards and tags concurrently - using standard pagination
+        // Load cards and tags concurrently - fetch all cards with a large limit
         const [cardsResponse, tagsResponse] = await Promise.all([
-          fetchCards(1, { type: [], tags: [], search: '' }),
+          fetchCards(1, { type: [], tags: [], search: '' }, 100), // Use a large limit to try to get all cards at once
           getAllTags()
         ]);
         
@@ -139,6 +148,48 @@ export default function Home() {
           ''          // No search term
         );
         setFilteredCards(initialFiltered);
+        
+        // Pre-load more cards immediately if we don't have all of them
+        if (cardsResponse.cards.length < cardsResponse.totalCount) {
+          setTimeout(async () => {
+            try {
+              // Fetch page 2 immediately
+              const page2Response = await fetchCards(2, { 
+                type: [], 
+                tags: [], 
+                search: '' 
+              });
+              
+              // Combine page 1 and page 2, removing duplicates by ID
+              const combinedCards = [...cardsResponse.cards];
+              
+              // Add cards from page 2 that don't already exist in page 1
+              page2Response.cards.forEach(newCard => {
+                if (!combinedCards.some(existingCard => existingCard.id === newCard.id)) {
+                  combinedCards.push(newCard);
+                } else {
+                  console.log(`Skipping duplicate card with ID: ${newCard.id}`);
+                }
+              });
+              
+              setCards(combinedCards);
+              
+              // Re-filter with combined cards
+              const combinedFiltered = applyFiltersAndSort(
+                combinedCards,
+                [],     // Empty array means all types (no type filter)
+                [],     // No tags selected by default
+                'newest', // Default sort to newest
+                ''      // No search term
+              );
+              setFilteredCards(combinedFiltered);
+              
+              console.log(`Pre-loaded page 2, now showing ${combinedCards.length} of ${cardsResponse.totalCount} cards`);
+            } catch (error) {
+              console.error('Error pre-loading page 2:', error);
+            }
+          }, 100);
+        }
       } catch (error) {
         console.error('Error loading data:', error);
         // Fallback to sample cards if API fails
@@ -303,6 +354,48 @@ export default function Home() {
         // Preserve the type filter from the server, but apply client-side sorting
         const sorted = applyFiltersAndSort(response.cards, types, tags, currentSort, '');
         setFilteredCards(sorted);
+        
+        // Pre-load more cards immediately if we don't have all of them
+        if (response.cards.length < response.totalCount && response.totalCount > 0) {
+          setTimeout(async () => {
+            try {
+              // Fetch page 2 immediately with the same type filters
+              const page2Response = await fetchCards(2, {
+                type: types,
+                tags: tags,
+                search: searchTerm
+              });
+              
+              // Combine page 1 and page 2, removing duplicates by ID
+              const combinedCards = [...response.cards];
+              
+              // Add cards from page 2 that don't already exist in page 1
+              page2Response.cards.forEach(newCard => {
+                if (!combinedCards.some(existingCard => existingCard.id === newCard.id)) {
+                  combinedCards.push(newCard);
+                } else {
+                  console.log(`Skipping duplicate card with ID: ${newCard.id}`);
+                }
+              });
+              
+              setCards(combinedCards);
+              
+              // Re-filter with combined cards
+              const combinedFiltered = applyFiltersAndSort(
+                combinedCards,
+                types,
+                tags,
+                currentSort,
+                ''
+              );
+              setFilteredCards(combinedFiltered);
+              
+              console.log(`Pre-loaded page 2 for type filter, now showing ${combinedCards.length} of ${response.totalCount} cards`);
+            } catch (error) {
+              console.error('Error pre-loading page 2 for type filter:', error);
+            }
+          }, 100);
+        }
       } else {
         // For other filters, use client-side filtering
         console.log('Home: All cards before filtering:', cards.map(c => ({ id: c.id, type: c.type })));
@@ -312,6 +405,49 @@ export default function Home() {
         console.log('Home: Filtered cards count:', filteredAndSorted.length);
         console.log('Home: Filtered card types:', filteredAndSorted.map(c => c.type));
         setFilteredCards(filteredAndSorted);
+        
+        // If we have very few cards after filtering, we might need to load more from the server
+        if (filteredAndSorted.length < 5 && totalCardCount > filteredAndSorted.length) {
+          console.log('Few cards after client-side filtering, trying to load more from server');
+          
+          // Load more cards from server then re-filter
+          setTimeout(async () => {
+            try {
+              // Re-fetch with server-side filtering for more accurate results
+              const response = await fetchCards(1, {
+                type: types,
+                tags: tags,
+                search: searchTerm
+              }, 24); // Double the page size for this specific case
+              
+              // Make sure we don't have duplicates in the response
+              const uniqueCards = [];
+              response.cards.forEach(card => {
+                if (!uniqueCards.some(existingCard => existingCard.id === card.id)) {
+                  uniqueCards.push(card);
+                } else {
+                  console.log(`Skipping duplicate card with ID: ${card.id} in server response`);
+                }
+              });
+              
+              setCards(uniqueCards);
+              
+              // Re-apply client side filtering
+              const newFilteredAndSorted = applyFiltersAndSort(
+                uniqueCards,
+                types,
+                tags,
+                currentSort,
+                searchTerm
+              );
+              
+              setFilteredCards(newFilteredAndSorted);
+              setTotalCardCount(response.totalCount);
+            } catch (error) {
+              console.error('Error loading more cards for client-side filtering:', error);
+            }
+          }, 100);
+        }
       }
     } catch (error) {
       console.error('Error applying filters:', error);
@@ -349,6 +485,27 @@ export default function Home() {
       // Apply client-side sorting while preserving server-side filtering
       const sorted = applyFiltersAndSort(response.cards, selectedTypes, selectedTags, currentSort, '');
       setFilteredCards(sorted);
+      
+      // If we have fewer cards than the total, try to load more immediately
+      if (response.cards.length < response.totalCount) {
+        setTimeout(async () => {
+          try {
+            const page2Response = await fetchCards(2, {
+              type: selectedTypes,
+              tags: selectedTags,
+              search: search
+            });
+            
+            // Combine both pages and apply filters/sort
+            const combinedCards = [...response.cards, ...page2Response.cards];
+            const newSorted = applyFiltersAndSort(combinedCards, selectedTypes, selectedTags, currentSort, '');
+            setCards(combinedCards);
+            setFilteredCards(newSorted);
+          } catch (error) {
+            console.error('Error pre-loading page 2:', error);
+          }
+        }, 100);
+      }
     } catch (error) {
       console.error('Error searching cards:', error);
     } finally {
@@ -369,11 +526,13 @@ export default function Home() {
   };
 
   const handleEditCard = (id: string) => {
+    console.log(`Attempting to edit card with ID: ${id}`);
+    
+    // First check if the card exists in our current state
     const cardToEdit = cards.find(card => card.id === id);
+    
     if (cardToEdit) {
-      // Store scroll position before opening modal
-      storeScrollPosition();
-      
+      console.log(`Found card to edit:`, cardToEdit);
       // Save the ID of the card being edited
       setLastEditedCardId(id);
       
@@ -381,6 +540,24 @@ export default function Home() {
       const cardCopy = {...cardToEdit};
       setCurrentEditCard(cardCopy);
       setShowEditModal(true);
+    } else {
+      // If we can't find the card, try to fetch it directly
+      console.log(`Couldn't find card with ID ${id} in current state, fetching directly...`);
+      
+      // Add a small delay to let any UI updates complete first
+      setTimeout(async () => {
+        try {
+          const fetchedCard = await fetchCardById(id);
+          console.log('Successfully fetched individual card:', fetchedCard);
+          
+          setLastEditedCardId(id);
+          setCurrentEditCard(fetchedCard);
+          setShowEditModal(true);
+        } catch (error) {
+          console.error(`Error fetching individual card with ID ${id}:`, error);
+          alert('Error loading card data. Please try refreshing the page.');
+        }
+      }, 10);
     }
   };
 
@@ -464,12 +641,22 @@ export default function Home() {
       await updateCard(currentEditCard.id, formData);
       setShowEditModal(false);
 
-      // Refresh the cards and tags
+      // Refresh the cards and tags - with a larger page size to get all cards
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(),
+        fetchCards(1, { 
+          type: selectedTypes, 
+          tags: selectedTags, 
+          search: searchTerm 
+        }, 100), // Use a larger limit to get all cards at once
         getAllTags()
       ]);
+      
+      console.log(`After update: Retrieved ${cardsResponse.cards.length} of ${cardsResponse.totalCount} cards`);
 
+      // Store the total count
+      setTotalCardCount(cardsResponse.totalCount);
+      
+      // Set all cards first
       setCards(cardsResponse.cards);
       setAvailableTags(tagsResponse);
 
@@ -483,11 +670,45 @@ export default function Home() {
       );
       setFilteredCards(filteredAndSorted);
       
-      // After cards are updated, restore the scroll position
-      setTimeout(() => {
-        restoreScrollPosition();
-      }, 100);
-      
+      // No need to refresh the page or restore scroll position
+      // Just make sure we have all cards loaded
+      if (cardsResponse.cards.length < cardsResponse.totalCount) {
+        console.log('Need to fetch more cards after update...');
+        
+        // If we don't have all cards, load the rest
+        try {
+          const moreCardsResponse = await fetchCards(2, {
+            type: selectedTypes,
+            tags: selectedTags,
+            search: searchTerm
+          }, 100);
+          
+          // Combine with existing cards (avoiding duplicates)
+          const allCards = [...cardsResponse.cards];
+          moreCardsResponse.cards.forEach(card => {
+            if (!allCards.some(c => c.id === card.id)) {
+              allCards.push(card);
+            }
+          });
+          
+          // Update the state with all cards
+          setCards(allCards);
+          
+          // Reapply filters
+          const newFilteredCards = applyFiltersAndSort(
+            allCards,
+            selectedTypes,
+            selectedTags,
+            currentSort,
+            searchTerm
+          );
+          setFilteredCards(newFilteredCards);
+          
+          console.log(`Now have ${allCards.length} total cards loaded`);
+        } catch (error) {
+          console.error('Error loading additional cards after update:', error);
+        }
+      }
     } catch (error) {
       console.error('Error updating card:', error);
       alert('Failed to update card. Please try again.');
@@ -594,7 +815,7 @@ export default function Home() {
         {!loading && totalCardCount > 0 && (
           <div className="mb-4 text-gray-600 text-sm">
             Showing {filteredCards.length} of {totalCardCount} cards
-            {selectedTypes.length > 0 && ` (filtered by ${selectedTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')})`}
+            {selectedTypes.length > 0 && ` (${selectedTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')} only)`}
           </div>
         )}
         
@@ -654,15 +875,8 @@ export default function Home() {
           onClose={() => {
             setShowEditModal(false);
             
-            // Restore scroll position on modal close
-            setTimeout(() => {
-              restoreScrollPosition();
-              
-              // Clear the last edited card ID after restoring scroll
-              setTimeout(() => {
-                setLastEditedCardId(null);
-              }, 300);
-            }, 100);
+            // Just clear the last edited card ID
+            setLastEditedCardId(null);
           }}
           onSubmit={handleCardUpdated}
           initialData={currentEditCard}

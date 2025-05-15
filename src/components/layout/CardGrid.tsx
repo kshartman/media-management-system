@@ -42,10 +42,16 @@ const CardGrid: React.FC<CardGridProps> = ({
     setCards(initialCards);
     setPage(1);
     setHasMore(true);
+    
+    // Reset viewport check flag when cards change
+    viewportCheckRef.current = false;
   }, [initialCards]);
   
   // Initialize the observer ref with null initially
   const observer = useRef<IntersectionObserver | null>(null);
+  
+  // Ref to track if viewport has enough content
+  const viewportCheckRef = useRef<boolean>(false);
 
   const loadMoreCards = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -58,7 +64,20 @@ const CardGrid: React.FC<CardGridProps> = ({
       if (newCards.length === 0) {
         setHasMore(false);
       } else {
-        setCards(prev => [...prev, ...newCards]);
+        setCards(prev => {
+          const combined = [...prev];
+          
+          // Only add cards that don't already exist
+          newCards.forEach(newCard => {
+            if (!combined.some(existingCard => existingCard.id === newCard.id)) {
+              combined.push(newCard);
+            } else {
+              console.log(`Skipping duplicate card with ID: ${newCard.id} when loading more`);
+            }
+          });
+          
+          return combined;
+        });
         setPage(nextPage);
       }
     } catch (error) {
@@ -80,6 +99,36 @@ const CardGrid: React.FC<CardGridProps> = ({
 
     if (node) observer.current.observe(node);
   }, [loading, hasMore, loadMoreCards]);
+  
+  // Check if we need to load more cards to fill the viewport
+  useEffect(() => {
+    if (cards.length === 0 || loading || !hasMore) return;
+    
+    // Only run this check if we have initial cards
+    const checkViewportAndLoadMore = () => {
+      // If content doesn't fill the viewport, load more
+      if (document.body.scrollHeight <= window.innerHeight && !viewportCheckRef.current) {
+        console.log('Viewport not filled, loading more cards automatically');
+        viewportCheckRef.current = true;
+        loadMoreCards();
+      }
+    };
+    
+    // Delay check slightly to ensure DOM has updated, but not too long
+    const timeoutId = setTimeout(checkViewportAndLoadMore, 50);
+    
+    // Also set a backup timeout with a longer delay in case the first one doesn't trigger
+    const backupTimeoutId = setTimeout(() => {
+      // Force reset the viewport check flag to ensure we can try again
+      viewportCheckRef.current = false;
+      checkViewportAndLoadMore();
+    }, 500);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      clearTimeout(backupTimeoutId);
+    };
+  }, [cards, loading, hasMore, loadMoreCards]);
 
   // Function to handle refs for each card
   const setCardRef = useCallback((id: string, element: HTMLDivElement | null) => {

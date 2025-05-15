@@ -17,7 +17,7 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   
   // Make sure type IDs exactly match the database model's enum values 
   const typeOptions = [
-    { id: 'all', label: 'All Types' },
+    { id: 'all', label: 'All' },
     { id: 'image', label: 'Images' },
     { id: 'social', label: 'Posts' },
     { id: 'reel', label: 'Reels' }
@@ -35,10 +35,10 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   // Determine current selection label
   const getCurrentSelectionLabel = () => {
     if (selectedTypes.length === 0) {
-      return 'All Types';
+      return 'All';
     } else {
       const selectedType = typeOptions.find(type => type.id === selectedTypes[0]);
-      return selectedType ? selectedType.label : 'All Types';
+      return selectedType ? selectedType.label : 'All';
     }
   };
   
