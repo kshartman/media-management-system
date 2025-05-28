@@ -240,7 +240,7 @@ export const getAllTags = async (): Promise<string[]> => {
 };
 
 // Update only the social copy without updating the entire card
-export const updateSocialCopy = async (id: string, data: { instagramCopy?: string, facebookCopy?: string }): Promise<CardProps> => {
+export const updateSocialCopy = async (id: string, data: { instagramCopy?: string | null, facebookCopy?: string | null }): Promise<CardProps> => {
   try {
     const response = await request(`/cards/${id}/social-copy`, {
       method: 'PATCH',

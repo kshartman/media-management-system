@@ -238,12 +238,31 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
     const previewUrl = await generateAndUploadPreview(localFilePath, originalFilename, true);
     console.log(`Preview generated successfully: ${previewUrl}`);
     
+    // Try to get actual video dimensions using ffprobe
+    let width = VIDEO_DIMENSIONS.WIDTH;
+    let height = VIDEO_DIMENSIONS.HEIGHT;
+    
+    try {
+      const videoUtils = require('./utils/videoUtils');
+      const videoMetadata = await videoUtils.getVideoMetadata(localFilePath);
+      
+      if (videoMetadata && videoMetadata.width && videoMetadata.height) {
+        width = videoMetadata.width;
+        height = videoMetadata.height;
+        console.log(`Using actual video dimensions: ${width}×${height}`);
+      } else {
+        console.log(`Using default video dimensions: ${width}×${height}`);
+      }
+    } catch (metadataError) {
+      console.error('Error getting video metadata, using default dimensions:', metadataError);
+    }
+    
     // Set preview path and metadata
     previewPath = previewUrl;
     metadata.fileMetadata.previewOriginalFileName = "Auto-generated from video frame";
     metadata.fileMetadata.isPreviewGenerated = true;
-    metadata.fileMetadata.width = VIDEO_DIMENSIONS.WIDTH;
-    metadata.fileMetadata.height = VIDEO_DIMENSIONS.HEIGHT;
+    metadata.fileMetadata.width = width; 
+    metadata.fileMetadata.height = height;
     metadata.fileMetadata.fileSize = file.size;
   } catch (previewError) {
     console.error('Error generating preview:', previewError);
@@ -563,47 +582,228 @@ const getBaseUrl = (req) => {
   return `${req.protocol}://${req.get('host')}`;
 };
 
+// Function to guess dimensions from filename or common types
+function guessDimensionsFromUrl(url) {
+  const filename = url.split('/').pop().toLowerCase();
+  
+  // Try to extract dimensions from filename patterns like 800x600, 1920x1080, etc.
+  const dimensionsMatch = filename.match(/(\d+)\s*[x×]\s*(\d+)/i);
+  if (dimensionsMatch) {
+    return {
+      width: parseInt(dimensionsMatch[1], 10),
+      height: parseInt(dimensionsMatch[2], 10)
+    };
+  }
+  
+  // Assign default dimensions based on file patterns
+  if (filename.includes('logo')) {
+    return { width: 800, height: 600 };
+  } else if (filename.includes('icon')) {
+    return { width: 512, height: 512 };
+  } else if (filename.includes('banner') || filename.includes('header')) {
+    return { width: 1200, height: 300 };
+  } else if (filename.includes('profile') || filename.includes('avatar')) {
+    return { width: 400, height: 400 };
+  } else if (filename.endsWith('.png') || filename.endsWith('.jpg') || filename.endsWith('.jpeg')) {
+    // Default dimensions for standard images
+    return { width: 1920, height: 1080 };
+  }
+  
+  // Couldn't determine dimensions
+  return { width: null, height: null };
+}
+
+// Check if URL is an S3 URL
+function isS3Url(url) {
+  return url && (
+    url.includes('amazonaws.com') || 
+    url.includes('zivepublic.s3') || 
+    url.startsWith('https://s3.')
+  );
+}
+
+// Using VIDEO_DIMENSIONS from earlier import
+
 // Utility function to extract metadata from uploaded files
 const extractFileMetadata = async (filePath, providedDate = null) => {
   try {
-    const fullPath = path.join(__dirname, filePath);
-    const stats = fs.statSync(fullPath);
-    const fileSize = stats.size; // File size in bytes
-    const date = providedDate || new Date();
-    let width = null;
-    let height = null;
+    // Check if the path is a direct file path (used during the upload process)
+    // In this case, we can extract dimensions directly from the file
+    if (fs.existsSync(filePath)) {
+      console.log(`Extracting metadata from direct file path: ${filePath}`);
+      const stats = fs.statSync(filePath);
+      const fileSize = stats.size; // File size in bytes
+      const date = providedDate || new Date();
+      let width = null;
+      let height = null;
 
-    // Get image dimensions for image files
-    const extension = path.extname(filePath).toLowerCase();
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      // Get image dimensions for image files
+      const extension = path.extname(filePath).toLowerCase();
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.webm'];
 
-    if (imageExtensions.includes(extension)) {
-      try {
-        // Use image-size to get dimensions
-        const dimensions = sizeOf(fullPath);
-        width = dimensions.width;
-        height = dimensions.height;
-      } catch (err) {
-        console.error('Error getting image dimensions:', err);
+      if (imageExtensions.includes(extension)) {
+        try {
+          // Use image-size to get dimensions directly from the file
+          const dimensions = sizeOf(filePath);
+          width = dimensions.width;
+          height = dimensions.height;
+          console.log(`Successfully extracted dimensions from file: ${width}×${height}`);
+        } catch (err) {
+          console.error('Error getting image dimensions from direct file:', err);
+          // Fall back to guessing dimensions
+          const guessedDimensions = guessDimensionsFromUrl(filePath);
+          width = guessedDimensions.width;
+          height = guessedDimensions.height;
+        }
+      } else if (videoExtensions.includes(extension)) {
+        try {
+          // Try to extract actual dimensions from the video file using ffprobe
+          const videoUtils = require('./utils/videoUtils');
+          const metadata = await videoUtils.getVideoMetadata(filePath);
+          
+          if (metadata && metadata.width && metadata.height) {
+            width = metadata.width;
+            height = metadata.height;
+            console.log(`Extracted actual video dimensions: ${width}×${height}`);
+          } else {
+            // Fall back to constants if metadata extraction fails
+            width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
+            height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
+            console.log(`Using video dimensions from constants: ${width}×${height}`);
+          }
+        } catch (videoError) {
+          console.error('Error extracting video metadata, using constants:', videoError);
+          width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
+          height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
+        }
       }
-    } else if (extension === '.mp4' || extension === '.mov' || extension === '.avi' || extension === '.webm') {
-      // For video files, we could use something like ffprobe here
-      // But we'll leave this for a future enhancement
-      // For now, we'll rely on sharp's metadata extraction capabilities for images only
-    }
 
-    return {
-      date,
-      width,
-      height,
-      fileSize
-    };
+      return {
+        date,
+        width,
+        height,
+        fileSize
+      };
+    }
+    
+    // Handle S3 URLs
+    if (isS3Url(filePath)) {
+      console.log(`Processing S3 file for metadata: ${filePath}`);
+      
+      // Try to guess dimensions from the URL/filename
+      const guessedDimensions = guessDimensionsFromUrl(filePath);
+      console.log(`Guessed dimensions from URL: ${guessedDimensions.width}×${guessedDimensions.height}`);
+      
+      // For videos, use constants instead of guessing
+      const extension = path.extname(filePath).toLowerCase();
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.webm'];
+      
+      if (videoExtensions.includes(extension)) {
+        guessedDimensions.width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait
+        guessedDimensions.height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait
+        console.log(`Using standard video dimensions for S3 video: ${guessedDimensions.width}×${guessedDimensions.height}`);
+      }
+      
+      // For S3 files, set a default size since we can't determine it without downloading
+      const defaultFileSize = 1024 * 1024; // 1MB as a reasonable default
+      
+      return {
+        date: providedDate || new Date(),
+        width: guessedDimensions.width,
+        height: guessedDimensions.height,
+        fileSize: defaultFileSize
+      };
+    }
+    
+    // Handle relative paths (paths that need to be joined with __dirname)
+    const fullPath = path.join(__dirname, filePath);
+    
+    try {
+      const stats = fs.statSync(fullPath);
+      const fileSize = stats.size; // File size in bytes
+      const date = providedDate || new Date();
+      let width = null;
+      let height = null;
+
+      // Get image dimensions for image files
+      const extension = path.extname(filePath).toLowerCase();
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.webm'];
+
+      if (imageExtensions.includes(extension)) {
+        try {
+          // Use image-size to get dimensions
+          const dimensions = sizeOf(fullPath);
+          width = dimensions.width;
+          height = dimensions.height;
+          console.log(`Successfully extracted dimensions from relative path: ${width}×${height}`);
+        } catch (err) {
+          console.error('Error getting image dimensions:', err);
+          
+          // Fall back to guessing dimensions
+          const guessedDimensions = guessDimensionsFromUrl(filePath);
+          width = guessedDimensions.width;
+          height = guessedDimensions.height;
+        }
+      } else if (videoExtensions.includes(extension)) {
+        try {
+          // Try to extract actual dimensions from the video file using ffprobe
+          const videoUtils = require('./utils/videoUtils');
+          const metadata = await videoUtils.getVideoMetadata(fullPath);
+          
+          if (metadata && metadata.width && metadata.height) {
+            width = metadata.width;
+            height = metadata.height;
+            console.log(`Extracted actual video dimensions: ${width}×${height}`);
+          } else {
+            // Fall back to constants if metadata extraction fails
+            width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
+            height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
+            console.log(`Using video dimensions from constants: ${width}×${height}`);
+          }
+        } catch (videoError) {
+          console.error('Error extracting video metadata, using constants:', videoError);
+          width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
+          height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
+        }
+      }
+
+      return {
+        date,
+        width,
+        height,
+        fileSize
+      };
+    } catch (fsError) {
+      console.error('File not accessible:', fsError);
+      
+      // If file not accessible, try to guess dimensions from filename
+      const guessedDimensions = guessDimensionsFromUrl(filePath);
+      
+      // For videos, use constants instead of guessing
+      const extension = path.extname(filePath).toLowerCase();
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.webm'];
+      
+      if (videoExtensions.includes(extension)) {
+        guessedDimensions.width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait
+        guessedDimensions.height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait
+        console.log(`Using standard video dimensions for inaccessible video: ${guessedDimensions.width}×${guessedDimensions.height}`);
+      }
+      
+      return {
+        date: providedDate || new Date(),
+        width: guessedDimensions.width,
+        height: guessedDimensions.height,
+        fileSize: null
+      };
+    }
   } catch (error) {
     console.error('Error extracting file metadata:', error);
     return {
       date: providedDate || new Date(),
-      width: null,
-      height: null,
+      width: 1920, // Default width for images
+      height: 1080, // Default height for images
       fileSize: null
     };
   }
@@ -2603,16 +2803,44 @@ app.patch('/api/cards/:id/social-copy', authMiddleware, async (req, res) => {
     // Prepare update object with only the provided fields
     const updateData = {};
     if (instagramCopy !== undefined) {
-      updateData.instagramCopy = instagramCopy;
+      // If null or empty string after trimming, remove the field
+      if (instagramCopy === null || (typeof instagramCopy === 'string' && instagramCopy.trim() === '')) {
+        updateData.$unset = { ...updateData.$unset, instagramCopy: "" };
+      } else {
+        updateData.instagramCopy = instagramCopy;
+      }
     }
+    
     if (facebookCopy !== undefined) {
-      updateData.facebookCopy = facebookCopy;
+      // If null or empty string after trimming, remove the field
+      if (facebookCopy === null || (typeof facebookCopy === 'string' && facebookCopy.trim() === '')) {
+        updateData.$unset = { ...updateData.$unset, facebookCopy: "" };
+      } else {
+        updateData.facebookCopy = facebookCopy;
+      }
     }
     
     // Update the card with just the social copy fields
+    let updateOperation = {};
+    
+    // Handle both setting and unsetting fields in one operation
+    if (Object.keys(updateData).some(key => key !== '$unset')) {
+      updateOperation.$set = {};
+      Object.entries(updateData).forEach(([key, value]) => {
+        if (key !== '$unset') {
+          updateOperation.$set[key] = value;
+        }
+      });
+    }
+    
+    // Add $unset operation if needed
+    if (updateData.$unset) {
+      updateOperation.$unset = updateData.$unset;
+    }
+    
     const updatedCard = await Card.findByIdAndUpdate(
       cardId,
-      { $set: updateData },
+      updateOperation,
       { new: true } // Return the updated document
     );
     

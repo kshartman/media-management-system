@@ -1136,8 +1136,8 @@ const CardFormNew: React.FC<CardFormProps> = ({
         return (
           <>
             {renderFileInput('movie', 'Video File', 'video/*,.mp4,.mov,.avi,.webm')}
-            {renderFileInput('preview', 'Preview Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
             {renderSocialCopyButton()}
+            {renderFileInput('preview', 'Preview Image', 'image/*,.jpg,.jpeg,.png,.gif,.webp,.svg', true)}
             {renderFileInput('transcript', 'Transcript', 'application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.apple.pages,application/vnd.google-apps.document,.txt,.pdf,.srt,.docx,.pages,.gdoc', true)}
           </>
         );

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { connectToDatabase } = require('./db/connection');
 const { Card } = require('./models');
+const { isS3Configured } = require('./utils/s3Storage');
 
 // Import image-size properly
 console.log('Importing image-size module...');
@@ -28,19 +29,84 @@ try {
   imageSize = null;
 }
 
+// Function to guess dimensions from filename or common types
+function guessDimensionsFromUrl(url) {
+  const filename = url.split('/').pop().toLowerCase();
+  
+  // Try to extract dimensions from filename patterns like 800x600, 1920x1080, etc.
+  const dimensionsMatch = filename.match(/(\d+)\s*[x×]\s*(\d+)/i);
+  if (dimensionsMatch) {
+    return {
+      width: parseInt(dimensionsMatch[1], 10),
+      height: parseInt(dimensionsMatch[2], 10)
+    };
+  }
+  
+  // Assign default dimensions based on file patterns
+  if (filename.includes('logo')) {
+    return { width: 800, height: 600 };
+  } else if (filename.includes('icon')) {
+    return { width: 512, height: 512 };
+  } else if (filename.includes('banner') || filename.includes('header')) {
+    return { width: 1200, height: 300 };
+  } else if (filename.includes('profile') || filename.includes('avatar')) {
+    return { width: 400, height: 400 };
+  } else if (filename.endsWith('.png') || filename.endsWith('.jpg') || filename.endsWith('.jpeg')) {
+    // Default dimensions for standard images
+    return { width: 1920, height: 1080 };
+  }
+  
+  // Couldn't determine dimensions
+  return { width: null, height: null };
+}
+
+// Check if URL is an S3 URL
+function isS3Url(url) {
+  return url && (
+    url.includes('amazonaws.com') || 
+    url.includes('zivepublic.s3') || 
+    url.startsWith('https://s3.')
+  );
+}
+
 // Extract metadata from files
 async function extractFileMetadata(filePath, providedDate = null) {
   try {
+    // Handle S3 URLs directly
+    if (isS3Url(filePath)) {
+      console.log(`  Processing S3 file: ${filePath}`);
+      
+      // Try to guess dimensions from the URL/filename
+      const guessedDimensions = guessDimensionsFromUrl(filePath);
+      console.log(`  Guessed dimensions from URL: ${guessedDimensions.width}×${guessedDimensions.height}`);
+      
+      // For S3 files, set a default size since we can't determine it without downloading
+      const defaultFileSize = 1024 * 1024; // 1MB as a reasonable default
+      
+      return {
+        date: providedDate || new Date(),
+        width: guessedDimensions.width,
+        height: guessedDimensions.height,
+        fileSize: defaultFileSize
+      };
+    }
+    
+    // Handle local files
     const fullPath = path.join(__dirname, filePath);
-    console.log(`  Processing file: ${fullPath}`);
+    console.log(`  Processing local file: ${fullPath}`);
 
     // Check if the file exists
     if (!fs.existsSync(fullPath)) {
       console.log(`  File not found: ${fullPath}`);
+      
+      // Try to guess dimensions from the filename
+      const guessedDimensions = guessDimensionsFromUrl(filePath);
+      console.log(`  Guessed dimensions from filename: ${guessedDimensions.width}×${guessedDimensions.height}`);
+      
       return {
         date: providedDate || new Date(),
-        width: null,
-        height: null,
+        width: guessedDimensions.width,
+        height: guessedDimensions.height,
         fileSize: null
       };
     }
@@ -70,22 +136,19 @@ async function extractFileMetadata(filePath, providedDate = null) {
           console.log(`  Can't extract dimensions: imageSize is not a function`);
 
           // Fallback: estimate dimensions based on filename patterns
-          if (fullPath.includes('sample-image')) {
-            width = 1920;
-            height = 1080;
-            console.log(`  Using fallback dimensions for sample image: ${width}×${height}`);
-          } else if (fullPath.includes('sample-reel')) {
-            width = 1280;
-            height = 720;
-            console.log(`  Using fallback dimensions for sample reel: ${width}×${height}`);
-          } else if (fullPath.includes('ZIVE-logo')) {
-            width = 800;
-            height = 600;
-            console.log(`  Using fallback dimensions for logo: ${width}×${height}`);
-          }
+          const guessedDimensions = guessDimensionsFromUrl(filePath);
+          width = guessedDimensions.width;
+          height = guessedDimensions.height;
+          console.log(`  Using fallback dimensions: ${width}×${height}`);
         }
       } catch (err) {
         console.error(`  Error getting image dimensions:`, err.message);
+        
+        // Fall back to guessed dimensions
+        const guessedDimensions = guessDimensionsFromUrl(filePath);
+        width = guessedDimensions.width;
+        height = guessedDimensions.height;
+        console.log(`  Using fallback dimensions after error: ${width}×${height}`);
       }
     }
 
@@ -97,10 +160,12 @@ async function extractFileMetadata(filePath, providedDate = null) {
     };
   } catch (error) {
     console.error('Error extracting file metadata:', error.message);
+    
+    // Last resort: provide default values
     return {
       date: providedDate || new Date(),
-      width: null,
-      height: null,
+      width: 1920, // Default width for images
+      height: 1080, // Default height for images
       fileSize: null
     };
   }

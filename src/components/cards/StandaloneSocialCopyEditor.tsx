@@ -53,10 +53,23 @@ const StandaloneSocialCopyEditor: React.FC<StandaloneSocialCopyEditorProps> = ({
     setError(null);
     
     try {
-      // Only include social copy fields that have content to avoid overwriting with empty strings
-      const updateData: { instagramCopy?: string, facebookCopy?: string } = {};
-      if (instagramCopy) updateData.instagramCopy = instagramCopy;
-      if (facebookCopy) updateData.facebookCopy = facebookCopy;
+      // Only include non-empty social copy fields to avoid overwriting with empty strings
+      // Empty strings after trimming will be deleted from database
+      const updateData: { instagramCopy?: string | null, facebookCopy?: string | null } = {};
+      
+      // If content exists (not empty after trimming), include it
+      // Otherwise explicitly set to null to delete from database
+      if (instagramCopy) {
+        updateData.instagramCopy = instagramCopy;
+      } else {
+        updateData.instagramCopy = null; // Delete from database if empty
+      }
+      
+      if (facebookCopy) {
+        updateData.facebookCopy = facebookCopy;
+      } else {
+        updateData.facebookCopy = null; // Delete from database if empty
+      }
       
       // Save using the PATCH endpoint
       const updatedCard = await updateSocialCopy(cardId, updateData);

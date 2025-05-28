@@ -83,7 +83,30 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
       const localFilePath = path.join(__dirname, 'uploads', file.filename);
       let storagePath = `/uploads/${file.filename}`;
       
-      // If S3 is configured, upload to S3 after processing locally
+      // Extract metadata from the local file BEFORE S3 upload
+      let fileSize = file.size || 0;
+      let width = null;
+      let height = null;
+      
+      // Always extract metadata from local file if the function is provided
+      if (extractMetadata) {
+        try {
+          // Always use the local file path for metadata extraction
+          const metadata = await extractMetadata(localFilePath, date);
+          if (metadata.fileSize) {
+            fileSize = metadata.fileSize;
+          }
+          if (metadata.width && metadata.height) {
+            width = metadata.width;
+            height = metadata.height;
+            console.log(`Extracted dimensions for image ${i}: ${width}×${height}`);
+          }
+        } catch (metadataError) {
+          console.error(`Error extracting metadata for sequence image ${i}:`, metadataError);
+        }
+      }
+      
+      // If S3 is configured, upload to S3 after extracting metadata from local file
       if (isS3Configured) {
         try {
           const s3Url = await uploadLocalFileToS3(localFilePath);
@@ -107,20 +130,6 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
         }
       }
       
-      // Extract metadata if function is provided
-      let fileSize = file.size || 0;
-      
-      if (extractMetadata && !isS3Configured) {
-        try {
-          const metadata = await extractMetadata(storagePath, date);
-          if (metadata.fileSize) {
-            fileSize = metadata.fileSize;
-          }
-        } catch (metadataError) {
-          console.error(`Error extracting metadata for sequence image ${i}:`, metadataError);
-        }
-      }
-      
       // Add to the result arrays
       sequencePaths.push(storagePath);
       originalFileNames.push(file.originalname);
@@ -136,7 +145,11 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
     imageSequenceOriginalFileNames: originalFileNames,
     imageSequenceFileSizes: fileSizes,
     totalSequenceSize: totalSize,
-    imageSequenceCount: sequencePaths.length
+    imageSequenceCount: sequencePaths.length,
+    // Include the image dimensions in the returned metadata
+    // These will be available to the card creation/update route
+    width: width,
+    height: height
   };
 }
 

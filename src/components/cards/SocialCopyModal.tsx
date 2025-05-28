@@ -37,7 +37,15 @@ const SocialCopyModal: React.FC<SocialCopyModalProps> = ({
 
   // Memoize the save handler to avoid dependency issues
   const handleSave = useCallback(() => {
-    onSave(instagramCopy, facebookCopy);
+    // Trim whitespace from both copies
+    const trimmedInstagramCopy = instagramCopy?.trim() || '';
+    const trimmedFacebookCopy = facebookCopy?.trim() || '';
+    
+    // Only pass non-empty strings
+    onSave(
+      trimmedInstagramCopy || '',
+      trimmedFacebookCopy || ''
+    );
     onClose();
   }, [onSave, onClose, instagramCopy, facebookCopy]);
 
