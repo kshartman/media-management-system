@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-WORKDIR /app/server
+WORKDIR /app
 
 # Copy package files
 COPY server/package*.json ./
@@ -11,13 +11,14 @@ RUN npm ci
 # Copy server code
 COPY server/ ./
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S backend -u 1001
+# Create uploads directory with proper permissions
+RUN mkdir -p /uploads && \
+    addgroup -g 1001 -S nodejs && \
+    adduser -S backend -u 1001 && \
+    chown -R backend:nodejs /uploads && \
+    chown -R backend:nodejs /app
 
-# Create uploads directory and set permissions
-RUN mkdir -p /uploads && chown -R backend:nodejs /uploads
-
+# Switch to non-root user
 USER backend
 
 EXPOSE 5001

@@ -19,6 +19,10 @@ RUN npm ci
 COPY src ./src
 COPY public ./public
 
+# Build arguments for environment variables
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_DOMAIN
+
 # Build the application
 RUN npm run build
 
@@ -27,20 +31,20 @@ FROM node:18-alpine AS runner
 
 WORKDIR /app
 
-# Copy built application
+# Copy necessary files from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/next.config.js ./
-COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/withMT.js ./
 
-# Install production dependencies only
+# Install production dependencies
 RUN npm ci --only=production
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
+
 USER nextjs
 
 EXPOSE 3000

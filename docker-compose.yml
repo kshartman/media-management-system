@@ -5,29 +5,43 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://marketing.shopzive.com/api}
+        NEXT_PUBLIC_DOMAIN: ${DOMAIN:-marketing.shopzive.com}
     image: media-management-frontend:latest
+    container_name: media-frontend
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://marketing.shopzive.com/api}
-      - NEXT_PUBLIC_DOMAIN=${DOMAIN:-marketing.shopzive.com}
+      - BACKEND_URL=http://backend:5001
     ports:
       - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - media-network
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     image: media-management-backend:latest
+    container_name: media-backend
     environment:
       - PORT=5001
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - UPLOAD_PATH=/uploads
       - DOMAIN=${DOMAIN:-marketing.shopzive.com}
     volumes:
-      - ${UPLOAD_PATH:-./uploads}:/uploads
+      - ${HOST_UPLOAD_PATH:-./uploads}:/uploads
     ports:
       - "5001:5001"
+    networks:
+      - media-network
+
+networks:
+  media-network:
+    driver: bridge
