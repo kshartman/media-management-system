@@ -34,7 +34,7 @@ const nextConfig = {
   },
   async rewrites() {
     // Use environment variable for backend URL, default to localhost for development
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5001';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
     
     return [
       {
