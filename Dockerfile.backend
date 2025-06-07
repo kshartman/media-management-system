@@ -1,0 +1,25 @@
+FROM node:18-alpine
+
+WORKDIR /app/server
+
+# Copy package files
+COPY server/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy server code
+COPY server/ ./
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S backend -u 1001
+
+# Create uploads directory and set permissions
+RUN mkdir -p /uploads && chown -R backend:nodejs /uploads
+
+USER backend
+
+EXPOSE 5001
+
+CMD ["node", "index.js"]
