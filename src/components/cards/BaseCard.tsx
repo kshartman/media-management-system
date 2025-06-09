@@ -167,12 +167,43 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
     }
   }, [updatedCard]);
 
+  // Body scroll locking effect for social copy modal
+  useEffect(() => {
+    if (!showSocialCopyModal) return;
+
+    // Store the original styles and scroll position
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    const scrollY = window.scrollY;
+    
+    // Store the scroll position value in local state for this component instance
+    const scrollPosForThisModal = scrollY;
+    
+    // Lock body scroll and fix position
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.top = `-${scrollY}px`;
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      // Restore original style when component unmounts
+      document.body.style.overflow = originalStyle;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.documentElement.style.overflow = '';
+      
+      // Restore scroll position
+      window.scrollTo(0, scrollPosForThisModal);
+    };
+  }, [showSocialCopyModal]);
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full">
       {/* Social Copy Viewer Modal */}
       {showSocialCopyModal && activeSocialCopy && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto" 
           role="dialog"
           aria-modal="true"
           onClick={() => {
@@ -194,7 +225,8 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
           tabIndex={-1}
         >
           <div 
-            className="bg-white rounded-lg p-6 max-w-2xl max-h-[80vh] overflow-auto w-full mx-4" 
+            className="bg-white rounded-lg p-6 absolute left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 max-h-[80vh] overflow-auto" 
+            style={{ top: '120px' }}
             role="document"
             onClick={e => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}

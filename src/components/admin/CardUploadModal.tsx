@@ -63,35 +63,27 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
     };
   }, [isOpen]);
 
-  // When modal opens, fix body scroll
+  // When modal opens, inject CSS to hide overflow
   useEffect(() => {
-    if (!isOpen) return;
-
-    // Store the original styles and scroll position
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    const scrollY = window.scrollY;
-    
-    // Store the scroll position value in local state for this component instance
-    // (we'll still use the context for restoration across navigation)
-    const scrollPosForThisModal = scrollY;
-    
-    // Lock body scroll and fix position
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.top = `-${scrollY}px`;
-    document.documentElement.style.overflow = 'hidden';
+    if (isOpen) {
+      // Create a style element to inject CSS
+      const style = document.createElement('style');
+      style.id = 'modal-overflow-fix';
+      style.textContent = `
+        html, body {
+          overflow: hidden !important;
+          height: 100% !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     return () => {
-      // Restore original style when component unmounts
-      document.body.style.overflow = originalStyle;
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
-      document.documentElement.style.overflow = '';
-      
-      // Restore scroll position
-      window.scrollTo(0, scrollPosForThisModal);
+      // Remove the injected style
+      const style = document.getElementById('modal-overflow-fix');
+      if (style) {
+        style.remove();
+      }
     };
   }, [isOpen]);
 
@@ -102,9 +94,9 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
       {/* Fixed overlay covering entire viewport */}
       <div className="fixed inset-0 z-40 bg-black bg-opacity-60" />
       
-      {/* Modal container with overflow handling */}
+      {/* Modal container with overflow */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
-        <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="absolute left-1/2 transform -translate-x-1/2 w-full max-w-7xl px-4" style={{ top: '120px' }}>
           {/* Loading overlay - appears when submitting */}
           {isSubmitting && (
             <div className="fixed inset-0 z-[60] bg-white bg-opacity-70 flex flex-col items-center justify-center">
@@ -115,7 +107,7 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
           )}
   
           {/* Modal content */}
-          <div className="relative w-full max-w-3xl">
+          <div className="relative w-full max-w-3xl mx-auto">
             {/* Modal backdrop for closing */}
             <div 
               className="fixed inset-0 -z-10"

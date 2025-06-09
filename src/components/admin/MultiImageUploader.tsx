@@ -150,6 +150,37 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
     setShowLightbox(true);
   };
   
+  // Body scroll locking effect for lightbox
+  useEffect(() => {
+    if (!showLightbox) return;
+
+    // Store the original styles and scroll position
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    const scrollY = window.scrollY;
+    
+    // Store the scroll position value in local state for this component instance
+    const scrollPosForThisModal = scrollY;
+    
+    // Lock body scroll and fix position
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.top = `-${scrollY}px`;
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      // Restore original style when component unmounts
+      document.body.style.overflow = originalStyle;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.documentElement.style.overflow = '';
+      
+      // Restore scroll position
+      window.scrollTo(0, scrollPosForThisModal);
+    };
+  }, [showLightbox]);
+  
   // Safe handler for mouse up to prevent errors when element is removed
   const handleSafeMouseUp = (e: React.MouseEvent) => {
     // Store a reference to the current element
@@ -344,7 +375,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
       {/* Lightbox */}
       {showLightbox && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 overflow-auto"
           role="dialog"
           aria-modal="true"
           onClick={() => setShowLightbox(false)}
@@ -355,7 +386,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
           }}
           tabIndex={-1}
         >
-          <div className="relative max-w-4xl max-h-[90vh] overflow-auto">
+          <div className="relative max-w-4xl max-h-[90vh] overflow-auto absolute left-1/2 transform -translate-x-1/2 w-full px-4" style={{ top: '120px' }}>
             <button
               className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70"
               onClick={() => setShowLightbox(false)}

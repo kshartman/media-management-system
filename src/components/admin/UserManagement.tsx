@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserCreateInput, UserUpdateInput, getUsers, createUser, updateUser, deleteUser } from '../../lib/api';
+import { useAuth } from '../../lib/authContext';
 import UserForm from './UserForm';
 
 interface UserManagementProps {
@@ -10,6 +11,7 @@ interface UserManagementProps {
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,11 +20,21 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Fetch users on component mount
+  // Fetch users on component mount and handle body scroll
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Re-enable body scroll when modal closes
+      document.body.style.overflow = 'unset';
     }
+    
+    // Cleanup function to ensure scroll is re-enabled
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen]);
 
   const fetchUsers = async () => {
@@ -71,6 +83,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    // Prevent users from deleting themselves
+    if (currentUser && userId === currentUser.id) {
+      setError('You cannot delete your own account.');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
@@ -98,9 +116,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto" style={{ backdropFilter: 'blur(2px)' }}>
+    <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-30" style={{ backdropFilter: 'blur(2px)' }}>
       <div 
-        className="fixed inset-0 bg-black bg-opacity-30"
+        className="absolute inset-0 min-h-full"
         onClick={onClose}
         role="button"
         tabIndex={0}
@@ -112,19 +130,25 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
         aria-label="Close modal"
       ></div>
       
-      <div className="relative mx-auto mt-16 mb-16 max-w-4xl">
-        <div className="bg-white rounded-lg shadow-2xl border border-gray-200">
-          <div className="sticky top-0 z-50 bg-white px-6 py-4 border-b flex justify-between items-center rounded-t-lg">
+      <div className="absolute left-1/2 transform -translate-x-1/2 w-full max-w-4xl px-4" style={{ top: '120px' }}>
+        <div className="bg-white rounded-lg shadow-2xl border border-gray-200 relative">
+          <div className="bg-white px-6 py-4 border-b rounded-t-lg flex justify-between items-center">
             <h3 className="text-xl font-semibold text-gray-900">
               User Management
             </h3>
             <button
-              className="text-gray-500 hover:text-gray-700"
-              onClick={onClose}
+              className="text-red-500 hover:text-red-700"
+              onClick={() => {
+                // Reset form state before closing modal
+                setShowCreateForm(false);
+                setUserToEdit(null);
+                onClose();
+              }}
               title="Close"
+              aria-label="Close modal"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>

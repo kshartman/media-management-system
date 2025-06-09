@@ -120,8 +120,8 @@ const SocialCopyModal: React.FC<SocialCopyModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-hidden">
-      <div className="social-copy-modal bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col m-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto">
+      <div className="social-copy-modal bg-white rounded-lg shadow-xl absolute left-1/2 transform -translate-x-1/2 w-full max-w-4xl px-4 max-h-[90vh] flex flex-col" style={{ top: '120px' }}>
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-semibold">Edit Social Copy</h2>
           <div className="flex gap-3">
