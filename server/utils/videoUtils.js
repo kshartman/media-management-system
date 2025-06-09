@@ -12,6 +12,25 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
 
 /**
+ * Safely parses a fraction string (e.g., "30/1") to a decimal number
+ * @param {string} fractionStr - The fraction string to parse
+ * @returns {number} - The decimal result or 0 if invalid
+ */
+function parseFraction(fractionStr) {
+  if (!fractionStr || typeof fractionStr !== 'string') return 0;
+  
+  const parts = fractionStr.split('/');
+  if (parts.length !== 2) return 0;
+  
+  const numerator = parseFloat(parts[0]);
+  const denominator = parseFloat(parts[1]);
+  
+  if (isNaN(numerator) || isNaN(denominator) || denominator === 0) return 0;
+  
+  return numerator / denominator;
+}
+
+/**
  * Extracts a preview frame from a video file at the first frame (0 seconds)
  * 
  * @param {string} videoPath - Path to the video file
@@ -172,20 +191,6 @@ async function createFallbackImage(videoPath, outputPath) {
   }
 }
 
-/**
- * Format seconds into HH:MM:SS.XXX timecode format
- * 
- * @param {number} seconds 
- * @returns {string} Formatted timecode
- */
-function formatTimeToTimecode(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-}
 
 /**
  * Gets video metadata including dimensions, duration, and codec information
@@ -264,7 +269,7 @@ async function getVideoMetadata(videoPath) {
             width: videoStream?.width || 0,
             height: videoStream?.height || 0,
             codec: videoStream?.codec_name || 'unknown',
-            fps: videoStream?.r_frame_rate ? eval(videoStream.r_frame_rate) : 0
+            fps: videoStream?.r_frame_rate ? parseFraction(videoStream.r_frame_rate) : 0
           };
           
           console.log('Extracted metadata:', result);
