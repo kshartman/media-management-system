@@ -24,10 +24,8 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
   ];
 
   const handleTypeChange = (typeId: string) => {
-    console.log('TypeDropdown: Selected type:', typeId);
     // If 'all' is selected, clear the type filter (empty array)
     const newTypes = typeId === 'all' ? [] : [typeId];
-    console.log('TypeDropdown: Setting filter to:', newTypes);
     onFilterChange({ type: newTypes });
     setIsOpen(false);
   };

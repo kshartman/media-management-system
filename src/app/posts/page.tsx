@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import CardFactory from '../../components/cards/CardFactory';
 import TagDropdown from '../../components/filters/TagDropdown';
 import SortDropdown, { SortOption } from '../../components/filters/SortDropdown';
 import SearchField from '../../components/filters/SearchField';
@@ -16,11 +15,11 @@ import { useAuth } from '../../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags, fetchCardById } from '../../lib/api';
 
 export default function PostsPage() {
-  const { isAdmin, login, logout } = useAuth();
+  const { isAdmin, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
-  const selectedTypes = ['social']; // Fixed to social type
+  const selectedTypes = useMemo(() => ['social'], []); // Fixed to social type
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [currentSort, setCurrentSort] = useState<SortOption>('newest');
   const [searchTerm, setSearchTerm] = useState('');
@@ -123,10 +122,10 @@ export default function PostsPage() {
     };
 
     loadData();
-  }, []);
+  }, [selectedTypes]);
   
   // Apply all filters and sorting
-  const applyFiltersAndSort = (
+  const applyFiltersAndSort = useCallback((
     allCards: CardProps[],
     types: string[],
     tags: string[],
@@ -188,7 +187,7 @@ export default function PostsPage() {
     });
 
     return filtered;
-  };
+  }, []);
 
   const handleFilterChange = async (filters: { tags?: string[] }) => {
     setLoading(true);
@@ -251,13 +250,13 @@ export default function PostsPage() {
     }
   };
 
-  const handleSortChange = (sortOption: SortOption) => {
+  const handleSortChange = useCallback((sortOption: SortOption) => {
     setCurrentSort(sortOption);
     const filteredAndSorted = applyFiltersAndSort(cards, ['social'], selectedTags, sortOption, searchTerm);
     setFilteredCards(filteredAndSorted);
-  };
+  }, [cards, selectedTags, searchTerm, applyFiltersAndSort]);
 
-  const handleSearch = async (search: string) => {
+  const handleSearch = useCallback(async (search: string) => {
     setLoading(true);
     try {
       setSearchTerm(search);
@@ -297,7 +296,7 @@ export default function PostsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTags, currentSort, applyFiltersAndSort]);
 
   const handleLoginClick = () => {
     if (isAdmin) {
@@ -349,7 +348,7 @@ export default function PostsPage() {
       
       try {
         await deleteCard(id);
-      } catch (apiError) {
+      } catch {
         setCards(cards);
         const revertedFilteredCards = applyFiltersAndSort(
           cards,
@@ -389,6 +388,31 @@ export default function PostsPage() {
       console.error('Error refreshing data:', error);
     }
   };
+
+  // Refresh all cards (for social copy updates)
+  const handleRefreshCards = useCallback(async () => {
+    try {
+      const [cardsResponse, tagsResponse] = await Promise.all([
+        fetchCards(1, { type: ['social'], tags: selectedTags, search: searchTerm }),
+        getAllTags()
+      ]);
+
+      setTotalCardCount(cardsResponse.totalCount);
+      setCards(cardsResponse.cards);
+      setAvailableTags(tagsResponse);
+
+      const filteredAndSorted = applyFiltersAndSort(
+        cardsResponse.cards,
+        ['social'],
+        selectedTags,
+        currentSort,
+        searchTerm
+      );
+      setFilteredCards(filteredAndSorted);
+    } catch (error) {
+      console.error('Error refreshing cards:', error);
+    }
+  }, [selectedTags, searchTerm, currentSort, applyFiltersAndSort]);
 
   const handleCardUpdated = async (formData: FormData) => {
     try {
@@ -587,6 +611,7 @@ export default function PostsPage() {
             isAdmin={isAdmin}
             onEdit={isAdmin ? handleEditCard : undefined}
             onDelete={isAdmin ? handleDeleteCard : undefined}
+            onRefresh={handleRefreshCards}
             selectedTypes={selectedTypes}
             lastEditedCardId={lastEditedCardId}
           />

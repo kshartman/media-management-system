@@ -21,13 +21,11 @@ const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], 
   
   // Update currentCardType when selectedCardType prop changes
   useEffect(() => {
-    console.log('selectedCardType changed in AdminBar:', selectedCardType);
     setCurrentCardType(selectedCardType || 'all');
   }, [selectedCardType]);
 
   const handleCreateCard = async (formData: FormData) => {
     try {
-      console.log('Creating card with selectedCardType:', selectedCardType);
       
       // Social card validation - check if we have image sequence files
       if (selectedCardType === 'social') {
@@ -56,7 +54,6 @@ const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], 
         onClick={() => {
           // Update current card type from selected type prop when opening modal
           setCurrentCardType(selectedCardType);
-          console.log('Opening modal with card type:', selectedCardType);
           setIsModalOpen(true);
         }}
         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"

@@ -16,6 +16,7 @@ interface CardGridProps {
   loadMore: (page: number) => Promise<CardProps[]>;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onRefresh?: () => void;
   isAdmin?: boolean;
   selectedTypes?: string[]; // Added to know whether to group by type
   lastEditedCardId?: string | null; // To track the last edited card
@@ -26,6 +27,7 @@ const CardGrid: React.FC<CardGridProps> = ({
   loadMore, 
   onEdit, 
   onDelete,
+  onRefresh,
   isAdmin = false,
   selectedTypes = [],
   lastEditedCardId = null
@@ -71,8 +73,6 @@ const CardGrid: React.FC<CardGridProps> = ({
           newCards.forEach(newCard => {
             if (!combined.some(existingCard => existingCard.id === newCard.id)) {
               combined.push(newCard);
-            } else {
-              console.log(`Skipping duplicate card with ID: ${newCard.id} when loading more`);
             }
           });
           
@@ -108,7 +108,6 @@ const CardGrid: React.FC<CardGridProps> = ({
     const checkViewportAndLoadMore = () => {
       // If content doesn't fill the viewport, load more
       if (document.body.scrollHeight <= window.innerHeight && !viewportCheckRef.current) {
-        console.log('Viewport not filled, loading more cards automatically');
         viewportCheckRef.current = true;
         loadMoreCards();
       }
@@ -150,7 +149,7 @@ const CardGrid: React.FC<CardGridProps> = ({
           // Set the card ref for scroll restoration
           if (el) setCardRef(card.id, el);
           // Also set the infinite scroll ref if this is the last card
-          if (isLast) lastCardRef(el);
+          if (isLast && el) lastCardRef(el);
         }}
         className={isLastEdited ? 'scroll-mt-24 relative' : 'relative'}
       >
@@ -158,6 +157,7 @@ const CardGrid: React.FC<CardGridProps> = ({
           {...card} 
           onEdit={onEdit}
           onDelete={onDelete}
+          onRefresh={onRefresh}
           isAdmin={isAdmin}
         />
       </div>

@@ -31,6 +31,19 @@ const Lightbox: React.FC<LightboxProps> = ({
 
   const imagesCount = images.length;
 
+  // Navigation functions
+  const goToNext = useCallback(() => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % imagesCount);
+  }, [imagesCount]);
+
+  const goToPrevious = useCallback(() => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + imagesCount) % imagesCount);
+  }, [imagesCount]);
+
+  const togglePlay = useCallback(() => {
+    setIsPlaying((prev) => !prev);
+  }, []);
+
   // Close the lightbox when pressing Escape
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -57,7 +70,7 @@ const Lightbox: React.FC<LightboxProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'auto';
     };
-  }, [isOpen, currentIndex, isPlaying, imagesCount]);
+  }, [isOpen, currentIndex, isPlaying, imagesCount, goToNext, goToPrevious, onClose, togglePlay]);
 
   // Handle auto-play functionality
   useEffect(() => {
@@ -73,19 +86,6 @@ const Lightbox: React.FC<LightboxProps> = ({
       if (timer) clearTimeout(timer);
     };
   }, [isOpen, isPlaying, currentIndex, interval, imagesCount]);
-
-  // Navigation functions
-  const goToNext = useCallback(() => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % imagesCount);
-  }, [imagesCount]);
-
-  const goToPrevious = useCallback(() => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + imagesCount) % imagesCount);
-  }, [imagesCount]);
-
-  const togglePlay = useCallback(() => {
-    setIsPlaying((prev) => !prev);
-  }, []);
 
   // Touch event handlers for swipe navigation
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -117,11 +117,21 @@ const Lightbox: React.FC<LightboxProps> = ({
   return (
     <div 
       className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      }}
+      tabIndex={-1}
     >
       <div 
         className="w-full h-full max-w-7xl flex flex-col items-center justify-center p-4"
+        role="document"
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button 

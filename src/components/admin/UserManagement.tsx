@@ -31,7 +31,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
       setError(null);
       const data = await getUsers();
       setUsers(data);
-    } catch (err) {
+    } catch {
       setError('Failed to load users. Please try again.');
     } finally {
       setLoading(false);
@@ -46,7 +46,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
       setShowCreateForm(false);
       setSuccessMessage('User created successfully');
       fetchUsers(); // Refresh the user list
-    } catch (err) {
+    } catch {
       setError('Failed to create user. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -63,7 +63,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
       setUserToEdit(null);
       setSuccessMessage('User updated successfully');
       fetchUsers(); // Refresh the user list
-    } catch (err) {
+    } catch {
       setError('Failed to update user. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -79,7 +79,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
       await deleteUser(userId);
       setSuccessMessage('User deleted successfully');
       fetchUsers(); // Refresh the user list
-    } catch (err) {
+    } catch {
       setError('Failed to delete user. Please try again.');
     }
   };

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import CardFactory from '../components/cards/CardFactory';
 import TypeDropdown from '../components/filters/TypeDropdown';
 import TagDropdown from '../components/filters/TagDropdown';
 import SortDropdown, { SortOption } from '../components/filters/SortDropdown';
@@ -14,8 +13,7 @@ import CardGrid from '../components/layout/CardGrid';
 import Navigation from '../components/layout/Navigation';
 import { CardProps, ImageCardProps, SocialCardProps, ReelCardProps } from '../types';
 import { useAuth } from '../lib/authContext';
-import { useScroll } from '../contexts/ScrollContext';
-import { fetchCards, deleteCard, updateCard, getAllTags } from '../lib/api';
+import { fetchCards, fetchCardById, deleteCard, updateCard, getAllTags } from '../lib/api';
 
 // Sample cards for testing (fallback if API fails)
 const SampleCards: CardProps[] = [
@@ -59,7 +57,7 @@ const SampleCards: CardProps[] = [
 ];
 
 export default function Home() {
-  const { isAdmin, login, logout } = useAuth();
+  const { isAdmin, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -133,8 +131,6 @@ export default function Home() {
           getAllTags()
         ]);
         
-        // Log total count vs received cards
-        console.log(`Total cards in database: ${cardsResponse.totalCount}, Retrieved: ${cardsResponse.cards.length} (Page 1)`);
         
         // Save the total count for display
         setTotalCardCount(cardsResponse.totalCount);
@@ -169,8 +165,6 @@ export default function Home() {
               page2Response.cards.forEach(newCard => {
                 if (!combinedCards.some(existingCard => existingCard.id === newCard.id)) {
                   combinedCards.push(newCard);
-                } else {
-                  console.log(`Skipping duplicate card with ID: ${newCard.id}`);
                 }
               });
               
@@ -186,7 +180,6 @@ export default function Home() {
               );
               setFilteredCards(combinedFiltered);
               
-              console.log(`Pre-loaded page 2, now showing ${combinedCards.length} of ${cardsResponse.totalCount} cards`);
             } catch (error) {
               console.error('Error pre-loading page 2:', error);
             }
@@ -221,24 +214,18 @@ export default function Home() {
     sort: SortOption,
     search: string = ''
   ) => {
-    console.log('applyFiltersAndSort: Starting with', allCards.length, 'cards');
-    console.log('applyFiltersAndSort: Filtering by types:', types);
     
     // Apply filters
     let filtered = [...allCards];
 
     // Filter by type if any types are selected
     if (types.length > 0) {
-      console.log('applyFiltersAndSort: Filtering by type:', types);
       filtered = filtered.filter(card => {
         // Add a case-insensitive match for better compatibility
         const cardType = card.type?.toLowerCase();
         const typeMatches = types.some(t => t.toLowerCase() === cardType);
-        console.log(`Card type "${card.type}" (${typeof card.type}) ${typeMatches ? 'matches' : 'does not match'} filter "${types}"`);
         return typeMatches;
       });
-      console.log('applyFiltersAndSort: After type filtering:', filtered.length, 'cards remain');
-      console.log('applyFiltersAndSort: Remaining card types:', filtered.map(c => c.type));
     }
 
     // Filter by tags if any tags are selected
@@ -317,13 +304,11 @@ export default function Home() {
   };
 
   const handleFilterChange = async (filters: { type?: string[], tags?: string[] }) => {
-    console.log('Home: Filter change received:', filters);
     setLoading(true);
     
     try {
       // Update selected types if provided
       if (filters.type !== undefined) {
-        console.log('Home: Setting selectedTypes from', selectedTypes, 'to', filters.type);
         setSelectedTypes(filters.type);
       }
 
@@ -336,7 +321,6 @@ export default function Home() {
       const types = filters.type !== undefined ? filters.type : selectedTypes;
       const tags = filters.tags !== undefined ? filters.tags : selectedTags;
       
-      console.log('Home: Applying filters with types:', types);
       
       // Fetch filtered cards directly from the server for type filters - first page only
       if (filters.type !== undefined) {
@@ -349,8 +333,6 @@ export default function Home() {
         // Update all cards, available tags, and total count
         setCards(response.cards);
         setTotalCardCount(response.totalCount);
-        console.log('Home: Fetched cards from server:', response.cards.length, 'of', response.totalCount, 'total');
-        console.log('Home: Card types from server:', response.cards.map(c => c.type));
         
         // Apply client-side sort only - we already have server-side filtered cards
         // Preserve the type filter from the server, but apply client-side sorting
@@ -375,8 +357,6 @@ export default function Home() {
               page2Response.cards.forEach(newCard => {
                 if (!combinedCards.some(existingCard => existingCard.id === newCard.id)) {
                   combinedCards.push(newCard);
-                } else {
-                  console.log(`Skipping duplicate card with ID: ${newCard.id}`);
                 }
               });
               
@@ -392,7 +372,6 @@ export default function Home() {
               );
               setFilteredCards(combinedFiltered);
               
-              console.log(`Pre-loaded page 2 for type filter, now showing ${combinedCards.length} of ${response.totalCount} cards`);
             } catch (error) {
               console.error('Error pre-loading page 2 for type filter:', error);
             }
@@ -400,17 +379,13 @@ export default function Home() {
         }
       } else {
         // For other filters, use client-side filtering
-        console.log('Home: All cards before filtering:', cards.map(c => ({ id: c.id, type: c.type })));
         
         // Apply filters and sort
         const filteredAndSorted = applyFiltersAndSort(cards, types, tags, currentSort, searchTerm);
-        console.log('Home: Filtered cards count:', filteredAndSorted.length);
-        console.log('Home: Filtered card types:', filteredAndSorted.map(c => c.type));
         setFilteredCards(filteredAndSorted);
         
         // If we have very few cards after filtering, we might need to load more from the server
         if (filteredAndSorted.length < 5 && totalCardCount > filteredAndSorted.length) {
-          console.log('Few cards after client-side filtering, trying to load more from server');
           
           // Load more cards from server then re-filter
           setTimeout(async () => {
@@ -423,12 +398,10 @@ export default function Home() {
               }, 24); // Double the page size for this specific case
               
               // Make sure we don't have duplicates in the response
-              const uniqueCards = [];
+              const uniqueCards: typeof response.cards = [];
               response.cards.forEach(card => {
                 if (!uniqueCards.some(existingCard => existingCard.id === card.id)) {
                   uniqueCards.push(card);
-                } else {
-                  console.log(`Skipping duplicate card with ID: ${card.id} in server response`);
                 }
               });
               
@@ -528,13 +501,11 @@ export default function Home() {
   };
 
   const handleEditCard = (id: string) => {
-    console.log(`Attempting to edit card with ID: ${id}`);
     
     // First check if the card exists in our current state
     const cardToEdit = cards.find(card => card.id === id);
     
     if (cardToEdit) {
-      console.log(`Found card to edit:`, cardToEdit);
       // Save the ID of the card being edited
       setLastEditedCardId(id);
       
@@ -544,13 +515,11 @@ export default function Home() {
       setShowEditModal(true);
     } else {
       // If we can't find the card, try to fetch it directly
-      console.log(`Couldn't find card with ID ${id} in current state, fetching directly...`);
       
       // Add a small delay to let any UI updates complete first
       setTimeout(async () => {
         try {
           const fetchedCard = await fetchCardById(id);
-          console.log('Successfully fetched individual card:', fetchedCard);
           
           setLastEditedCardId(id);
           setCurrentEditCard(fetchedCard);
@@ -587,7 +556,6 @@ export default function Home() {
       // Then attempt the actual deletion
       try {
         await deleteCard(id);
-        console.log(`Card ${id} successfully deleted`);
       } catch (apiError) {
         console.error('Error deleting card:', apiError);
         
@@ -653,7 +621,6 @@ export default function Home() {
         getAllTags()
       ]);
       
-      console.log(`After update: Retrieved ${cardsResponse.cards.length} of ${cardsResponse.totalCount} cards`);
 
       // Store the total count
       setTotalCardCount(cardsResponse.totalCount);
@@ -675,7 +642,6 @@ export default function Home() {
       // No need to refresh the page or restore scroll position
       // Just make sure we have all cards loaded
       if (cardsResponse.cards.length < cardsResponse.totalCount) {
-        console.log('Need to fetch more cards after update...');
         
         // If we don't have all cards, load the rest
         try {
@@ -706,7 +672,6 @@ export default function Home() {
           );
           setFilteredCards(newFilteredCards);
           
-          console.log(`Now have ${allCards.length} total cards loaded`);
         } catch (error) {
           console.error('Error loading additional cards after update:', error);
         }

@@ -62,4 +62,8 @@ next-env.d.ts
 # Exclude chrome debug profile
 .vscode/chrome-debug-profile/
 
+# Server uploads (temp files and user uploads)
+server/uploads/*.zip
+server/uploads/[0-9]*
+
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, UserCreateInput, UserUpdateInput } from '../../lib/api';
 
 interface UserFormProps {
@@ -67,7 +67,7 @@ const UserForm: React.FC<UserFormProps> = ({
       }
       
       await onSubmit(userData);
-    } catch (error) {
+    } catch {
       setErrors(prev => ({
         ...prev,
         form: 'An error occurred while saving. Please try again.'

@@ -152,16 +152,19 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 autoPlay
                 playsInline
                 onEnded={() => playVideo("")} // Clear the current playing video when ended
+                aria-label={props.description || "Video content"}
                 className="w-full h-full object-cover"
               >
                 {/* Adding a track element for captions if transcript is provided */}
-                {props.transcript && (
+                {props.transcript ? (
                   <track
                     kind="captions"
                     src={props.transcript}
                     label="English captions"
                     srcLang="en"
                   />
+                ) : (
+                  <track kind="captions" label="No captions available" />
                 )}
                 Your browser does not support the video tag.
               </video>

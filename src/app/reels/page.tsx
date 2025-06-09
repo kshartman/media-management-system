@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import CardFactory from '../../components/cards/CardFactory';
-import TypeDropdown from '../../components/filters/TypeDropdown';
 import TagDropdown from '../../components/filters/TagDropdown';
 import SortDropdown, { SortOption } from '../../components/filters/SortDropdown';
 import SearchField from '../../components/filters/SearchField';
@@ -17,7 +15,7 @@ import { useAuth } from '../../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags, fetchCardById } from '../../lib/api';
 
 export default function ReelsPage() {
-  const { isAdmin, login, logout } = useAuth();
+  const { isAdmin, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -207,7 +205,7 @@ export default function ReelsPage() {
             setCards(combinedCards);
             const combinedFiltered = applyFiltersAndSort(
               combinedCards,
-              types,
+              ['reel'],
               tags,
               currentSort,
               ''
@@ -323,7 +321,7 @@ export default function ReelsPage() {
       
       try {
         await deleteCard(id);
-      } catch (apiError) {
+      } catch {
         setCards(cards);
         const revertedFilteredCards = applyFiltersAndSort(
           cards,

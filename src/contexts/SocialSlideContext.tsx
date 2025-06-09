@@ -29,8 +29,9 @@ export const SocialSlideProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     return () => {
       // Clear all timers on unmount
-      Object.keys(timersRef.current).forEach(key => {
-        clearTimeout(timersRef.current[key]);
+      const currentTimers = timersRef.current;
+      Object.keys(currentTimers).forEach(key => {
+        clearTimeout(currentTimers[key]);
       });
     };
   }, []);

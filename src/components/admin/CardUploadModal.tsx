@@ -21,7 +21,6 @@ const CardUploadModal: React.FC<CardUploadModalProps> = ({
   availableTags = [],
   initialCardType = 'image',
 }) => {
-  const isEditMode = !!initialData;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 

@@ -443,7 +443,6 @@ const CardForm: React.FC<CardFormProps> = ({ initialData, initialCardType = 'ima
                       setDate(inputVal);
                     } else {
                       // If year is out of range, keep existing value
-                      console.log(`Year ${year} out of range, keeping current value`);
                     }
                   } catch (err) {
                     console.error("Error parsing date:", err);

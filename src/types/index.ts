@@ -14,6 +14,7 @@ export interface FileMetadata {
   imageSequenceOriginalFileNames?: string[]; // Array of original filenames for image sequence
   imageSequenceFileSizes?: number[]; // Array of file sizes for each image in the sequence
   imageSequenceCaptions?: string[]; // Array of captions for each image in the sequence
+  isPreviewGenerated?: boolean; // Indicates if preview was auto-generated
 }
 
 export interface BaseCardProps {
@@ -24,6 +25,7 @@ export interface BaseCardProps {
   fileMetadata?: FileMetadata;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onRefresh?: () => void;
   isAdmin?: boolean;
   // Add properties needed for download all functionality
   preview?: string;

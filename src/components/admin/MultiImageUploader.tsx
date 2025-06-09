@@ -161,8 +161,8 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
         if (element && document.body.contains(element)) {
           element.removeAttribute('dragging');
         }
-      } catch (error) {
-        console.log('Element may have been removed from DOM:', error);
+      } catch {
+        // Element may have been removed from DOM
       }
     }, 100);
   };
@@ -254,8 +254,8 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
         e.currentTarget.classList.remove('dragging');
         e.currentTarget.removeAttribute('dragging');
       }
-    } catch (error) {
-      console.log('Error in drag end handler:', error);
+    } catch {
+      // Handle drag end error
     }
   };
 
@@ -345,7 +345,15 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
       {showLightbox && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
           onClick={() => setShowLightbox(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setShowLightbox(false);
+            }
+          }}
+          tabIndex={-1}
         >
           <div className="relative max-w-4xl max-h-[90vh] overflow-auto">
             <button
@@ -358,7 +366,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
             </button>
             <img 
               src={lightboxImage} 
-              alt="Enlarged preview" 
+              alt="Enlarged view" 
               className="max-w-full max-h-[85vh] object-contain"
               onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on image
             />
@@ -431,6 +439,8 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
               <div 
                 key={`new-${url}-${index}`}
                 className="relative w-20 h-20 border border-gray-200 rounded overflow-hidden cursor-move"
+                role="button"
+                tabIndex={0}
                 draggable={!isSubmitting}
                 onDragStart={(e) => handleDragStart(e, index, false)}
                 onDragOver={handleDragOver}
@@ -442,12 +452,19 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                     handleShowLightbox(url);
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleShowLightbox(url);
+                  }
+                }}
                 onMouseDown={(e) => e.currentTarget.setAttribute('dragging', 'true')}
                 onMouseUp={handleSafeMouseUp}
+                aria-label={`View image ${index + 1}`}
               >
                 <img 
                   src={url} 
-                  alt={`Selected image ${index + 1}`} 
+                  alt={`Selected file ${index + 1}`} 
                   className="w-full h-full object-cover"
                 />
                 <button
@@ -475,6 +492,8 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
               <div 
                 key={`existing-${index}`}
                 className="relative w-20 h-20 border border-blue-200 rounded overflow-hidden cursor-move"
+                role="button"
+                tabIndex={0}
                 draggable={!isSubmitting}
                 onDragStart={(e) => handleDragStart(e, index, true)}
                 onDragOver={handleDragOver}
@@ -486,12 +505,19 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                     handleShowLightbox(url);
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleShowLightbox(url);
+                  }
+                }}
+                aria-label={`View existing image ${index + 1}`}
                 onMouseDown={(e) => e.currentTarget.setAttribute('dragging', 'true')}
                 onMouseUp={handleSafeMouseUp}
               >
                 <img 
                   src={url} 
-                  alt={`Existing image ${index + 1}`} 
+                  alt={`Existing file ${index + 1}`} 
                   className="w-full h-full object-cover"
                 />
                 <button

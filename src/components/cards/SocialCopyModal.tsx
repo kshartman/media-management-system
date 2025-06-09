@@ -115,7 +115,7 @@ const SocialCopyModal: React.FC<SocialCopyModalProps> = ({
       document.body.style.top = '';
       document.documentElement.style.overflow = '';
     };
-  }, [isOpen, handleSave]);
+  }, [isOpen, handleSave, isSubmitting, onClose]);
   
   if (!isOpen) return null;
 

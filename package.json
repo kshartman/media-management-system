@@ -12,7 +12,6 @@
     "lint:strict": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --max-warnings=0"
   },
   "dependencies": {
-    "@material-tailwind/react": "^2.1.10",
     "@tiptap/extension-bold": "^2.12.0",
     "@tiptap/extension-bullet-list": "^2.12.0",
     "@tiptap/extension-color": "^2.12.0",
@@ -27,29 +26,18 @@
     "@tiptap/pm": "^2.12.0",
     "@tiptap/react": "^2.12.0",
     "@tiptap/starter-kit": "^2.12.0",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "jszip": "^3.10.1",
     "lodash": "^4.17.21",
-    "multer": "^2.0.0",
     "next": "15.3.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "uuid": "^11.1.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/line-clamp": "^0.4.4",
     "@tailwindcss/postcss": "^4.1.6",
-    "@types/cors": "^2.8.18",
-    "@types/express": "^5.0.1",
-    "@types/jsonwebtoken": "^9.0.9",
     "@types/lodash": "^4.17.16",
-    "@types/multer": "^1.4.12",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.32.0",
     "@typescript-eslint/parser": "^8.32.0",
     "autoprefixer": "^10.4.19",
