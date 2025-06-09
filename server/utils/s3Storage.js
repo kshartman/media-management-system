@@ -100,13 +100,37 @@ const getSignedFileUrl = async (filename, expirationSeconds = 3600) => {
   if (!isS3Configured || !filename) return null;
 
   try {
-    // Remove any leading slashes for consistency
-    const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
+    let key;
+    
+    // Handle full S3 URLs - extract just the key part
+    if (filename.includes('amazonaws.com/')) {
+      key = filename.split('amazonaws.com/')[1];
+    }
+    // Handle custom domain URLs
+    else if (s3CustomDomain && filename.includes(s3CustomDomain)) {
+      key = filename.split(`${s3CustomDomain}/`)[1];
+    }
+    // Handle local paths that might have uploads/ prefix
+    else if (filename.includes('uploads/')) {
+      const baseName = filename.split('uploads/')[1];
+      key = `${s3FolderPath}/${baseName}`;
+    }
+    // Handle paths that already have the S3 folder prefix
+    else if (filename.startsWith(s3FolderPath + '/')) {
+      key = filename;
+    }
+    // Handle simple filenames
+    else {
+      // Remove any leading slashes for consistency
+      const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
+      // Add the S3 folder prefix if it's not already there
+      key = cleanFilename.includes(s3FolderPath) ? cleanFilename : `${s3FolderPath}/${cleanFilename}`;
+    }
     
     // Create a GetObject command
     const command = new GetObjectCommand({
       Bucket: bucketName,
-      Key: cleanFilename,
+      Key: key,
     });
 
     // Generate a signed URL

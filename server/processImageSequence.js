@@ -70,6 +70,10 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
   const fileSizes = [...existingFileSizes];
   let totalSize = existingTotalSize;
   
+  // Initialize dimensions variables outside the loop
+  let width = null;
+  let height = null;
+  
   // Process each new image in the sequence
   for (let i = 0; i < sequenceCount; i++) {
     const fieldName = `imageSequence_${i}`;
@@ -85,8 +89,6 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
       
       // Extract metadata from the local file BEFORE S3 upload
       let fileSize = file.size || 0;
-      let width = null;
-      let height = null;
       
       // Always extract metadata from local file if the function is provided
       if (extractMetadata) {
@@ -97,9 +99,12 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
             fileSize = metadata.fileSize;
           }
           if (metadata.width && metadata.height) {
-            width = metadata.width;
-            height = metadata.height;
-            console.log(`Extracted dimensions for image ${i}: ${width}×${height}`);
+            // Update the outer scope variables with dimensions from the first image
+            if (width === null && height === null) {
+              width = metadata.width;
+              height = metadata.height;
+              console.log(`Extracted dimensions for image sequence: ${width}×${height}`);
+            }
           }
         } catch (metadataError) {
           console.error(`Error extracting metadata for sequence image ${i}:`, metadataError);

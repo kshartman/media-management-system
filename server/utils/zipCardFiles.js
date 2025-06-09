@@ -8,9 +8,7 @@ const { getFileUrl, getSignedFileUrl, getFilenameFromUrl } = require('./s3Storag
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { htmlToText } = require('html-to-text');
-const HtmlToRtf = require('html-to-rtf');
-const pdf = require('html-pdf');
-const { promisify } = require('util');
+const puppeteer = require('puppeteer');
 
 /**
  * Get the original filename from card metadata, or use a placeholder name
@@ -50,128 +48,53 @@ function convertHtmlToText(htmlContent) {
 }
 
 /**
- * Convert HTML content to RTF format
+ * Convert HTML content to RTF format (simplified version)
  * @param {string} htmlContent - HTML content to convert
  * @returns {string} - RTF content
  */
 function convertHtmlToRtf(htmlContent) {
   if (!htmlContent) return '';
   
-  return HtmlToRtf.convertHtmlToRtf(htmlContent);
-}
-
-/**
- * Convert HTML content to PDF
- * @param {string} htmlContent - HTML content to convert
- * @returns {Promise<Buffer>} - PDF content as buffer
- */
-function convertHtmlToPdf(htmlContent) {
-  if (!htmlContent) return Promise.resolve(Buffer.from(''));
-  
-  return new Promise((resolve, reject) => {
-    const options = {
-      format: 'A4',
-      border: {
-        top: '15mm',
-        right: '15mm',
-        bottom: '15mm',
-        left: '15mm'
-      }
-    };
-    
-    pdf.create(htmlContent, options).toBuffer((err, buffer) => {
-      if (err) {
-        console.error('Error generating PDF:', err);
-        reject(err);
-      } else {
-        resolve(buffer);
-      }
-    });
-  });
-}
-
-/**
- * Add HTML content converted to different formats to the zip archive
- * @param {JSZip} zip - JSZip instance
- * @param {string} htmlContent - HTML content to convert
- * @param {string} baseFilename - Base name for the generated files (without extension)
- * @returns {Promise<void>}
- */
-async function addHtmlContentToZip(zip, htmlContent, baseFilename) {
-  if (!htmlContent) return;
-  
-  try {
-    // Convert HTML to plain text
-    const textContent = convertHtmlToText(htmlContent);
-    zip.file(`${baseFilename}.txt`, textContent);
-    console.log(`Added ${baseFilename}.txt to ZIP`);
-    
-    // Convert HTML to RTF
-    const rtfContent = convertHtmlToRtf(htmlContent);
-    zip.file(`${baseFilename}.rtf`, rtfContent);
-    console.log(`Added ${baseFilename}.rtf to ZIP`);
-    
-    // Convert HTML to PDF
-    const pdfBuffer = await convertHtmlToPdf(htmlContent);
-    zip.file(`${baseFilename}.pdf`, pdfBuffer);
-    console.log(`Added ${baseFilename}.pdf to ZIP`);
-  } catch (error) {
-    console.error(`Error converting HTML content for ${baseFilename}:`, error);
-    // Continue with other conversions
-  }
-}
-
-/**
- * Convert HTML content to plain text
- * @param {string} html - HTML content
- * @returns {string} - Plain text version
- */
-function convertHtmlToText(html) {
-  if (!html) return '';
-  
-  return htmlToText(html, {
-    wordwrap: 80,
+  // Simple HTML to RTF conversion
+  // Remove HTML tags and add basic RTF formatting
+  const text = htmlToText(htmlContent, {
+    wordwrap: false,
     selectors: [
       { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
       { selector: 'img', format: 'skip' }
     ]
   });
+  
+  // Basic RTF header and footer
+  const rtfHeader = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
+  const rtfFooter = '}';
+  
+  // Escape special RTF characters
+  const escapedText = text
+    .replace(/\\/g, '\\\\')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}')
+    .replace(/\n/g, '\\par ');
+  
+  return `${rtfHeader}\\f0\\fs24 ${escapedText}${rtfFooter}`;
 }
 
 /**
- * Convert HTML content to RTF format
- * @param {string} html - HTML content
- * @returns {string} - RTF content
+ * Convert HTML content to PDF using Puppeteer
+ * @param {string} htmlContent - HTML content to convert
+ * @returns {Promise<Buffer>} - PDF content as buffer
  */
-function convertHtmlToRtf(html) {
-  if (!html) return '';
+async function convertHtmlToPdf(htmlContent) {
+  if (!htmlContent) return Buffer.from('');
   
+  let browser;
   try {
-    return HtmlToRtf.convertHtmlToRtf(html);
-  } catch (error) {
-    console.error('Error converting HTML to RTF:', error);
-    return '';
-  }
-}
-
-/**
- * Convert HTML content to PDF
- * @param {string} html - HTML content
- * @returns {Promise<Buffer>} - PDF buffer
- */
-function convertHtmlToPdf(html) {
-  if (!html) return Promise.resolve(Buffer.from(''));
-  
-  return new Promise((resolve, reject) => {
-    const options = {
-      format: 'A4',
-      border: {
-        top: '0.5in',
-        right: '0.5in',
-        bottom: '0.5in',
-        left: '0.5in'
-      }
-    };
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    const page = await browser.newPage();
     
     // Wrap HTML in basic styling
     const styledHtml = `
@@ -179,58 +102,85 @@ function convertHtmlToPdf(html) {
       <html>
       <head>
         <style>
-          body { font-family: Arial, sans-serif; }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px;
+            line-height: 1.6;
+          }
           p { margin-bottom: 10px; }
+          h1, h2, h3 { color: #333; }
         </style>
       </head>
       <body>
-        ${html}
+        ${htmlContent}
       </body>
       </html>
     `;
     
-    pdf.create(styledHtml, options).toBuffer((err, buffer) => {
-      if (err) {
-        console.error('Error creating PDF:', err);
-        reject(err);
-      } else {
-        resolve(buffer);
-      }
+    await page.setContent(styledHtml, { waitUntil: 'networkidle0' });
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      margin: {
+        top: '15mm',
+        right: '15mm',
+        bottom: '15mm',
+        left: '15mm'
+      },
+      printBackground: true
     });
-  });
+    
+    return pdfBuffer;
+  } catch (error) {
+    console.error('Error generating PDF with Puppeteer:', error);
+    throw error;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
 }
 
+
 /**
- * Add HTML content to ZIP in multiple formats (TXT, RTF, PDF)
+ * Add HTML content to ZIP in text and PDF formats only
  * @param {JSZip} zip - JSZip instance
  * @param {string} html - HTML content
  * @param {string} baseName - Base filename (without extension)
  * @returns {Promise<void>}
  */
 async function addHtmlContentToZip(zip, html, baseName) {
-  if (!html || !zip || !baseName) return;
+  if (!html || !zip || !baseName) {
+    console.log(`Skipping ${baseName} - missing html (${!!html}), zip (${!!zip}), or baseName (${!!baseName})`);
+    return;
+  }
+  
+  console.log(`Processing HTML content for ${baseName}:`, html.substring(0, 100) + '...');
   
   try {
     // Convert to plain text
     const textContent = convertHtmlToText(html);
     zip.file(`${baseName}.txt`, textContent);
-    
-    // Convert to RTF
-    const rtfContent = convertHtmlToRtf(html);
-    zip.file(`${baseName}.rtf`, rtfContent);
+    console.log(`✓ Added ${baseName}.txt to ZIP`);
     
     // Convert to PDF
     try {
+      console.log(`Attempting to create PDF for ${baseName}...`);
       const pdfBuffer = await convertHtmlToPdf(html);
-      zip.file(`${baseName}.pdf`, pdfBuffer);
+      if (pdfBuffer && pdfBuffer.length > 0) {
+        zip.file(`${baseName}.pdf`, pdfBuffer);
+        console.log(`✓ Added ${baseName}.pdf to ZIP (${pdfBuffer.length} bytes)`);
+      } else {
+        console.warn(`PDF buffer empty for ${baseName}`);
+      }
     } catch (pdfError) {
-      console.error(`Error creating PDF for ${baseName}:`, pdfError);
+      console.error(`✗ Error creating PDF for ${baseName}:`, pdfError.message);
       // Continue without PDF
     }
     
-    console.log(`Added ${baseName} content in multiple formats to ZIP`);
+    console.log(`Completed processing ${baseName} content in text and PDF formats`);
   } catch (error) {
-    console.error(`Error adding HTML content to ZIP: ${baseName}`, error);
+    console.error(`✗ Error adding HTML content to ZIP: ${baseName}`, error);
     // Continue with other files
   }
 }
