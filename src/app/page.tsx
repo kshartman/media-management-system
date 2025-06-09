@@ -11,6 +11,7 @@ import LoginForm from '../components/auth/LoginForm';
 import AdminBar from '../components/admin/AdminBar';
 import CardUploadModal from '../components/admin/CardUploadModal';
 import CardGrid from '../components/layout/CardGrid';
+import Navigation from '../components/layout/Navigation';
 import { CardProps, ImageCardProps, SocialCardProps, ReelCardProps } from '../types';
 import { useAuth } from '../lib/authContext';
 import { useScroll } from '../contexts/ScrollContext';
@@ -72,6 +73,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [lastEditedCardId, setLastEditedCardId] = useState<string | null>(null);
   const [totalCardCount, setTotalCardCount] = useState<number>(0);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   // Fetch cards and tags from the API when the component mounts
   // Event handler for image drop on social cards
@@ -718,30 +720,75 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#d9f2fc] border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center relative">
-          <h1 className="text-xl font-bold text-gray-900 hidden sm:block">Affiliate Resources</h1>
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          {/* Top row with title, logo, and menu */}
+          <div className="flex justify-between items-center relative">
+            <div className="relative">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="flex items-center justify-center w-10 h-10 text-gray-700 hover:text-gray-900 focus:outline-none"
+                aria-label="Menu"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              {showMobileMenu && (
+                <div className="absolute left-0 top-12 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                  <button
+                    onClick={() => {
+                      handleLoginClick();
+                      setShowMobileMenu(false);
+                    }}
+                    className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+                  >
+                    {isAdmin ? 'Logout' : 'Admin Login'}
+                  </button>
+                  <a
+                    href="https://affiliates.shopzive.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    Affiliate Portal
+                  </a>
+                  <a
+                    href="https://shopzive.com/pages/zivepro-affiliate-resources"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    Affiliate Training
+                  </a>
+                </div>
+              )}
+            </div>
 
-          <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
-            <Image
-              src="/zive-logo.png"
-              alt="ZIVE logo"
-              className="h-8 w-auto"
-              width={96}
-              height={32}
-              priority
-            />
+            <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+              <Image
+                src="/zive-logo.png"
+                alt="ZIVE logo"
+                className="h-8 w-auto"
+                width={96}
+                height={32}
+                priority
+              />
+            </div>
+
+            <h1 className="text-xl font-bold text-gray-900 hidden sm:block">Affiliate Resources</h1>
           </div>
-
-          <button
-            onClick={handleLoginClick}
-            className="text-sm bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2"
-          >
-            {isAdmin ? 'Logout' : 'Admin Login'}
-          </button>
+          
+          {/* Navigation row */}
+          <div className="mt-3 flex justify-center">
+            <Navigation />
+          </div>
         </div>
       </header>
 
-      <div className="sticky top-[60px] z-30 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-[100px] z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
           {/* Controls row - keeps all controls on one line */}
           <div className="flex items-center gap-4">
