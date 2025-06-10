@@ -10,7 +10,6 @@ COPY next.config.ts ./
 COPY tsconfig.json ./
 COPY tailwind.config.js ./
 COPY postcss.config.mjs ./
-COPY withMT.js ./
 
 # Install dependencies
 RUN npm ci
@@ -36,7 +35,6 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/next.config.js ./
-COPY --from=builder /app/withMT.js ./
 
 # Install production dependencies
 RUN npm ci --only=production
