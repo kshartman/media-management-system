@@ -73,7 +73,7 @@ docker-compose up -d
    ```bash
    docker run -d \
      --name media-frontend \
-     -p 3000:3000 \
+     -p 5000:3000 \
      --env-file .env \
      media-management-frontend:latest
    ```
@@ -89,7 +89,7 @@ docker-compose up -d
 
        # Frontend
        location / {
-           proxy_pass http://localhost:3000;
+           proxy_pass http://localhost:5000;
            proxy_http_version 1.1;
            proxy_set_header Upgrade $http_upgrade;
            proxy_set_header Connection 'upgrade';
@@ -141,7 +141,7 @@ The backend requires a persistent volume for file uploads:
 
 ## Health Checks
 
-- Frontend health: `http://frontend-host:3000`
+- Frontend health: `http://frontend-host:5000`
 - Backend health: `http://backend-host:5001/api/health` (if implemented)
 
 ## Troubleshooting
