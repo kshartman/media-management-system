@@ -15,9 +15,8 @@ echo "=================================================="
 
 # Check if .env file exists
 if [ ! -f .env ]; then
-    echo -e "${YELLOW}Warning: .env file not found. Creating from .env.example...${NC}"
-    cp .env.example .env
-    echo -e "${RED}Please update .env with your configuration before deploying!${NC}"
+    echo -e "${YELLOW}Warning: .env file not found.${NC}"
+    echo -e "${RED}Please create a .env file with your configuration before deploying!${NC}"
 fi
 
 # Build backend image
