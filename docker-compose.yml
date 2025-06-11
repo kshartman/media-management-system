@@ -10,6 +10,7 @@ services:
         NEXT_PUBLIC_DOMAIN: ${DOMAIN:-marketing.shopzive.com}
     image: media-management-frontend:latest
     container_name: media-frontend
+    restart: unless-stopped
     environment:
       - BACKEND_URL=http://backend:5001
     ports:
@@ -25,6 +26,7 @@ services:
       dockerfile: Dockerfile.backend
     image: media-management-backend:latest
     container_name: media-backend
+    restart: unless-stopped
     environment:
       - PORT=5001
       - MONGODB_URI=${MONGODB_URI}
