@@ -1,0 +1,98 @@
+# Documentation
+*.md
+README*
+DEPLOYMENT*
+DEBUG*
+docs/
+
+# Development files
+.env.local*
+.env.example
+.env.docker.example
+*.example
+server/.env*
+server/env.gpg
+
+# Scripts and setup files
+*.sh
+setup-*
+download-*
+build-*
+start-*
+migrate-*
+fix-*
+update-*
+server/migrate-*.js
+server/fix-*.js
+server/update-*.js
+server/setup-*.sh
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Node modules (if accidentally included)
+node_modules/
+server/node_modules/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test files
+test/
+tests/
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
+.nyc_output/
+
+# Build artifacts (local builds)
+.next/
+out/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Temporary files
+tmp/
+temp/
+server/temp/
+server/test-frames/
+*.tmp
+
+# Configuration examples and policies
+nginx-*.conf
+withMT.js
+postcss.config.js
+next.config.ts
+*-policy.json
+*-iam-*.json
+server/*-policy.json
+server/*-setup-guide.md
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Misc
+.npmrc
+.yarnrc
+yarn.lock
+pnpm-lock.yaml
