@@ -80,7 +80,6 @@ server/test-frames/
 nginx-*.conf
 withMT.js
 postcss.config.js
-next.config.ts
 *-policy.json
 *-iam-*.json
 server/*-policy.json
