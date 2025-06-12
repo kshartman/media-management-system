@@ -67,5 +67,5 @@ next-env.d.ts
 # Server uploads (temp files and user uploads)
 server/uploads/*.zip
 server/uploads/[0-9]*
-
+server/backend.log
 

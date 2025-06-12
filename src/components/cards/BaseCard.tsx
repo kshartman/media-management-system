@@ -352,7 +352,7 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
 
         {/* Description */}
         {description && (
-          <p className="text-sm text-gray-700 mb-3 line-clamp-2">{description}</p>
+          <p className="text-sm text-gray-700 mb-3 line-clamp-2 break-words">{description}</p>
         )}
 
         {/* Action buttons */}

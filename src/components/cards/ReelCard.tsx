@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useVideoPlayer } from '../../contexts/VideoPlayerContext';
+import { getProxiedImageUrl } from '../../lib/utils';
 
 const ReelCard: React.FC<ReelCardProps> = (props) => {
   // Keep all props to pass to BaseCard
@@ -52,7 +53,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
             <>
               {props.preview ? (
                 <Image 
-                  src={props.preview}
+                  src={getProxiedImageUrl(props.preview)}
                   alt={props.description}
                   fill
                   className="object-cover"
@@ -79,14 +80,14 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 aria-hidden="true"
               >
                 {/* Play button styled to match the provided image */}
-                <div className="w-24 h-24 rounded-full bg-gray-500/50 flex items-center justify-center shadow-lg hover:bg-gray-500/60 transition-colors">
+                <div className="w-24 h-24 rounded-full bg-gray-800/30 flex items-center justify-center shadow-lg hover:bg-gray-800/50 transition-colors">
                   <div className="w-0 h-0 border-t-[20px] border-t-transparent border-l-[35px] border-l-white border-b-[20px] border-b-transparent ml-2.5"></div>
                 </div>
               </div>
               
               {/* Download Icon Overlay */}
               <a
-                href={props.movie}
+                href={getProxiedImageUrl(props.movie)}
                 download={props.fileMetadata?.movieOriginalFileName || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -96,7 +97,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                   e.preventDefault(); 
                   // Create a temporary link and trigger a direct download
                   const link = document.createElement('a');
-                  link.href = props.movie;
+                  link.href = getProxiedImageUrl(props.movie);
                   link.download = props.fileMetadata?.movieOriginalFileName || 'video';
                   document.body.appendChild(link);
                   link.click();
@@ -147,7 +148,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
             <div className="w-full aspect-[9/16] relative">
               <video
                 ref={videoRef}
-                src={props.movie}
+                src={getProxiedImageUrl(props.movie)}
                 controls
                 autoPlay
                 playsInline
