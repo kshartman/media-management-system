@@ -49,6 +49,16 @@ const SocialCopyModal: React.FC<SocialCopyModalProps> = ({
     onClose();
   }, [onSave, onClose, instagramCopy, facebookCopy]);
 
+  // Handler to delete Instagram copy
+  const handleDeleteInstagram = useCallback(() => {
+    setInstagramCopy('');
+  }, []);
+
+  // Handler to delete Facebook copy
+  const handleDeleteFacebook = useCallback(() => {
+    setFacebookCopy('');
+  }, []);
+
   // Prevent body scrolling when modal is open and scroll modal into view
   useEffect(() => {
     if (isOpen) {
@@ -200,26 +210,54 @@ const SocialCopyModal: React.FC<SocialCopyModalProps> = ({
 
         <div className="p-4 flex-grow overflow-auto">
           <div className="flex border-b">
-            <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'instagram'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('instagram')}
-            >
-              Instagram Copy
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'facebook'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('facebook')}
-            >
-              Facebook Copy
-            </button>
+            <div className="flex items-center">
+              <button
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === 'instagram'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('instagram')}
+              >
+                Instagram Copy
+              </button>
+              {instagramCopy?.trim() && (
+                <button
+                  onClick={handleDeleteInstagram}
+                  className="ml-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                  title="Delete Instagram copy"
+                  aria-label="Delete Instagram copy"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center">
+              <button
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === 'facebook'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('facebook')}
+              >
+                Facebook Copy
+              </button>
+              {facebookCopy?.trim() && (
+                <button
+                  onClick={handleDeleteFacebook}
+                  className="ml-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                  title="Delete Facebook copy"
+                  aria-label="Delete Facebook copy"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="mt-4">
