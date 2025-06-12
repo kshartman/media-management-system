@@ -2,9 +2,9 @@ FROM node:22.16-slim
 
 WORKDIR /app
 
-# Install ffmpeg, Chromium (for Puppeteer), and other required packages
+# Install Chromium (for Puppeteer) and other required packages
+# Note: ffmpeg is not needed here as @ffmpeg-installer/ffmpeg provides its own binary
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
     chromium \
     fonts-liberation \
     libappindicator3-1 \
