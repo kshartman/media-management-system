@@ -32,6 +32,7 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   const [updatedCard, setUpdatedCard] = useState<{instagramCopy?: string | null; facebookCopy?: string | null} | null>(null);
   const [localInstagramCopy, setLocalInstagramCopy] = useState<string | undefined>(instagramCopy);
   const [localFacebookCopy, setLocalFacebookCopy] = useState<string | undefined>(facebookCopy);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   // Function to fetch a file and return it as an ArrayBuffer
   const _fetchFileAsArrayBuffer = async (url: string): Promise<{ data: ArrayBuffer, filename: string }> => {
@@ -332,28 +333,53 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
       {/* Card content */}
       <div className="flex-1 flex flex-col">
         {children}
+        
+        {/* Tags - positioned right after image content */}
+        <div className="px-4 pt-3">
+          <div className="h-6 mb-2 flex flex-wrap gap-1">
+            {tags && tags.length > 0 ? (
+              tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                >
+                  {tag}
+                </span>
+              ))
+            ) : (
+              // Empty space to maintain consistent layout
+              <div className="h-6"></div>
+            )}
+          </div>
+        </div>
+
+        {/* Description - positioned right after tags */}
+        <div className="px-4">
+          {description && (
+            <div className="mb-3">
+              <p className={`text-sm text-gray-700 break-words ${
+                isDescriptionExpanded ? '' : 'line-clamp-2'
+              }`}>
+                {description}
+              </p>
+              {description.length > 70 && (
+                <button
+                  onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                  className="text-blue-600 hover:text-blue-800 text-xs font-medium mt-1 transition-colors"
+                >
+                  {isDescriptionExpanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Spacer to push action buttons to bottom */}
+        <div className="flex-1"></div>
       </div>
 
-      {/* Footer with tags, description and action buttons */}
+      {/* Footer with action buttons only */}
       <div className="p-4 bg-gray-50 flex-shrink-0">
-        {/* Tags */}
-        {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
-            {tags.map((tag, index) => (
-              <span
-                key={index}
-                className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Description */}
-        {description && (
-          <p className="text-sm text-gray-700 mb-3 line-clamp-2 break-words">{description}</p>
-        )}
 
         {/* Action buttons */}
         <div className="flex items-center justify-between">
