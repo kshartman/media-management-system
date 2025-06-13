@@ -40,7 +40,8 @@ const getStorage = () => {
   
   return multer.diskStorage({
     destination: (req, file, cb) => {
-      const uploadDir = path.join(__dirname, '..', 'uploads');
+      // Use UPLOAD_PATH env var or default to /uploads (the mounted volume)
+      const uploadDir = process.env.UPLOAD_PATH || '/uploads';
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }

@@ -139,7 +139,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Use UPLOAD_PATH env var or default to /uploads (the mounted volume)
+const uploadPath = process.env.UPLOAD_PATH || '/uploads';
+app.use('/uploads', express.static(uploadPath));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -238,7 +240,7 @@ async function startServer() {
     
     app.listen(PORT, () => {
       apiLogger.warn(`🚀 Server running on port ${PORT}`);
-      apiLogger.warn(`📁 Serving static files from: ${path.join(__dirname, 'uploads')}`);
+      apiLogger.warn(`📁 Serving static files from: ${uploadPath}`);
       apiLogger.warn(`🔒 CORS enabled for origins: ${CORS_ALLOWED_ORIGINS.join(', ')}`);
       apiLogger.warn(`📧 Email service: ${isEmailConfigured() ? 'Configured' : 'Not configured'}`);
       apiLogger.warn('✅ Media Management System API is ready');
