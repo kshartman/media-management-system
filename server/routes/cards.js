@@ -19,6 +19,8 @@ const {
   processFileAndGetPath,
   downloadFile,
   processVideoAndGeneratePreview,
+  generatePreviewFromExistingVideo,
+  generateFallbackPreview,
   extractFileMetadata
 } = require('../utils/cardHelpers');
 const { 
@@ -84,6 +86,11 @@ router.get('/', async (req, res) => {
       // Convert image sequence paths
       if (cardObj.imageSequence && Array.isArray(cardObj.imageSequence)) {
         cardObj.imageSequence = cardObj.imageSequence.map(img => getFileUrl(img, baseUrl));
+      }
+      
+      // Check for missing video files in reel cards and mark for fallback preview
+      if (cardObj.type === 'reel' && cardObj.movie && !cardObj.preview) {
+        cardObj._needsFallbackPreview = true;
       }
       
       return cardObj;
@@ -185,6 +192,9 @@ router.post('/', authMiddleware, handleCardUpload, async (req, res) => {
       const previewPath = await processFileAndGetPath(previewFile.path, 'preview');
       cardData.preview = previewPath;
       
+      // Mark preview as user-uploaded
+      cardData.fileMetadata.previewSource = 'user-uploaded';
+      
       // Extract metadata
       const previewMetadata = await extractFileMetadata(previewFile, cardData.fileMetadata.date);
       Object.assign(cardData.fileMetadata, previewMetadata);
@@ -253,7 +263,7 @@ router.post('/', authMiddleware, handleCardUpload, async (req, res) => {
       preserveOriginalFileName(req, movieFile, 'movie', cardData);
       
       try {
-        const { videoPath, previewPath } = await processVideoAndGeneratePreview(
+        const { videoPath, previewPath, previewSource } = await processVideoAndGeneratePreview(
           movieFile, 
           cardData.fileMetadata,
           type
@@ -264,7 +274,9 @@ router.post('/', authMiddleware, handleCardUpload, async (req, res) => {
         // Use generated preview if no explicit preview was uploaded
         if (!cardData.preview && previewPath) {
           cardData.preview = previewPath;
-          fileLogger.info('Using generated preview from video');
+          // Preserve the preview source from the video processing
+          cardData.fileMetadata.previewSource = previewSource;
+          fileLogger.info(`Using ${previewSource} preview from video`);
         }
       } catch (error) {
         fileLogger.error('Error processing video:', error);
@@ -354,25 +366,25 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
     // Handle file removals
     if (req.body.remove_preview === 'true') {
       if (existingCard.preview) {
-        await safeDeleteOrphanedFile(existingCard.preview, cardId, 'preview');
+        await safeDeleteOrphanedFile(existingCard.preview, Card);
         updateData.preview = null;
       }
     }
     if (req.body.remove_download === 'true') {
       if (existingCard.download) {
-        await safeDeleteOrphanedFile(existingCard.download, cardId, 'download');
+        await safeDeleteOrphanedFile(existingCard.download, Card);
         updateData.download = null;
       }
     }
     if (req.body.remove_movie === 'true') {
       if (existingCard.movie) {
-        await safeDeleteOrphanedFile(existingCard.movie, cardId, 'movie');
+        await safeDeleteOrphanedFile(existingCard.movie, Card);
         updateData.movie = null;
       }
     }
     if (req.body.remove_transcript === 'true') {
       if (existingCard.transcript) {
-        await safeDeleteOrphanedFile(existingCard.transcript, cardId, 'transcript');
+        await safeDeleteOrphanedFile(existingCard.transcript, Card);
         updateData.transcript = null;
       }
     }
@@ -384,11 +396,14 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
       
       // Delete old preview if it exists
       if (existingCard.preview) {
-        await safeDeleteOrphanedFile(existingCard.preview, cardId, 'preview');
+        await safeDeleteOrphanedFile(existingCard.preview, Card);
       }
       
       const previewPath = await processFileAndGetPath(previewFile.path, 'preview');
       updateData.preview = previewPath;
+      
+      // Mark preview as user-uploaded
+      updateData.fileMetadata.previewSource = 'user-uploaded';
       
       // Extract metadata
       const previewMetadata = await extractFileMetadata(previewFile, updateData.fileMetadata.date);
@@ -401,7 +416,7 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
       
       // Delete old download if it exists
       if (existingCard.download) {
-        await safeDeleteOrphanedFile(existingCard.download, cardId, 'download');
+        await safeDeleteOrphanedFile(existingCard.download, Card);
       }
       
       const downloadPath = await processFileAndGetPath(downloadFile.path, 'download');
@@ -418,11 +433,11 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
       
       // Delete old movie if it exists
       if (existingCard.movie) {
-        await safeDeleteOrphanedFile(existingCard.movie, cardId, 'movie');
+        await safeDeleteOrphanedFile(existingCard.movie, Card);
       }
       
       try {
-        const { videoPath, previewPath } = await processVideoAndGeneratePreview(
+        const { videoPath, previewPath, previewSource } = await processVideoAndGeneratePreview(
           movieFile, 
           updateData.fileMetadata,
           updateData.type
@@ -430,13 +445,25 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
         
         updateData.movie = videoPath;
         
-        // Update preview if generated and no explicit preview
-        if (!req.files.preview && previewPath) {
+        // Handle preview update logic based on user intent and existing preview source
+        const hasUserUploadedPreview = req.files.preview; // User explicitly uploaded a new preview
+        const existingPreviewSource = existingCard.fileMetadata?.previewSource || 'auto-generated';
+        const shouldRegeneratePreview = !hasUserUploadedPreview && 
+          (existingPreviewSource === 'auto-generated' || existingPreviewSource === 'fallback');
+        
+        // Update preview if generated and conditions are met
+        if (shouldRegeneratePreview && previewPath) {
+          // Delete old auto-generated or fallback preview
           if (existingCard.preview) {
-            await safeDeleteOrphanedFile(existingCard.preview, cardId, 'preview');
+            await safeDeleteOrphanedFile(existingCard.preview, Card);
           }
           updateData.preview = previewPath;
-          fileLogger.info('Updated with generated preview from video');
+          updateData.fileMetadata.previewSource = previewSource;
+          fileLogger.info(`Updated with ${previewSource} preview from new video`);
+        } else if (hasUserUploadedPreview) {
+          fileLogger.info('Preserving user-uploaded preview, not regenerating from video');
+        } else if (existingPreviewSource === 'user-uploaded') {
+          fileLogger.info('Preserving existing user-uploaded preview, not regenerating from video');
         }
       } catch (error) {
         fileLogger.error('Error processing updated video:', error);
@@ -450,7 +477,7 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
       
       // Delete old transcript if it exists
       if (existingCard.transcript) {
-        await safeDeleteOrphanedFile(existingCard.transcript, cardId, 'transcript');
+        await safeDeleteOrphanedFile(existingCard.transcript, Card);
       }
       
       const transcriptPath = await processFileAndGetPath(transcriptFile.path, 'transcript');
@@ -475,7 +502,7 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
         // Delete old image sequence
         if (existingCard.imageSequence && Array.isArray(existingCard.imageSequence)) {
           for (const imagePath of existingCard.imageSequence) {
-            await safeDeleteOrphanedFile(imagePath, cardId, 'imageSequence');
+            await safeDeleteOrphanedFile(imagePath, Card);
           }
         }
         
@@ -501,19 +528,30 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
         
         // Delete old preview if it exists
         if (existingCard.preview) {
-          await safeDeleteOrphanedFile(existingCard.preview, cardId, 'preview');
+          await safeDeleteOrphanedFile(existingCard.preview, Card);
         }
         
-        // Generate new preview
-        const { previewPath } = await processVideoAndGeneratePreview(
-          { path: moviePath }, 
-          updateData.fileMetadata,
-          updateData.type
+        // Generate new preview from existing video
+        const { previewPath, previewSource } = await generatePreviewFromExistingVideo(
+          moviePath, 
+          updateData.fileMetadata
         );
         
         if (previewPath) {
           updateData.preview = previewPath;
-          fileLogger.info('Generated new preview from existing video');
+          updateData.fileMetadata.previewSource = previewSource;
+          fileLogger.info(`Generated new ${previewSource} preview from existing video`);
+        } else {
+          // If preview generation failed, create a fallback
+          const { previewPath: fallbackPath, previewSource: fallbackSource } = await generateFallbackPreview(
+            updateData.description || existingCard.description,
+            updateData.type
+          );
+          if (fallbackPath) {
+            updateData.preview = fallbackPath;
+            updateData.fileMetadata.previewSource = fallbackSource;
+            fileLogger.info('Generated fallback preview due to video processing failure');
+          }
         }
       } catch (error) {
         fileLogger.error('Error generating preview:', error);
@@ -593,6 +631,69 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     res.status(204).end();
   } catch (error) {
     cardLogger.error('Error deleting card:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/cards/:id/generate-fallback-preview - Generate fallback preview for missing video
+router.patch('/:id/generate-fallback-preview', authMiddleware, async (req, res) => {
+  try {
+    const cardId = req.params.id;
+    
+    // Find the card
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+    
+    // Only allow for reel cards without previews
+    if (card.type !== 'reel') {
+      return res.status(400).json({ error: 'Fallback previews can only be generated for reel cards' });
+    }
+    
+    if (card.preview) {
+      return res.status(400).json({ error: 'Card already has a preview' });
+    }
+    
+    try {
+      // Generate fallback preview
+      const { previewPath, previewSource } = await generateFallbackPreview(
+        card.description,
+        card.type
+      );
+      
+      if (previewPath) {
+        // Update the card with the fallback preview
+        const updateData = {
+          preview: previewPath,
+          'fileMetadata.previewSource': previewSource
+        };
+        
+        const updatedCard = await Card.findByIdAndUpdate(cardId, updateData, { new: true });
+        cardLogger.info(`Generated fallback preview for card: ${cardId}`);
+        
+        // Convert storage paths to absolute URLs for response
+        const baseUrl = getBaseUrl(req);
+        const responseCard = updatedCard.toObject();
+        
+        if (responseCard.preview) responseCard.preview = getFileUrl(responseCard.preview, baseUrl);
+        if (responseCard.download) responseCard.download = getFileUrl(responseCard.download, baseUrl);
+        if (responseCard.movie) responseCard.movie = getFileUrl(responseCard.movie, baseUrl);
+        if (responseCard.transcript) responseCard.transcript = getFileUrl(responseCard.transcript, baseUrl);
+        if (responseCard.imageSequence && Array.isArray(responseCard.imageSequence)) {
+          responseCard.imageSequence = responseCard.imageSequence.map(img => getFileUrl(img, baseUrl));
+        }
+        
+        res.json(responseCard);
+      } else {
+        return res.status(500).json({ error: 'Failed to generate fallback preview' });
+      }
+    } catch (error) {
+      fileLogger.error('Error generating fallback preview:', error);
+      return res.status(500).json({ error: 'Failed to generate fallback preview' });
+    }
+  } catch (error) {
+    cardLogger.error('Error generating fallback preview:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

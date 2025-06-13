@@ -3,7 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const { getFileUrl, getStorage, uploadLocalFileToS3, isS3Configured } = require('./s3Storage');
 const { getVideoMetadata, extractVideoFrame } = require('./videoUtils');
-const generateAndUploadPreview = require('../generatePreview');
+const { generateAndUploadPreview } = require('../generatePreview');
 const { Tag, Card } = require('../models');
 const logger = require('./logger');
 const { VIDEO_DIMENSIONS } = require('./mediaConstants');
@@ -163,12 +163,13 @@ const downloadFile = (url, destPath) => {
 };
 
 // Process video and generate preview
-const processVideoAndGeneratePreview = async (videoFile, metadata, cardType) => {
+const processVideoAndGeneratePreview = async (videoFile, metadata, cardType, forcePreviewGeneration = false) => {
   const storage = getStorage();
   const videoPath = videoFile.path;
   let previewPath = null;
   let dbVideoPath = null;
   let dbPreviewPath = null;
+  let previewSource = 'auto-generated';
   
   // Process the video file
   if (isS3Configured) {
@@ -183,6 +184,7 @@ const processVideoAndGeneratePreview = async (videoFile, metadata, cardType) => 
         const s3PreviewUrl = await generateAndUploadPreview(s3VideoUrl);
         if (s3PreviewUrl) {
           dbPreviewPath = s3PreviewUrl;
+          previewSource = 'auto-generated';
           s3Logger.info(`Preview generated and uploaded to S3: ${s3PreviewUrl}`);
         }
       } catch (s3PreviewError) {
@@ -190,28 +192,28 @@ const processVideoAndGeneratePreview = async (videoFile, metadata, cardType) => 
         
         // Fall back to local preview generation
         try {
-          const localPreviewPath = path.join(
-            path.dirname(videoPath),
-            `preview-${Date.now()}-${path.basename(videoPath, path.extname(videoPath))}.jpg`
-          );
-          
-          await extractVideoFrame(videoPath, localPreviewPath);
+          const outputDir = path.dirname(videoPath);
+          const localPreviewPath = await extractVideoFrame(videoPath, outputDir);
           
           if (fs.existsSync(localPreviewPath)) {
             if (isS3Configured) {
               const s3PreviewUrl = await uploadLocalFileToS3(localPreviewPath);
               if (s3PreviewUrl) {
                 dbPreviewPath = s3PreviewUrl;
+                previewSource = 'auto-generated';
                 fs.unlinkSync(localPreviewPath);
               } else {
                 dbPreviewPath = `/uploads/${path.basename(localPreviewPath)}`;
+                previewSource = 'auto-generated';
               }
             } else {
               dbPreviewPath = `/uploads/${path.basename(localPreviewPath)}`;
+              previewSource = 'auto-generated';
             }
           }
         } catch (localPreviewError) {
           fileLogger.error('Failed to generate preview locally:', localPreviewError);
+          previewSource = 'fallback';
         }
       }
       
@@ -228,18 +230,16 @@ const processVideoAndGeneratePreview = async (videoFile, metadata, cardType) => 
       
       // Generate preview locally
       try {
-        const localPreviewPath = path.join(
-          path.dirname(videoPath),
-          `preview-${Date.now()}-${path.basename(videoPath, path.extname(videoPath))}.jpg`
-        );
-        
-        await extractVideoFrame(videoPath, localPreviewPath);
+        const outputDir = path.dirname(videoPath);
+        const localPreviewPath = await extractVideoFrame(videoPath, outputDir);
         
         if (fs.existsSync(localPreviewPath)) {
           dbPreviewPath = `/uploads/${path.basename(localPreviewPath)}`;
+          previewSource = 'auto-generated';
         }
       } catch (previewError) {
         fileLogger.error('Failed to generate preview for local video:', previewError);
+        previewSource = 'fallback';
       }
     }
   } else {
@@ -248,18 +248,16 @@ const processVideoAndGeneratePreview = async (videoFile, metadata, cardType) => 
     
     // Generate preview locally
     try {
-      const localPreviewPath = path.join(
-        path.dirname(videoPath),
-        `preview-${Date.now()}-${path.basename(videoPath, path.extname(videoPath))}.jpg`
-      );
-      
-      await extractVideoFrame(videoPath, localPreviewPath);
+      const outputDir = path.dirname(videoPath);
+      const localPreviewPath = await extractVideoFrame(videoPath, outputDir);
       
       if (fs.existsSync(localPreviewPath)) {
         dbPreviewPath = `/uploads/${path.basename(localPreviewPath)}`;
+        previewSource = 'auto-generated';
       }
     } catch (previewError) {
       fileLogger.error('Failed to generate preview:', previewError);
+      previewSource = 'fallback';
     }
   }
   
@@ -269,14 +267,158 @@ const processVideoAndGeneratePreview = async (videoFile, metadata, cardType) => 
     metadata.width = videoMetadata.width || VIDEO_DIMENSIONS.WIDTH;
     metadata.height = videoMetadata.height || VIDEO_DIMENSIONS.HEIGHT;
     metadata.fileSize = videoFile.size;
+    metadata.previewSource = previewSource;
   } catch (metadataError) {
     fileLogger.error('Error extracting video metadata:', metadataError);
     metadata.width = VIDEO_DIMENSIONS.WIDTH;
     metadata.height = VIDEO_DIMENSIONS.HEIGHT;
     metadata.fileSize = videoFile.size;
+    metadata.previewSource = previewSource;
   }
   
-  return { videoPath: dbVideoPath, previewPath: dbPreviewPath };
+  return { videoPath: dbVideoPath, previewPath: dbPreviewPath, previewSource };
+};
+
+// Generate preview from existing video path
+const generatePreviewFromExistingVideo = async (videoPath, metadata) => {
+  let dbPreviewPath = null;
+  let previewSource = 'auto-generated';
+  
+  try {
+    if (videoPath.startsWith('http')) {
+      // Video is stored in S3, use the generate and upload preview function
+      const s3PreviewUrl = await generateAndUploadPreview(videoPath);
+      if (s3PreviewUrl) {
+        dbPreviewPath = s3PreviewUrl;
+        previewSource = 'auto-generated';
+        s3Logger.info(`Preview regenerated and uploaded to S3: ${s3PreviewUrl}`);
+      }
+    } else {
+      // Video is stored locally
+      const localVideoPath = path.join(__dirname, '..', 'public', videoPath);
+      
+      if (fs.existsSync(localVideoPath)) {
+        const tempDir = path.join(__dirname, '..', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const localPreviewPath = path.join(
+          tempDir,
+          `preview-${Date.now()}-${path.basename(localVideoPath, path.extname(localVideoPath))}.jpg`
+        );
+        
+        await extractVideoFrame(localVideoPath, localPreviewPath);
+        
+        if (fs.existsSync(localPreviewPath)) {
+          if (isS3Configured) {
+            const s3PreviewUrl = await uploadLocalFileToS3(localPreviewPath);
+            if (s3PreviewUrl) {
+              dbPreviewPath = s3PreviewUrl;
+              previewSource = 'auto-generated';
+              fs.unlinkSync(localPreviewPath);
+            } else {
+              dbPreviewPath = `/uploads/${path.basename(localPreviewPath)}`;
+              previewSource = 'auto-generated';
+            }
+          } else {
+            dbPreviewPath = `/uploads/${path.basename(localPreviewPath)}`;
+            previewSource = 'auto-generated';
+          }
+        }
+      } else {
+        fileLogger.error(`Video file not found at path: ${localVideoPath}`);
+        previewSource = 'fallback';
+      }
+    }
+  } catch (error) {
+    fileLogger.error('Error generating preview from existing video:', error);
+    previewSource = 'fallback';
+  }
+  
+  if (metadata) {
+    metadata.previewSource = previewSource;
+  }
+  
+  return { previewPath: dbPreviewPath, previewSource };
+};
+
+// Generate fallback preview for missing videos
+const generateFallbackPreview = async (cardDescription, cardType = 'reel') => {
+  let dbPreviewPath = null;
+  const previewSource = 'fallback';
+  
+  try {
+    const tempDir = path.join(__dirname, '..', 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const fallbackPreviewPath = path.join(tempDir, `fallback-${Date.now()}.jpg`);
+    
+    // Use the generateAndUploadPreview fallback logic
+    
+    // Create a simple fallback image using Sharp
+    const sharp = require('sharp');
+    const { VIDEO_DIMENSIONS, PREVIEW_SETTINGS } = require('./mediaConstants');
+    
+    const width = VIDEO_DIMENSIONS.WIDTH;
+    const height = VIDEO_DIMENSIONS.HEIGHT;
+    
+    // Generate a random color for the background
+    const r = Math.floor(Math.random() * 200) + 25;
+    const g = Math.floor(Math.random() * 200) + 25;
+    const b = Math.floor(Math.random() * 200) + 25;
+    
+    const displayText = cardDescription.length > 30 
+      ? cardDescription.substring(0, 30) + '...' 
+      : cardDescription;
+    
+    await sharp({
+      create: {
+        width: width,
+        height: height,
+        channels: 4,
+        background: { r, g, b, alpha: 1 }
+      }
+    })
+    .composite([
+      {
+        input: Buffer.from(`
+          <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="rgb(${r},${g},${b})" />
+            <text x="${width/2}" y="${height/2-40}" text-anchor="middle" font-family="Arial" font-size="28" fill="white">${displayText}</text>
+            <text x="${width/2}" y="${height/2}" text-anchor="middle" font-family="Arial" font-size="20" fill="white">Video Missing</text>
+            <text x="${width/2}" y="${height/2+30}" text-anchor="middle" font-family="Arial" font-size="16" fill="white">Upload a new video to generate preview</text>
+          </svg>
+        `),
+        top: 0,
+        left: 0
+      }
+    ])
+    .jpeg({ quality: PREVIEW_SETTINGS.QUALITY })
+    .toFile(fallbackPreviewPath);
+    
+    if (fs.existsSync(fallbackPreviewPath)) {
+      if (isS3Configured) {
+        const s3PreviewUrl = await uploadLocalFileToS3(fallbackPreviewPath);
+        if (s3PreviewUrl) {
+          dbPreviewPath = s3PreviewUrl;
+          fs.unlinkSync(fallbackPreviewPath);
+        } else {
+          dbPreviewPath = `/uploads/${path.basename(fallbackPreviewPath)}`;
+        }
+      } else {
+        dbPreviewPath = `/uploads/${path.basename(fallbackPreviewPath)}`;
+      }
+      
+      fileLogger.info(`Generated fallback preview: ${dbPreviewPath}`);
+    }
+  } catch (error) {
+    fileLogger.error('Error generating fallback preview:', error);
+  }
+  
+  return { previewPath: dbPreviewPath, previewSource };
 };
 
 // Extract file metadata
@@ -395,6 +537,8 @@ module.exports = {
   processFileAndGetPath,
   downloadFile,
   processVideoAndGeneratePreview,
+  generatePreviewFromExistingVideo,
+  generateFallbackPreview,
   extractFileMetadata,
   guessDimensionsFromUrl
 };

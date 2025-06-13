@@ -80,7 +80,12 @@ const cardSchema = new mongoose.Schema({
     instagramCopyOriginalFileName: String, // For Instagram copy
     facebookCopyOriginalFileName: String, // For Facebook copy
     imageSequenceOriginalFileNames: [String], // Original filenames for image sequence
-    imageSequenceFileSizes: [Number] // Sizes of each image in the sequence in bytes
+    imageSequenceFileSizes: [Number], // Sizes of each image in the sequence in bytes
+    previewSource: {
+      type: String,
+      enum: ['auto-generated', 'user-uploaded', 'fallback'],
+      default: 'auto-generated' // Track how the preview was created
+    }
   }
 }, { timestamps: true });
 
