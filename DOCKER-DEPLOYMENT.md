@@ -42,6 +42,7 @@ This guide explains how to build and deploy the Media Management System using Do
 | `SENDGRID_FROM_EMAIL` | From email address (optional) | noreply@domain.com |
 | `FRONTEND_URL` | Frontend URL for reset links (optional) | https://domain.com |
 | `LOG_LEVEL` | Logging level (optional) | warn |
+| `NODE_ENV` | Node.js environment (set automatically in Docker) | production |
 
 ## Deployment Steps
 
@@ -66,6 +67,7 @@ services:
   frontend:
     image: your-registry/media-frontend:v1.0
     environment:
+      - NODE_ENV=production
       - BACKEND_URL=http://backend:5001
     networks:
       - internal
@@ -73,6 +75,7 @@ services:
   backend:
     image: your-registry/media-backend:v1.0
     environment:
+      - NODE_ENV=production
       - PORT=5001
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}

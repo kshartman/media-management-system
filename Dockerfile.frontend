@@ -29,6 +29,9 @@ COPY public ./public
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_DOMAIN
 
+# Set production environment for build
+ENV NODE_ENV=production
+
 # Build the application
 RUN npm run build
 
@@ -41,6 +44,9 @@ WORKDIR /app
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Set production environment for runtime
+ENV NODE_ENV=production
 
 # Create non-root user
 RUN groupadd -g 1001 nodejs && \

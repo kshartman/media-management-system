@@ -27,8 +27,11 @@ COPY server/package*.json ./
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Install dependencies
-RUN npm ci
+# Set production environment
+ENV NODE_ENV=production
+
+# Install dependencies (production only)
+RUN npm ci --only=production
 
 # Copy server code
 COPY server/ ./

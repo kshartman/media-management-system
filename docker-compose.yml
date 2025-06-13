@@ -12,6 +12,7 @@ services:
     container_name: media-frontend
     restart: unless-stopped
     environment:
+      - NODE_ENV=production
       - BACKEND_URL=http://backend:5001
     ports:
       - "5000:3000"
@@ -28,6 +29,7 @@ services:
     container_name: media-backend
     restart: unless-stopped
     environment:
+      - NODE_ENV=production
       - PORT=5001
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
