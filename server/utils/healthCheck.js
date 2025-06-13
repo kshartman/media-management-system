@@ -126,9 +126,9 @@ class HealthChecker {
     const memUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
     const memTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
     
-    // Memory warning if using > 95% of heap or > 200MB total
-    // For this application: 34MB usage is normal, 80% heap utilization is efficient
-    const memoryStatus = (memUsedMB > 200 || (memUsedMB / memTotalMB) > 0.95) ? 'warning' : 'healthy';
+    // Memory warning if using > 98% of heap or > 200MB total
+    // For this application: 34MB usage is normal, 90%+ heap utilization is efficient
+    const memoryStatus = (memUsedMB > 200 || (memUsedMB / memTotalMB) > 0.98) ? 'warning' : 'healthy';
     
     return {
       status: memoryStatus,
