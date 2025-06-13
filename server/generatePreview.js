@@ -9,7 +9,11 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 const { VIDEO_DIMENSIONS, PREVIEW_SETTINGS, S3_SETTINGS } = require('./utils/mediaConstants');
+const logger = require('./utils/logger');
 require('dotenv').config();
+
+// Create a child logger for this module
+const previewGenerator = logger.child({ module: 'previewGenerator' });
 
 // Set the ffmpeg and ffprobe paths
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -23,7 +27,7 @@ ffmpeg.setFfprobePath(ffprobePath);
  */
 const downloadFile = (url, destPath) => {
   return new Promise((resolve, reject) => {
-    console.log(`Downloading file from ${url} to ${destPath}`);
+    previewGenerator.debug(`Downloading file from ${url} to ${destPath}`);
     const file = fs.createWriteStream(destPath);
     
     // Choose the right protocol
@@ -39,20 +43,20 @@ const downloadFile = (url, destPath) => {
       
       file.on('finish', () => {
         file.close();
-        console.log(`Download complete, file saved to ${destPath}`);
+        previewGenerator.debug(`Download complete, file saved to ${destPath}`);
         resolve(destPath);
       });
     });
     
     request.on('error', err => {
       fs.unlink(destPath, () => {});
-      console.error(`Error downloading file: ${err.message}`);
+      previewGenerator.error(`Error downloading file: ${err.message}`, err);
       reject(err);
     });
     
     file.on('error', err => {
       fs.unlink(destPath, () => {});
-      console.error(`Error saving file: ${err.message}`);
+      previewGenerator.error(`Error saving file: ${err.message}`, err);
       reject(err);
     });
   });
@@ -66,11 +70,11 @@ const downloadFile = (url, destPath) => {
  */
 const extractFrameFromVideo = (videoPath, outputPath) => {
   return new Promise((resolve, reject) => {
-    console.log(`Extracting frame from video at ${videoPath}`);
+    previewGenerator.debug(`Extracting frame from video at ${videoPath}`);
     
     // Verify the video file exists
     if (!fs.existsSync(videoPath)) {
-      console.error(`Video file does not exist: ${videoPath}`);
+      previewGenerator.error(`Video file does not exist: ${videoPath}`);
       return reject(new Error(`Video file does not exist: ${videoPath}`));
     }
     
@@ -78,25 +82,25 @@ const extractFrameFromVideo = (videoPath, outputPath) => {
     try {
       const stats = fs.statSync(videoPath);
       if (stats.size === 0) {
-        console.error(`Video file is empty (0 bytes): ${videoPath}`);
+        previewGenerator.error(`Video file is empty (0 bytes): ${videoPath}`);
         return reject(new Error(`Video file is empty (0 bytes): ${videoPath}`));
       }
-      console.log(`Video file exists and has content: ${videoPath}, size: ${stats.size} bytes`);
+      previewGenerator.debug(`Video file exists and has content: ${videoPath}, size: ${stats.size} bytes`);
     } catch (statError) {
-      console.error(`Error checking video file stats: ${statError.message}`);
+      previewGenerator.error(`Error checking video file stats: ${statError.message}`, statError);
       return reject(statError);
     }
     
     ffmpeg(videoPath)
       .on('start', cmdline => {
-        console.log(`Running ffmpeg command: ${cmdline}`);
+        previewGenerator.debug(`Running ffmpeg command: ${cmdline}`);
       })
       .on('error', err => {
-        console.error(`Error extracting frame: ${err.message}`);
+        previewGenerator.error(`Error extracting frame: ${err.message}`, err);
         reject(err);
       })
       .on('end', () => {
-        console.log(`Frame extracted successfully to ${outputPath}`);
+        previewGenerator.debug(`Frame extracted successfully to ${outputPath}`);
         resolve(outputPath);
       })
       .screenshots({
@@ -117,28 +121,28 @@ const extractFrameFromVideo = (videoPath, outputPath) => {
  * @returns {Promise<string>} - URL of the generated preview
  */
 async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = false) {
-  console.log('==================== PREVIEW GENERATOR START ====================');
-  console.log('Generating preview for video:', videoPath);
-  console.log('Video filename:', videoFilename);
-  console.log('Is local file:', isLocalFile);
-  console.log('Input validation:');
-  console.log('- videoPath type:', typeof videoPath, 'value:', videoPath);
-  console.log('- videoFilename type:', typeof videoFilename, 'value:', videoFilename);
-  console.log('- isLocalFile:', isLocalFile);
-  console.log('- process.env.S3_BUCKET:', process.env.S3_BUCKET);
-  console.log('- process.env.AWS_REGION:', process.env.AWS_REGION);
-  console.log('- process.env.AWS_ACCESS_KEY_ID exists:', !!process.env.AWS_ACCESS_KEY_ID);
-  console.log('- process.env.AWS_SECRET_ACCESS_KEY exists:', !!process.env.AWS_SECRET_ACCESS_KEY);
-  console.log('- process.env.S3_CUSTOM_DOMAIN:', process.env.S3_CUSTOM_DOMAIN);
+  previewGenerator.info('==================== PREVIEW GENERATOR START ====================');
+  previewGenerator.info('Generating preview for video:', videoPath);
+  previewGenerator.info('Video filename:', videoFilename);
+  previewGenerator.info('Is local file:', isLocalFile);
+  previewGenerator.debug('Input validation:');
+  previewGenerator.debug('- videoPath type:', typeof videoPath, 'value:', videoPath);
+  previewGenerator.debug('- videoFilename type:', typeof videoFilename, 'value:', videoFilename);
+  previewGenerator.debug('- isLocalFile:', isLocalFile);
+  previewGenerator.debug('- process.env.S3_BUCKET:', process.env.S3_BUCKET);
+  previewGenerator.debug('- process.env.AWS_REGION:', process.env.AWS_REGION);
+  previewGenerator.debug('- process.env.AWS_ACCESS_KEY_ID exists:', !!process.env.AWS_ACCESS_KEY_ID);
+  previewGenerator.debug('- process.env.AWS_SECRET_ACCESS_KEY exists:', !!process.env.AWS_SECRET_ACCESS_KEY);
+  previewGenerator.debug('- process.env.S3_CUSTOM_DOMAIN:', process.env.S3_CUSTOM_DOMAIN);
   
   if (!videoPath) {
     const error = new Error('Invalid or missing video path');
-    console.error('ERROR:', error.message);
-    console.log('==================== PREVIEW GENERATOR ERROR ====================');
+    previewGenerator.error('ERROR:', error.message, error);
+    previewGenerator.info('==================== PREVIEW GENERATOR ERROR ====================');
     throw error;
   }
   
-  console.log('Will attempt to extract a frame from the video first');
+  previewGenerator.debug('Will attempt to extract a frame from the video first');
   
   // If no filename was provided or is undefined, extract it from the path/URL
   if (!videoFilename) {
@@ -152,9 +156,9 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
         const lastPart = urlParts[urlParts.length - 1].split('?')[0]; // Remove query params
         videoFilename = decodeURIComponent(lastPart);
       }
-      console.log('Extracted filename:', videoFilename);
+      previewGenerator.debug('Extracted filename:', videoFilename);
     } catch (error) {
-      console.log('Failed to extract filename, using default');
+      previewGenerator.debug('Failed to extract filename, using default');
       videoFilename = 'video';
     }
   }
@@ -164,11 +168,11 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     const tempDir = path.join(__dirname, PREVIEW_SETTINGS.TEMP_DIR);
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
-      console.log(`Created temp directory: ${tempDir}`);
+      previewGenerator.debug(`Created temp directory: ${tempDir}`);
     } else {
-      console.log(`Using existing temp directory: ${tempDir}`);
+      previewGenerator.debug(`Using existing temp directory: ${tempDir}`);
     }
-    console.log('Temp directory path:', tempDir);
+    previewGenerator.debug('Temp directory path:', tempDir);
     
     // Set up filenames and paths using constants
     const width = VIDEO_DIMENSIONS.WIDTH;
@@ -180,13 +184,13 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     // We only need to create a temp video path if the source is a URL
     const tempVideoPath = isLocalFile ? videoPath : path.join(tempDir, `temp-video-${uuid.substring(0, 8)}${path.extname(videoFilename) || '.mp4'}`);
     
-    console.log('Configuration:');
-    console.log('- preview width:', width);
-    console.log('- preview height:', height);
-    console.log('- generated UUID:', uuid);
-    console.log('- preview filename:', previewFilename);
-    console.log('- preview path:', previewPath);
-    console.log('- video path for processing:', tempVideoPath);
+    previewGenerator.debug('Configuration:');
+    previewGenerator.debug('- preview width:', width);
+    previewGenerator.debug('- preview height:', height);
+    previewGenerator.debug('- generated UUID:', uuid);
+    previewGenerator.debug('- preview filename:', previewFilename);
+    previewGenerator.debug('- preview path:', previewPath);
+    previewGenerator.debug('- video path for processing:', tempVideoPath);
     
     // Get the filename without extension for display on the preview
     let displayName;
@@ -195,9 +199,9 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
         .replace(/_/g, ' ')
         .replace(/-/g, ' ');
       
-      console.log('Display name for preview:', displayName);
+      previewGenerator.debug('Display name for preview:', displayName);
     } catch (nameError) {
-      console.error('Error processing display name:', nameError);
+      previewGenerator.error('Error processing display name:', nameError.message, nameError);
       displayName = 'Video Preview';
     }
     
@@ -207,20 +211,20 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     try {
       // If not a local file, download the video to a temp file
       if (!isLocalFile) {
-        console.log('Step 1: Downloading video from', videoPath);
+        previewGenerator.debug('Step 1: Downloading video from', videoPath);
         await downloadFile(videoPath, tempVideoPath);
       } else {
-        console.log('Using local file directly:', videoPath);
+        previewGenerator.debug('Using local file directly:', videoPath);
       }
       
       // Extract a frame using ffmpeg
-      console.log('Step 2: Extracting frame...');
+      previewGenerator.debug('Step 2: Extracting frame...');
       await extractFrameFromVideo(tempVideoPath, previewPath);
       frameExtracted = true;
       
-      console.log('Successfully extracted frame from video!');
+      previewGenerator.debug('Successfully extracted frame from video!');
     } catch (videoError) {
-      console.error('Error processing video, falling back to placeholder image:', videoError.message);
+      previewGenerator.error('Error processing video, falling back to placeholder image:', videoError.message, videoError);
       
       // If frame extraction failed, we'll create a placeholder in the fallback section
       frameExtracted = false;
@@ -228,15 +232,15 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     
     // Only create a placeholder if frame extraction failed
     if (!frameExtracted) {
-      console.log('Creating fallback colored placeholder image');
+      previewGenerator.debug('Creating fallback colored placeholder image');
       
       // Generate a random color
       const r = Math.floor(Math.random() * 200) + 25; // 25-225 for better visibility
       const g = Math.floor(Math.random() * 200) + 25;
       const b = Math.floor(Math.random() * 200) + 25;
       
-      console.log(`Using random color: rgb(${r},${g},${b})`);
-      console.log('Creating preview image with sharp...');
+      previewGenerator.debug(`Using random color: rgb(${r},${g},${b})`);
+      previewGenerator.debug('Creating preview image with sharp...');
       
       try {
         await sharp({
@@ -263,7 +267,7 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
         .jpeg({ quality: PREVIEW_SETTINGS.QUALITY })
         .toFile(previewPath);
       } catch (sharpError) {
-        console.error('Error creating fallback image:', sharpError);
+        previewGenerator.error('Error creating fallback image:', sharpError.message, sharpError);
         throw sharpError; // If this fails too, we have bigger problems
       }
     }
@@ -273,14 +277,14 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
       try {
         if (fs.existsSync(tempVideoPath)) {
           fs.unlinkSync(tempVideoPath);
-          console.log(`Cleaned up temporary video file: ${tempVideoPath}`);
+          previewGenerator.debug(`Cleaned up temporary video file: ${tempVideoPath}`);
         }
       } catch (cleanupError) {
-        console.error(`Error cleaning up temp video file: ${cleanupError.message}`);
+        previewGenerator.error(`Error cleaning up temp video file: ${cleanupError.message}`, cleanupError);
       }
     }
     
-    console.log('Preview image created successfully');
+    previewGenerator.debug('Preview image created successfully');
     
     // Check if the file was created
     if (!fs.existsSync(previewPath)) {
@@ -288,16 +292,16 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     }
     
     const fileStats = fs.statSync(previewPath);
-    console.log('Preview file exists, size:', fileStats.size, 'bytes');
+    previewGenerator.debug('Preview file exists, size:', fileStats.size, 'bytes');
     
     // Now upload to S3
-    console.log('Uploading preview to S3...');
+    previewGenerator.debug('Uploading preview to S3...');
     
     // Initialize S3 client
-    console.log('Creating S3 client with:');
-    console.log('- Region:', process.env.AWS_REGION);
-    console.log('- Has access key:', !!process.env.AWS_ACCESS_KEY_ID);
-    console.log('- Has secret key:', !!process.env.AWS_SECRET_ACCESS_KEY);
+    previewGenerator.debug('Creating S3 client with:');
+    previewGenerator.debug('- Region:', process.env.AWS_REGION);
+    previewGenerator.debug('- Has access key:', !!process.env.AWS_ACCESS_KEY_ID);
+    previewGenerator.debug('- Has secret key:', !!process.env.AWS_SECRET_ACCESS_KEY);
     
     let s3Client;
     try {
@@ -308,9 +312,9 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
         }
       });
-      console.log('S3 client created successfully');
+      previewGenerator.debug('S3 client created successfully');
     } catch (s3ClientError) {
-      console.error('ERROR creating S3 client:', s3ClientError);
+      previewGenerator.error('ERROR creating S3 client:', s3ClientError.message, s3ClientError);
       throw new Error(`Failed to create S3 client: ${s3ClientError.message}`);
     }
     
@@ -318,9 +322,9 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     let fileContent;
     try {
       fileContent = fs.readFileSync(previewPath);
-      console.log('Read preview image file, size:', fileContent.length, 'bytes');
+      previewGenerator.debug('Read preview image file, size:', fileContent.length, 'bytes');
     } catch (readError) {
-      console.error('ERROR reading preview file:', readError);
+      previewGenerator.error('ERROR reading preview file:', readError.message, readError);
       throw new Error(`Failed to read preview file: ${readError.message}`);
     }
     
@@ -333,7 +337,7 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
       throw new Error('S3_BUCKET environment variable is not set');
     }
     
-    console.log('Using S3 bucket:', bucketName);
+    previewGenerator.debug('Using S3 bucket:', bucketName);
     
     // Define S3 upload parameters
     const uploadParams = {
@@ -343,7 +347,7 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
       ContentType: S3_SETTINGS.CONTENT_TYPES.JPEG
     };
     
-    console.log('S3 upload parameters:', {
+    previewGenerator.debug('S3 upload parameters:', {
       bucket: bucketName,
       key: s3Key,
       contentType: S3_SETTINGS.CONTENT_TYPES.JPEG,
@@ -354,9 +358,9 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     try {
       const command = new PutObjectCommand(uploadParams);
       const result = await s3Client.send(command);
-      console.log('Preview image uploaded to S3 successfully, result:', result);
+      previewGenerator.debug('Preview image uploaded to S3 successfully, result:', result);
     } catch (uploadError) {
-      console.error('ERROR uploading to S3:', uploadError);
+      previewGenerator.error('ERROR uploading to S3:', uploadError.message, uploadError);
       throw new Error(`Failed to upload to S3: ${uploadError.message}`);
     }
     
@@ -364,39 +368,39 @@ async function generateAndUploadPreview(videoPath, videoFilename, isLocalFile = 
     let previewUrl;
     if (process.env.S3_CUSTOM_DOMAIN) {
       previewUrl = `https://${process.env.S3_CUSTOM_DOMAIN}/${s3Key}`;
-      console.log('Using custom domain for preview URL');
+      previewGenerator.debug('Using custom domain for preview URL');
     } else {
       previewUrl = `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
-      console.log('Using default S3 URL format for preview URL');
+      previewGenerator.debug('Using default S3 URL format for preview URL');
     }
     
-    console.log('Final preview URL:', previewUrl);
+    previewGenerator.debug('Final preview URL:', previewUrl);
     
     // Clean up the temporary file
     try {
       fs.unlinkSync(previewPath);
-      console.log('Temporary file cleaned up successfully');
+      previewGenerator.debug('Temporary file cleaned up successfully');
     } catch (cleanupError) {
-      console.warn('Warning: Failed to clean up temporary file:', cleanupError.message);
+      previewGenerator.warn('Warning: Failed to clean up temporary file:', cleanupError.message);
       // Continue even if cleanup fails - this is non-critical
     }
     
-    console.log('==================== PREVIEW GENERATOR SUCCESS ====================');
+    previewGenerator.info('==================== PREVIEW GENERATOR SUCCESS ====================');
     // Return the S3 URL of the preview
     return previewUrl;
   } catch (error) {
-    console.error('==================== PREVIEW GENERATOR ERROR ====================');
-    console.error('ERROR generating or uploading preview:', error);
-    console.error('Error stack:', error.stack);
+    previewGenerator.error('==================== PREVIEW GENERATOR ERROR ====================');
+    previewGenerator.error('ERROR generating or uploading preview:', error.message, error);
+    previewGenerator.error('Error stack:', error.stack);
     // Add additional error info if present
-    if (error.code) console.error('Error code:', error.code);
-    if (error.region) console.error('Error region:', error.region);
-    if (error.time) console.error('Error time:', error.time);
-    if (error.requestId) console.error('Error requestId:', error.requestId);
-    if (error.statusCode) console.error('Error statusCode:', error.statusCode);
-    if (error.retryable) console.error('Error retryable:', error.retryable);
-    if (error.message) console.error('Error message:', error.message);
-    console.error('==================== END PREVIEW GENERATOR ERROR ====================');
+    if (error.code) previewGenerator.error('Error code:', error.code);
+    if (error.region) previewGenerator.error('Error region:', error.region);
+    if (error.time) previewGenerator.error('Error time:', error.time);
+    if (error.requestId) previewGenerator.error('Error requestId:', error.requestId);
+    if (error.statusCode) previewGenerator.error('Error statusCode:', error.statusCode);
+    if (error.retryable) previewGenerator.error('Error retryable:', error.retryable);
+    if (error.message) previewGenerator.error('Error message:', error.message);
+    previewGenerator.error('==================== END PREVIEW GENERATOR ERROR ====================');
     throw error;
   }
 }

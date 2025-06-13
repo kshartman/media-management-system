@@ -51,6 +51,7 @@ Configure these in your `.env` file:
 - `SENDGRID_API_KEY`: SendGrid API key for password reset emails (optional)
 - `SENDGRID_FROM_EMAIL`: Sender email for password reset emails (optional)
 - `FRONTEND_URL`: Frontend URL for password reset links (optional)
+- `LOG_LEVEL`: Logging level - debug, info, warn, error (defaults to warn in production)
 
 ## Deployment Options
 

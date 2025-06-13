@@ -7,6 +7,9 @@ const JSZip = require('jszip');
 const { getFileUrl, getSignedFileUrl, getFilenameFromUrl } = require('./s3Storage');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./logger');
+
+const zipSequenceLogger = logger.child({ module: 'zipSequence' });
 
 /**
  * Create a ZIP file from an image sequence
@@ -24,7 +27,7 @@ async function createSequenceZip(imagePaths, originalFilenames, cardTitle) {
   const zipFilename = `${timestamp}-${cardTitle || 'image-sequence'}-${uuidv4().substring(0, 8)}.zip`;
   const zipPath = path.join(__dirname, '..', 'uploads', zipFilename);
   
-  console.log(`Creating ZIP archive: ${zipPath}`);
+  zipSequenceLogger.info(`Creating ZIP archive: ${zipPath}`);
 
   // Create a new JSZip instance
   const zip = new JSZip();
@@ -52,16 +55,16 @@ async function createSequenceZip(imagePaths, originalFilenames, cardTitle) {
 
         // Add the buffer to the zip with the original filename
         zip.file(filename, response.data);
-        console.log(`Added file from S3 to ZIP: ${filename}`);
+        zipSequenceLogger.info(`Added file from S3 to ZIP: ${filename}`);
       } else {
         // It's a local file path
         const fullPath = path.join(__dirname, '..', imagePath);
         const fileData = fs.readFileSync(fullPath);
         zip.file(filename, fileData);
-        console.log(`Added local file to ZIP: ${filename}`);
+        zipSequenceLogger.info(`Added local file to ZIP: ${filename}`);
       }
     } catch (error) {
-      console.error(`Error adding file to ZIP: ${filename}`, error);
+      zipSequenceLogger.error(`Error adding file to ZIP: ${filename}`, error);
       // Continue with other files
     }
   }
@@ -71,11 +74,11 @@ async function createSequenceZip(imagePaths, originalFilenames, cardTitle) {
     zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
       .pipe(fs.createWriteStream(zipPath))
       .on('finish', () => {
-        console.log(`ZIP archive created: ${zipPath}`);
+        zipSequenceLogger.info(`ZIP archive created: ${zipPath}`);
         resolve(`/uploads/${zipFilename}`);
       })
       .on('error', (err) => {
-        console.error('Error generating ZIP file:', err);
+        zipSequenceLogger.error('Error generating ZIP file:', err);
         reject(err);
       });
   });

@@ -9,6 +9,9 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { htmlToText } = require('html-to-text');
 const puppeteer = require('puppeteer');
+const logger = require('./logger');
+
+const zipFiles = logger.child({ component: 'zipFiles' });
 
 /**
  * Get the original filename from card metadata, or use a placeholder name
@@ -139,7 +142,7 @@ async function convertHtmlToPdf(htmlContent) {
     
     return pdfBuffer;
   } catch (error) {
-    console.error('Error generating PDF with Puppeteer:', error);
+    zipFiles.error('Error generating PDF with Puppeteer:', error);
     throw error;
   } finally {
     if (browser) {
@@ -158,36 +161,36 @@ async function convertHtmlToPdf(htmlContent) {
  */
 async function addHtmlContentToZip(zip, html, baseName) {
   if (!html || !zip || !baseName) {
-    console.log(`Skipping ${baseName} - missing html (${!!html}), zip (${!!zip}), or baseName (${!!baseName})`);
+    zipFiles.debug(`Skipping ${baseName} - missing html (${!!html}), zip (${!!zip}), or baseName (${!!baseName})`);
     return;
   }
   
-  console.log(`Processing HTML content for ${baseName}:`, html.substring(0, 100) + '...');
+  zipFiles.debug(`Processing HTML content for ${baseName}:`, html.substring(0, 100) + '...');
   
   try {
     // Convert to plain text
     const textContent = convertHtmlToText(html);
     zip.file(`${baseName}.txt`, textContent);
-    console.log(`✓ Added ${baseName}.txt to ZIP`);
+    zipFiles.info(`✓ Added ${baseName}.txt to ZIP`);
     
     // Convert to PDF
     try {
-      console.log(`Attempting to create PDF for ${baseName}...`);
+      zipFiles.debug(`Attempting to create PDF for ${baseName}...`);
       const pdfBuffer = await convertHtmlToPdf(html);
       if (pdfBuffer && pdfBuffer.length > 0) {
         zip.file(`${baseName}.pdf`, pdfBuffer);
-        console.log(`✓ Added ${baseName}.pdf to ZIP (${pdfBuffer.length} bytes)`);
+        zipFiles.info(`✓ Added ${baseName}.pdf to ZIP (${pdfBuffer.length} bytes)`);
       } else {
-        console.warn(`PDF buffer empty for ${baseName}`);
+        zipFiles.warn(`PDF buffer empty for ${baseName}`);
       }
     } catch (pdfError) {
-      console.error(`✗ Error creating PDF for ${baseName}:`, pdfError.message);
+      zipFiles.error(`✗ Error creating PDF for ${baseName}:`, pdfError);
       // Continue without PDF
     }
     
-    console.log(`Completed processing ${baseName} content in text and PDF formats`);
+    zipFiles.debug(`Completed processing ${baseName} content in text and PDF formats`);
   } catch (error) {
-    console.error(`✗ Error adding HTML content to ZIP: ${baseName}`, error);
+    zipFiles.error(`✗ Error adding HTML content to ZIP: ${baseName}`, error);
     // Continue with other files
   }
 }
@@ -217,20 +220,20 @@ async function addFileToZip(zip, filePath, filename) {
 
       // Add the buffer to the zip with the original filename
       zip.file(filename, response.data);
-      console.log(`Added file from S3 to ZIP: ${filename}`);
+      zipFiles.info(`Added file from S3 to ZIP: ${filename}`);
     } else {
       // It's a local file path
       const fullPath = path.join(__dirname, '..', filePath);
       if (fs.existsSync(fullPath)) {
         const fileData = fs.readFileSync(fullPath);
         zip.file(filename, fileData);
-        console.log(`Added local file to ZIP: ${filename}`);
+        zipFiles.info(`Added local file to ZIP: ${filename}`);
       } else {
-        console.warn(`File not found, skipping: ${fullPath}`);
+        zipFiles.warn(`File not found, skipping: ${fullPath}`);
       }
     }
   } catch (error) {
-    console.error(`Error adding file to ZIP: ${filename}`, error);
+    zipFiles.error(`Error adding file to ZIP: ${filename}`, error);
     // Continue with other files
   }
 }
@@ -246,8 +249,8 @@ async function createCardZip(card) {
   }
   
   // Log the card type for debugging
-  console.log(`Creating ZIP archive for card type: ${card.type}`);
-  console.log(`Card has the following properties: ${Object.keys(card).join(', ')}`);
+  zipFiles.debug(`Creating ZIP archive for card type: ${card.type}`);
+  zipFiles.debug(`Card has the following properties: ${Object.keys(card).join(', ')}`);
 
   // Create a sanitized name for the ZIP file based on card type and content
   let zipBaseName = '';
@@ -271,7 +274,7 @@ async function createCardZip(card) {
   const zipFilename = `${timestamp}-${zipBaseName}-${uuidv4().substring(0, 8)}.zip`;
   const zipPath = path.join(__dirname, '..', 'uploads', zipFilename);
   
-  console.log(`Creating ZIP archive for ${card.type} card: ${zipPath}`);
+  zipFiles.info(`Creating ZIP archive for ${card.type} card: ${zipPath}`);
 
   // Create a new JSZip instance
   const zip = new JSZip();
@@ -324,7 +327,7 @@ async function createCardZip(card) {
       
       // Add all images in the sequence - ONLY for social cards
       if (card.imageSequence && Array.isArray(card.imageSequence)) {
-        console.log(`Processing image sequence with ${card.imageSequence.length} images`);
+        zipFiles.debug(`Processing image sequence with ${card.imageSequence.length} images`);
         const originalFilenames = card.fileMetadata?.imageSequenceOriginalFileNames || [];
         
         for (let i = 0; i < card.imageSequence.length; i++) {
@@ -339,7 +342,7 @@ async function createCardZip(card) {
           await addFileToZip(zip, imagePath, filename);
         }
       } else {
-        console.log('No image sequence found for social card or not an array');
+        zipFiles.debug('No image sequence found for social card or not an array');
       }
       
       // Add transcript (which replaced documentCopy)
@@ -359,7 +362,7 @@ async function createCardZip(card) {
       }
     }
   } catch (error) {
-    console.error('Error processing card files for ZIP:', error);
+    zipFiles.error('Error processing card files for ZIP:', error);
     // Continue with creating the ZIP even if some files couldn't be added
   }
 
@@ -368,11 +371,11 @@ async function createCardZip(card) {
     zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
       .pipe(fs.createWriteStream(zipPath))
       .on('finish', () => {
-        console.log(`ZIP archive created: ${zipPath}`);
+        zipFiles.info(`ZIP archive created: ${zipPath}`);
         resolve(`/uploads/${zipFilename}`);
       })
       .on('error', (err) => {
-        console.error('Error generating ZIP file:', err);
+        zipFiles.error('Error generating ZIP file:', err);
         reject(err);
       });
   });

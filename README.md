@@ -91,6 +91,9 @@ SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 
 # Frontend URL (for password reset links)
 FRONTEND_URL=http://localhost:3000
+
+# Logging Configuration
+LOG_LEVEL=debug  # debug, info, warn, error (defaults: debug in dev, warn in production)
 ```
 
 Replace all placeholders with your actual values. The S3 configuration is only required if you're using S3 storage (`USE_S3_STORAGE=true`).
@@ -166,6 +169,28 @@ The password reset feature requires SendGrid for sending emails:
 4. **Verify sender identity** in SendGrid (required for production)
 
 **Note**: If SendGrid is not configured, the password reset feature will be automatically disabled and users will see an appropriate error message.
+
+## Logging
+
+The application uses Winston for structured logging with the following features:
+
+- **Development**: Colorized console output with debug level logging
+- **Production**: JSON format logging with warn level by default
+- **Component-based**: Different parts of the application use child loggers (database, s3, auth, api, file)
+- **Configurable**: Set `LOG_LEVEL` environment variable to control verbosity
+
+**Log Levels** (in order of verbosity):
+- `debug`: Detailed diagnostic information (default in development)
+- `info`: General informational messages
+- `warn`: Potentially harmful situations (default in production)  
+- `error`: Error events that might still allow the application to continue
+
+**Example development output:**
+```
+2024-01-15 10:30:45 [info]: Server started on port 3001 {"component":"api"}
+2024-01-15 10:30:46 [debug]: Connected to MongoDB {"component":"database"}
+2024-01-15 10:30:47 [error]: Failed to upload file {"component":"s3","error":"Access denied"}
+```
 
 ### S3 Integration Details
 

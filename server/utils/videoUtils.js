@@ -6,6 +6,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const sharp = require('sharp');
 const { VIDEO_DIMENSIONS, PREVIEW_SETTINGS } = require('./mediaConstants');
+const logger = require('./logger').child({ module: 'videoUtils' });
 
 // Set the ffmpeg and ffprobe paths
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -38,27 +39,28 @@ function parseFraction(fractionStr) {
  * @returns {Promise<string>} - Path to the extracted frame
  */
 async function extractVideoFrame(videoPath, outputDir) {
-  console.log('Extracting video frame from:', videoPath);
-  console.log('Output directory:', outputDir);
+  logger.info('Extracting video frame from:', { videoPath });
+  logger.info('Output directory:', { outputDir });
   
   return new Promise((resolve, reject) => {
     // Verify the video file exists
     if (!fs.existsSync(videoPath)) {
-      console.error(`Video file does not exist: ${videoPath}`);
-      return reject(new Error(`Video file does not exist: ${videoPath}`));
+      const error = new Error(`Video file does not exist: ${videoPath}`);
+      logger.error(`Video file does not exist: ${videoPath}`, error);
+      return reject(error);
     }
     
-    console.log('Video file exists, generating thumbnail...');
+    logger.info('Video file exists, generating thumbnail...');
     
     // Create a filename for the image
     const imageFilename = `${path.basename(videoPath, path.extname(videoPath))}-preview-${uuidv4().substring(0, 8)}.jpg`;
     const outputPath = path.join(outputDir, imageFilename);
     
-    console.log(`Output image will be saved as: ${outputPath}`);
+    logger.info('Output image will be saved as:', { outputPath });
 
     // Ensure the output directory exists
     if (!fs.existsSync(outputDir)) {
-      console.log(`Creating output directory: ${outputDir}`);
+      logger.info('Creating output directory:', { outputDir });
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
@@ -66,7 +68,7 @@ async function extractVideoFrame(videoPath, outputDir) {
     generateThumbnail(videoPath, outputPath, imageFilename, outputDir)
       .then(result => resolve(result))
       .catch(err => {
-        console.error('Thumbnail generation failed, creating fallback image...', err);
+        logger.error('Thumbnail generation failed, creating fallback image...', err);
         createFallbackImage(videoPath, outputPath)
           .then(fallbackPath => resolve(fallbackPath))
           .catch(fallbackErr => reject(fallbackErr));
@@ -91,30 +93,32 @@ function generateThumbnail(videoPath, outputPath, imageFilename, outputDir) {
     // Set up the thumbnail extraction with event handlers
     command
       .on('filenames', (filenames) => {
-        console.log('Generated filename:', filenames.join(', '));
+        logger.debug('Generated filename:', { filenames: filenames.join(', ') });
       })
       .on('start', (commandLine) => {
-        console.log('FFmpeg command:', commandLine);
+        logger.debug('FFmpeg command:', { commandLine });
       })
       .on('end', () => {
-        console.log(`Successfully extracted thumbnail from ${videoPath}`);
+        logger.info('Successfully extracted thumbnail from:', { videoPath });
         
         // Verify the file was created
         if (fs.existsSync(outputPath)) {
-          console.log(`Output file exists: ${outputPath}, size: ${fs.statSync(outputPath).size} bytes`);
+          const fileSize = fs.statSync(outputPath).size;
+          logger.info('Output file exists:', { outputPath, size: fileSize });
           resolve(outputPath);
         } else {
-          console.error(`Output file not found: ${outputPath}`);
-          reject(new Error(`Output file not found: ${outputPath}`));
+          const error = new Error(`Output file not found: ${outputPath}`);
+          logger.error(`Output file not found: ${outputPath}`, error);
+          reject(error);
         }
       })
       .on('error', (err) => {
-        console.error(`Error extracting frame from video: ${err.message}`);
+        logger.error(`Error extracting frame from video: ${err.message}`, err);
         reject(err);
       });
     
     // Use the very first frame (0 seconds)
-    console.log(`Using first frame (${PREVIEW_SETTINGS.TIMESTAMP}) for thumbnail`);
+    logger.info('Using first frame for thumbnail:', { timestamp: PREVIEW_SETTINGS.TIMESTAMP });
     
     try {
       // Take the screenshot at the beginning of the video
@@ -126,7 +130,7 @@ function generateThumbnail(videoPath, outputPath, imageFilename, outputDir) {
           size: `${VIDEO_DIMENSIONS.WIDTH}x${VIDEO_DIMENSIONS.HEIGHT}` // Portrait orientation
         });
     } catch (cmdError) {
-      console.error('Error setting up screenshot command:', cmdError);
+      logger.error('Error setting up screenshot command:', cmdError);
       reject(cmdError);
     }
   });
@@ -141,7 +145,7 @@ function generateThumbnail(videoPath, outputPath, imageFilename, outputDir) {
  */
 async function createFallbackImage(videoPath, outputPath) {
   try {
-    console.log('Creating fallback image at:', outputPath);
+    logger.info('Creating fallback image at:', { outputPath });
     
     // Get the filename for display
     const displayName = path.basename(videoPath, path.extname(videoPath))
@@ -158,7 +162,7 @@ async function createFallbackImage(videoPath, outputPath) {
     const g = Math.floor(Math.random() * 200) + 25;
     const b = Math.floor(Math.random() * 200) + 25;
     
-    console.log(`Using random color: rgb(${r},${g},${b})`);
+    logger.debug('Using random color:', { color: `rgb(${r},${g},${b})` });
     
     await sharp({
       create: {
@@ -183,10 +187,10 @@ async function createFallbackImage(videoPath, outputPath) {
     .jpeg({ quality: PREVIEW_SETTINGS.QUALITY })
     .toFile(outputPath);
     
-    console.log('Created fallback image successfully:', outputPath);
+    logger.info('Created fallback image successfully:', { outputPath });
     return outputPath;
   } catch (error) {
-    console.error('Error creating fallback image:', error);
+    logger.error('Error creating fallback image:', error);
     throw error;
   }
 }
@@ -202,7 +206,7 @@ async function getVideoMetadata(videoPath) {
   return new Promise((resolve) => {
     // Verify the video file exists
     if (!fs.existsSync(videoPath)) {
-      console.error(`Video file does not exist: ${videoPath}`);
+      logger.error(`Video file does not exist: ${videoPath}`);
       // Return default metadata rather than rejecting
       return resolve({
         duration: 0,
@@ -215,17 +219,17 @@ async function getVideoMetadata(videoPath) {
       });
     }
     
-    console.log('Getting video metadata for:', videoPath);
+    logger.info('Getting video metadata for:', { videoPath });
     
     try {
       // Wrap ffprobe in a try/catch to ensure we never throw errors
       ffmpeg.ffprobe(videoPath, (err, metadata) => {
         if (err) {
-          console.error('Error getting video metadata:', err);
+          logger.error('Error getting video metadata:', err);
           // Return fallback stats instead of rejecting
           try {
             const stat = fs.statSync(videoPath);
-            console.log('Using basic file stats as fallback:', stat.size);
+            logger.info('Using basic file stats as fallback:', { size: stat.size });
             
             return resolve({
               duration: 0,
@@ -237,7 +241,7 @@ async function getVideoMetadata(videoPath) {
               fps: 0
             });
           } catch (statError) {
-            console.error('Error getting file stats:', statError);
+            logger.error('Error getting file stats:', statError);
             return resolve({
               duration: 0,
               size: 0,
@@ -251,7 +255,7 @@ async function getVideoMetadata(videoPath) {
         }
         
         try {
-          console.log('Raw metadata received:', JSON.stringify(metadata.format, null, 2));
+          logger.debug('Raw metadata received:', { metadata: metadata.format });
           
           // Find video stream safely
           let videoStream = null;
@@ -259,7 +263,7 @@ async function getVideoMetadata(videoPath) {
             videoStream = metadata.streams.find(stream => stream && stream.codec_type === 'video');
           }
           
-          console.log('Video stream:', videoStream ? JSON.stringify(videoStream, null, 2) : 'Not found');
+          logger.debug('Video stream:', { videoStream: videoStream || 'Not found' });
           
           // Extract useful metadata with safe fallbacks
           const result = {
@@ -272,10 +276,10 @@ async function getVideoMetadata(videoPath) {
             fps: videoStream?.r_frame_rate ? parseFraction(videoStream.r_frame_rate) : 0
           };
           
-          console.log('Extracted metadata:', result);
+          logger.info('Extracted metadata:', { result });
           resolve(result);
         } catch (parseError) {
-          console.error('Error parsing metadata:', parseError);
+          logger.error('Error parsing metadata:', parseError);
           
           // Return minimal metadata to avoid breaking the application
           try {
@@ -302,13 +306,13 @@ async function getVideoMetadata(videoPath) {
         }
       });
     } catch (probeError) {
-      console.error('Error probing video file:', probeError);
+      logger.error('Error probing video file:', probeError);
       
       // Return minimal metadata as fallback
       try {
         // Get basic file information as fallback
         const stat = fs.statSync(videoPath);
-        console.log('Using basic file stats as fallback:', stat.size);
+        logger.info('Using basic file stats as fallback:', { size: stat.size });
         
         resolve({
           duration: 0,
@@ -320,7 +324,7 @@ async function getVideoMetadata(videoPath) {
           fps: 0
         });
       } catch (statError) {
-        console.error('Error getting file stats:', statError);
+        logger.error('Error getting file stats:', statError);
         // Even if we can't get file stats, return something instead of failing
         resolve({
           duration: 0,

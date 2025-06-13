@@ -4,7 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
+const logger = require('./logger');
 require('dotenv').config();
+
+// Create a child logger for s3Storage
+const s3StorageLogger = logger.child({ component: 's3Storage' });
 
 // Extract S3 configuration from environment variables
 const useS3Storage = process.env.USE_S3_STORAGE === 'true';
@@ -30,7 +34,7 @@ const s3FolderPath = 'dams';
 // Configure storage engine to always store locally first
 const getStorage = () => {
   // Always use local storage initially
-  console.log(isS3Configured ? 
+  s3StorageLogger.info(isS3Configured ? 
     'Using local storage first, then uploading to S3' :
     'Using local file storage only');
   
@@ -57,7 +61,7 @@ const getStorage = () => {
       }
       req.fileOriginalNames[file.fieldname] = sanitizedName;
 
-      console.log(`Generating unique filename for upload: ${fileName}`);
+      s3StorageLogger.debug(`Generating unique filename for upload: ${fileName}`);
       cb(null, fileName);
     },
   });
@@ -136,7 +140,7 @@ const getSignedFileUrl = async (filename, expirationSeconds = 3600) => {
     // Generate a signed URL
     return await getSignedUrl(s3Client, command, { expiresIn: expirationSeconds });
   } catch (error) {
-    console.error('Error generating signed URL:', error);
+    s3StorageLogger.error('Error generating signed URL:', error);
     return null;
   }
 };
@@ -186,7 +190,7 @@ const deleteFile = async (filename) => {
       return false;
     }
   } catch (error) {
-    console.error(`Error deleting file ${filename}:`, error);
+    s3StorageLogger.error(`Error deleting file ${filename}:`, error);
     return false;
   }
 };
@@ -223,7 +227,7 @@ const getFilenameFromUrl = (url) => {
     // For local paths or non-S3 environments, just return the filename
     return path.basename(fullPath);
   } catch (error) {
-    console.error('Error extracting filename from URL:', error);
+    s3StorageLogger.error('Error extracting filename from URL:', error);
     return null;
   }
 };
@@ -254,7 +258,7 @@ const isFileOrphaned = async (fileUrl, Card) => {
     // If no card references this file, it's orphaned
     return !referencingCard;
   } catch (error) {
-    console.error(`Error checking if file ${fileUrl} is orphaned:`, error);
+    s3StorageLogger.error(`Error checking if file ${fileUrl} is orphaned:`, error);
     // Assume it's not orphaned if there's an error (safer approach)
     return false;
   }
@@ -273,16 +277,16 @@ const safeDeleteOrphanedFile = async (fileUrl, Card) => {
 
     if (orphaned) {
       // File is orphaned, safe to delete
-      console.log(`File ${fileUrl} is orphaned, deleting...`);
+      s3StorageLogger.info(`File ${fileUrl} is orphaned, deleting...`);
       await deleteFile(fileUrl);
       return true;
     } else {
       // File is still referenced by at least one card
-      console.log(`File ${fileUrl} is still referenced by at least one card, not deleting`);
+      s3StorageLogger.info(`File ${fileUrl} is still referenced by at least one card, not deleting`);
       return false;
     }
   } catch (error) {
-    console.error(`Error safely deleting file ${fileUrl}:`, error);
+    s3StorageLogger.error(`Error safely deleting file ${fileUrl}:`, error);
     return false;
   }
 };
@@ -297,11 +301,11 @@ const uploadLocalFileToS3 = async (localFilePath, customFilename = null) => {
   if (!isS3Configured || !localFilePath) return null;
   
   try {
-    console.log(`Uploading local file ${localFilePath} to S3...`);
+    s3StorageLogger.info(`Uploading local file ${localFilePath} to S3...`);
     
     // Check if the file exists
     if (!fs.existsSync(localFilePath)) {
-      console.error(`File ${localFilePath} does not exist`);
+      s3StorageLogger.error(`File ${localFilePath} does not exist`);
       return null;
     }
     
@@ -324,7 +328,7 @@ const uploadLocalFileToS3 = async (localFilePath, customFilename = null) => {
     };
     
     // Upload to S3
-    console.log(`Uploading to S3: ${bucketName}/${s3Key} (${contentType})`);
+    s3StorageLogger.info(`Uploading to S3: ${bucketName}/${s3Key} (${contentType})`);
     const command = new PutObjectCommand(uploadParams);
     await s3Client.send(command);
     
@@ -334,7 +338,7 @@ const uploadLocalFileToS3 = async (localFilePath, customFilename = null) => {
     }
     return `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
   } catch (error) {
-    console.error(`Error uploading ${localFilePath} to S3:`, error);
+    s3StorageLogger.error(`Error uploading ${localFilePath} to S3:`, error);
     return null;
   }
 };

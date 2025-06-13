@@ -41,6 +41,7 @@ This guide explains how to build and deploy the Media Management System using Do
 | `SENDGRID_API_KEY` | SendGrid API key (optional) | your-sendgrid-key |
 | `SENDGRID_FROM_EMAIL` | From email address (optional) | noreply@domain.com |
 | `FRONTEND_URL` | Frontend URL for reset links (optional) | https://domain.com |
+| `LOG_LEVEL` | Logging level (optional) | warn |
 
 ## Deployment Steps
 

@@ -1,4 +1,7 @@
 const sgMail = require('@sendgrid/mail');
+const logger = require('./logger');
+
+const emailServiceLogger = logger.child({ service: 'emailService' });
 
 // Check if SendGrid is configured
 const isEmailConfigured = () => {
@@ -62,9 +65,9 @@ const sendWelcomeEmail = async (to, resetToken, username) => {
 
   try {
     await sgMail.send(msg);
-    console.log(`Welcome email sent to ${to}`);
+    emailServiceLogger.info(`Welcome email sent to ${to}`);
   } catch (error) {
-    console.error('Error sending welcome email:', error);
+    emailServiceLogger.error('Error sending welcome email', error);
     throw error;
   }
 };
@@ -118,9 +121,9 @@ const sendPasswordResetEmail = async (to, resetToken, username) => {
 
   try {
     await sgMail.send(msg);
-    console.log(`Password reset email sent to ${to}`);
+    emailServiceLogger.info(`Password reset email sent to ${to}`);
   } catch (error) {
-    console.error('Error sending password reset email:', error);
+    emailServiceLogger.error('Error sending password reset email', error);
     throw error;
   }
 };

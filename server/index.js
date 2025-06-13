@@ -20,7 +20,15 @@ const { createCardZip } = require('./utils/zipCardFiles');
 const { cleanupOrphanedZipFiles } = require('./utils/cleanupOrphanedFiles');
 const { VIDEO_DIMENSIONS } = require('./utils/mediaConstants');
 const { isEmailConfigured, sendPasswordResetEmail, sendWelcomeEmail } = require('./utils/emailService');
+const logger = require('./utils/logger');
 require('dotenv').config();
+
+// Create child loggers for different components
+const dbLogger = logger.createChildLogger('database');
+const s3Logger = logger.createChildLogger('s3');
+const authLogger = logger.createChildLogger('auth');
+const apiLogger = logger.createChildLogger('api');
+const fileLogger = logger.createChildLogger('file-processing');
 
 /**
  * Process a file and return its path
@@ -39,13 +47,13 @@ require('dotenv').config();
 const processFileAndGetPath = async (file, options = {}) => {
   if (!file) return null;
 
-  console.log(`Processing file:`, {
+  fileLogger.info(`Processing file`, {
     originalname: file.originalname,
     filename: file.filename,
     mimetype: file.mimetype,
     size: file.size,
     fieldname: file.fieldname,
-    options: JSON.stringify(options)
+    options: options
   });
 
   // Get the local file path (multer always stores locally now)
@@ -54,13 +62,13 @@ const processFileAndGetPath = async (file, options = {}) => {
   
   // Special handling for videos - always keep local first for processing
   if (options.isVideo) {
-    console.log(`Keeping video ${file.filename} local for processing first`);
+    fileLogger.debug(`Keeping video ${file.filename} local for processing first`);
     return dbPath;
   }
   
   // If instructed to skip S3 upload, return local path
   if (options.skipS3Upload) {
-    console.log(`Skipping S3 upload for ${file.filename} as requested`);
+    s3Logger.debug(`Skipping S3 upload for ${file.filename} as requested`);
     return dbPath;
   }
   
@@ -68,11 +76,11 @@ const processFileAndGetPath = async (file, options = {}) => {
   if (isS3Configured && options.uploadToS3 !== false) {
     try {
       // Upload to S3
-      console.log(`Uploading ${file.filename} to S3...`);
+      s3Logger.info(`Uploading ${file.filename} to S3...`);
       const s3Url = await uploadLocalFileToS3(localFilePath);
       
       if (s3Url) {
-        console.log(`Uploaded ${file.fieldname} to S3: ${s3Url}`);
+        s3Logger.info(`Uploaded ${file.fieldname} to S3: ${s3Url}`);
         // Return the S3 URL for database storage
         dbPath = s3Url;
         
@@ -80,18 +88,18 @@ const processFileAndGetPath = async (file, options = {}) => {
         try {
           if (fs.existsSync(localFilePath)) {
             fs.unlinkSync(localFilePath);
-            console.log(`Deleted local file ${localFilePath} after S3 upload`);
+            fileLogger.debug(`Deleted local file ${localFilePath} after S3 upload`);
           }
         } catch (cleanupError) {
-          console.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
+          fileLogger.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
           // Continue even if cleanup fails - file will be stored in S3
         }
       } else {
-        console.error(`Failed to upload ${file.fieldname} to S3, using local path instead`);
+        s3Logger.error(`Failed to upload ${file.fieldname} to S3, using local path instead`);
         // Keep the local path if S3 upload failed
       }
     } catch (error) {
-      console.error(`Error uploading ${file.fieldname} to S3:`, error);
+      s3Logger.error(`Error uploading ${file.fieldname} to S3:`, error);
     }
   }
 
@@ -117,11 +125,11 @@ const processFileAndGetPath = async (file, options = {}) => {
  */
 const downloadFile = (url, destPath) => {
   return new Promise((resolve, reject) => {
-    console.log(`Downloading file from ${url} to ${destPath}`);
+    fileLogger.info(`Downloading file from ${url} to ${destPath}`);
     
     // Validate URL
     if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-      console.error(`Invalid URL format: ${url}`);
+      fileLogger.error(`Invalid URL format: ${url}`);
       return reject(new Error(`Invalid URL format: ${url}`));
     }
     
@@ -129,7 +137,7 @@ const downloadFile = (url, destPath) => {
     const destDir = path.dirname(destPath);
     if (!fs.existsSync(destDir)) {
       fs.mkdirSync(destDir, { recursive: true });
-      console.log(`Created destination directory: ${destDir}`);
+      fileLogger.debug(`Created destination directory: ${destDir}`);
     }
     
     const file = fs.createWriteStream(destPath);
@@ -149,8 +157,8 @@ const downloadFile = (url, destPath) => {
         throw new Error(`Unsupported protocol: ${parsedUrl.protocol}`);
       }
       
-      console.log(`Using ${parsedUrl.protocol} protocol to download from ${parsedUrl.hostname}`);
-      console.log(`Full path: ${parsedUrl.pathname}${parsedUrl.search || ''}`);
+      fileLogger.debug(`Using ${parsedUrl.protocol} protocol to download from ${parsedUrl.hostname}`);
+      fileLogger.debug(`Full path: ${parsedUrl.pathname}${parsedUrl.search || ''}`);
     
       const options = {
         hostname: parsedUrl.hostname,
@@ -163,7 +171,7 @@ const downloadFile = (url, destPath) => {
       
       const request = protocol.request(options, response => {
         if (response.statusCode !== 200) {
-          console.error(`Failed to download file: HTTP status code ${response.statusCode}`);
+          fileLogger.error(`Failed to download file: HTTP status code ${response.statusCode}`);
           file.close();
           fs.unlink(destPath, () => {}); // Clean up
           resolve(false);
@@ -174,27 +182,27 @@ const downloadFile = (url, destPath) => {
         
         file.on('finish', () => {
           file.close();
-          console.log(`Download complete, file saved to ${destPath}`);
+          fileLogger.info(`Download complete, file saved to ${destPath}`);
           resolve(true);
         });
         
         file.on('error', err => {
           fs.unlink(destPath, () => {});
-          console.error(`Error saving file: ${err.message}`);
+          fileLogger.error(`Error saving file: ${err.message}`);
           resolve(false);
         });
       });
       
       request.on('error', err => {
         fs.unlink(destPath, () => {});
-        console.error(`Error downloading file: ${err.message}`);
+        fileLogger.error(`Error downloading file: ${err.message}`);
         resolve(false);
       });
       
       // Actually send the request
       request.end();
     } catch (error) {
-      console.error(`Error setting up download: ${error.message}`);
+      fileLogger.error(`Error setting up download: ${error.message}`);
       resolve(false);
     }
   });
@@ -203,8 +211,8 @@ const downloadFile = (url, destPath) => {
 const processVideoAndGeneratePreview = async (file, metadata = {}) => {
   if (!file) return { videoPath: null, previewPath: null };
   
-  console.log('Processing video and generating preview...');
-  console.log('File data:', { 
+  fileLogger.info('Processing video and generating preview...');
+  fileLogger.debug('File data:', { 
     filename: file.filename,
     originalname: file.originalname,
     size: file.size,
@@ -218,11 +226,11 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
   
   // Verify the file exists
   if (!fs.existsSync(localFilePath)) {
-    console.error(`Error: Video file does not exist at path: ${localFilePath}`);
+    fileLogger.error(`Error: Video file does not exist at path: ${localFilePath}`);
     return { videoPath, previewPath };
   }
   
-  console.log(`Verified video file exists at: ${localFilePath}, size: ${fs.statSync(localFilePath).size} bytes`);
+  fileLogger.debug(`Verified video file exists at: ${localFilePath}, size: ${fs.statSync(localFilePath).size} bytes`);
   
   // Make sure we have a metadata object
   if (!metadata.fileMetadata) metadata.fileMetadata = {};
@@ -233,11 +241,11 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
   // Step 1: Generate preview from local file
   try {
     const originalFilename = file.originalname;
-    console.log(`Generating preview for local video: ${localFilePath}`);
+    fileLogger.info(`Generating preview for local video: ${localFilePath}`);
     
     // This will generate preview and upload it to S3 if configured
     const previewUrl = await generateAndUploadPreview(localFilePath, originalFilename, true);
-    console.log(`Preview generated successfully: ${previewUrl}`);
+    fileLogger.info(`Preview generated successfully: ${previewUrl}`);
     
     // Try to get actual video dimensions using ffprobe
     let width = VIDEO_DIMENSIONS.WIDTH;
@@ -250,12 +258,12 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
       if (videoMetadata && videoMetadata.width && videoMetadata.height) {
         width = videoMetadata.width;
         height = videoMetadata.height;
-        console.log(`Using actual video dimensions: ${width}×${height}`);
+        fileLogger.debug(`Using actual video dimensions: ${width}×${height}`);
       } else {
-        console.log(`Using default video dimensions: ${width}×${height}`);
+        fileLogger.debug(`Using default video dimensions: ${width}×${height}`);
       }
     } catch (metadataError) {
-      console.error('Error getting video metadata, using default dimensions:', metadataError);
+      fileLogger.error('Error getting video metadata, using default dimensions:', metadataError);
     }
     
     // Set preview path and metadata
@@ -266,36 +274,36 @@ const processVideoAndGeneratePreview = async (file, metadata = {}) => {
     metadata.fileMetadata.height = height;
     metadata.fileMetadata.fileSize = file.size;
   } catch (previewError) {
-    console.error('Error generating preview:', previewError);
-    console.log('Continuing without preview');
+    fileLogger.error('Error generating preview:', previewError);
+    fileLogger.info('Continuing without preview');
   }
   
   // Step 2: Upload video to S3 if configured (after preview generation)
   if (isS3Configured) {
     try {
-      console.log('Now uploading the actual video file to S3...');
+      s3Logger.info('Now uploading the actual video file to S3...');
       const videoS3Url = await uploadLocalFileToS3(localFilePath);
       
       if (videoS3Url) {
-        console.log(`Video uploaded to S3: ${videoS3Url}`);
+        s3Logger.info(`Video uploaded to S3: ${videoS3Url}`);
         videoPath = videoS3Url;
         
         // Clean up the local file after successful S3 upload
         try {
           if (fs.existsSync(localFilePath)) {
             fs.unlinkSync(localFilePath);
-            console.log(`Deleted local file ${localFilePath} after S3 upload`);
+            fileLogger.debug(`Deleted local file ${localFilePath} after S3 upload`);
           }
         } catch (cleanupError) {
-          console.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
+          fileLogger.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
           // Continue even if cleanup fails - file will be stored in S3
         }
       } else {
-        console.error('Failed to upload video to S3, keeping local path');
+        s3Logger.error('Failed to upload video to S3, keeping local path');
       }
     } catch (uploadError) {
-      console.error('Error uploading video to S3:', uploadError);
-      console.log('Keeping local video path');
+      s3Logger.error('Error uploading video to S3:', uploadError);
+      s3Logger.info('Keeping local video path');
     }
   }
   
@@ -329,7 +337,7 @@ function getFileNameFromS3Url(url) {
     // Remove the extension
     return path.basename(fileName, path.extname(fileName));
   } catch (error) {
-    console.error('Error extracting filename from S3 URL:', error);
+    s3Logger.error('Error extracting filename from S3 URL:', error);
     return 'video-preview';
   }
 }
@@ -338,18 +346,18 @@ async function verifyPassword(storedPassword, suppliedPassword) {
   try {
     // Check for undefined or invalid values
     if (!storedPassword) {
-      console.error('Error verifying password: storedPassword is undefined or null');
+      authLogger.error('Error verifying password: storedPassword is undefined or null');
       return false;
     }
 
     if (!suppliedPassword) {
-      console.error('Error verifying password: suppliedPassword is undefined or null');
+      authLogger.error('Error verifying password: suppliedPassword is undefined or null');
       return false;
     }
 
     // Check if the password is in the expected format
     if (!isAlreadyHashed(storedPassword)) {
-      console.error('Error verifying password: stored password is not in the expected hashed format');
+      authLogger.error('Error verifying password: stored password is not in the expected hashed format');
       return false;
     }
 
@@ -358,7 +366,7 @@ async function verifyPassword(storedPassword, suppliedPassword) {
 
     // Double-check that we got both parts
     if (!salt || !storedHash) {
-      console.error('Error verifying password: could not extract salt and hash from stored password');
+      authLogger.error('Error verifying password: could not extract salt and hash from stored password');
       return false;
     }
 
@@ -371,7 +379,7 @@ async function verifyPassword(storedPassword, suppliedPassword) {
       derivedKey
     );
   } catch (error) {
-    console.error('Error verifying password:', error);
+    authLogger.error('Error verifying password:', error);
     return false;
   }
 }
@@ -415,7 +423,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
     cb(null, true);
   } else {
-    console.log(`Rejected file: ${file.originalname} (${file.mimetype})`);
+    fileLogger.warn(`Rejected file: ${file.originalname} (${file.mimetype})`);
     cb(null, false);
   }
 };
@@ -511,14 +519,14 @@ async function seedDatabase() {
     // Check if we have any cards
     const cardCount = await Card.countDocuments();
     if (cardCount === 0) {
-      console.log('Seeding database with sample cards...');
+      dbLogger.info('Seeding database with sample cards...');
       await Card.insertMany(sampleCards);
     }
 
     // Check if we have any users
     const userCount = await User.countDocuments();
     if (userCount === 0) {
-      console.log('Seeding database with sample users...');
+      dbLogger.info('Seeding database with sample users...');
 
       // Hash the admin password before saving with our scrypt helper
       const hashedPassword = await hashPassword(adminUser.password);
@@ -531,16 +539,16 @@ async function seedDatabase() {
         role: adminUser.role
       });
 
-      console.log('Admin user created with hashed password');
+      dbLogger.info('Admin user created with hashed password');
     } else {
       // Update existing users to use hashed passwords if they are not already hashed
-      console.log('Checking for users that need password hashing...');
+      dbLogger.info('Checking for users that need password hashing...');
       const users = await User.find({});
 
       for (const user of users) {
         // If the password isn't hashed yet, hash it
         if (!isAlreadyHashed(user.password)) {
-          console.log(`Updating password hash for user: ${user.username}`);
+          dbLogger.info(`Updating password hash for user: ${user.username}`);
 
           // If email is missing, add it (for backwards compatibility)
           if (!user.email) {
@@ -557,11 +565,11 @@ async function seedDatabase() {
     // Check if we have any tags
     const tagCount = await Tag.countDocuments();
     if (tagCount === 0) {
-      console.log('Seeding database with sample tags...');
+      dbLogger.info('Seeding database with sample tags...');
       await Tag.insertMany(sampleTags);
     }
   } catch (error) {
-    console.error('Error seeding database:', error);
+    dbLogger.error('Error seeding database:', error);
   }
 }
 
@@ -635,7 +643,7 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
     // Check if the path is a direct file path (used during the upload process)
     // In this case, we can extract dimensions directly from the file
     if (fs.existsSync(filePath)) {
-      console.log(`Extracting metadata from direct file path: ${filePath}`);
+      fileLogger.debug(`Extracting metadata from direct file path: ${filePath}`);
       const stats = fs.statSync(filePath);
       const fileSize = stats.size; // File size in bytes
       const date = providedDate || new Date();
@@ -653,9 +661,9 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
           const dimensions = sizeOf(filePath);
           width = dimensions.width;
           height = dimensions.height;
-          console.log(`Successfully extracted dimensions from file: ${width}×${height}`);
+          fileLogger.debug(`Successfully extracted dimensions from file: ${width}×${height}`);
         } catch (err) {
-          console.error('Error getting image dimensions from direct file:', err);
+          fileLogger.error('Error getting image dimensions from direct file:', err);
           // Fall back to guessing dimensions
           const guessedDimensions = guessDimensionsFromUrl(filePath);
           width = guessedDimensions.width;
@@ -670,15 +678,15 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
           if (metadata && metadata.width && metadata.height) {
             width = metadata.width;
             height = metadata.height;
-            console.log(`Extracted actual video dimensions: ${width}×${height}`);
+            fileLogger.debug(`Extracted actual video dimensions: ${width}×${height}`);
           } else {
             // Fall back to constants if metadata extraction fails
             width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
             height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
-            console.log(`Using video dimensions from constants: ${width}×${height}`);
+            fileLogger.debug(`Using video dimensions from constants: ${width}×${height}`);
           }
         } catch (videoError) {
-          console.error('Error extracting video metadata, using constants:', videoError);
+          fileLogger.error('Error extracting video metadata, using constants:', videoError);
           width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
           height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
         }
@@ -694,11 +702,11 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
     
     // Handle S3 URLs
     if (isS3Url(filePath)) {
-      console.log(`Processing S3 file for metadata: ${filePath}`);
+      s3Logger.debug(`Processing S3 file for metadata: ${filePath}`);
       
       // Try to guess dimensions from the URL/filename
       const guessedDimensions = guessDimensionsFromUrl(filePath);
-      console.log(`Guessed dimensions from URL: ${guessedDimensions.width}×${guessedDimensions.height}`);
+      s3Logger.debug(`Guessed dimensions from URL: ${guessedDimensions.width}×${guessedDimensions.height}`);
       
       // For videos, use constants instead of guessing
       const extension = path.extname(filePath).toLowerCase();
@@ -707,7 +715,7 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
       if (videoExtensions.includes(extension)) {
         guessedDimensions.width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait
         guessedDimensions.height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait
-        console.log(`Using standard video dimensions for S3 video: ${guessedDimensions.width}×${guessedDimensions.height}`);
+        s3Logger.debug(`Using standard video dimensions for S3 video: ${guessedDimensions.width}×${guessedDimensions.height}`);
       }
       
       // For S3 files, set a default size since we can't determine it without downloading
@@ -742,9 +750,9 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
           const dimensions = sizeOf(fullPath);
           width = dimensions.width;
           height = dimensions.height;
-          console.log(`Successfully extracted dimensions from relative path: ${width}×${height}`);
+          fileLogger.debug(`Successfully extracted dimensions from relative path: ${width}×${height}`);
         } catch (err) {
-          console.error('Error getting image dimensions:', err);
+          fileLogger.error('Error getting image dimensions:', err);
           
           // Fall back to guessing dimensions
           const guessedDimensions = guessDimensionsFromUrl(filePath);
@@ -760,15 +768,15 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
           if (metadata && metadata.width && metadata.height) {
             width = metadata.width;
             height = metadata.height;
-            console.log(`Extracted actual video dimensions: ${width}×${height}`);
+            fileLogger.debug(`Extracted actual video dimensions: ${width}×${height}`);
           } else {
             // Fall back to constants if metadata extraction fails
             width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
             height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
-            console.log(`Using video dimensions from constants: ${width}×${height}`);
+            fileLogger.debug(`Using video dimensions from constants: ${width}×${height}`);
           }
         } catch (videoError) {
-          console.error('Error extracting video metadata, using constants:', videoError);
+          fileLogger.error('Error extracting video metadata, using constants:', videoError);
           width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait orientation
           height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait orientation
         }
@@ -781,7 +789,7 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
         fileSize
       };
     } catch (fsError) {
-      console.error('File not accessible:', fsError);
+      fileLogger.error('File not accessible:', fsError);
       
       // If file not accessible, try to guess dimensions from filename
       const guessedDimensions = guessDimensionsFromUrl(filePath);
@@ -793,7 +801,7 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
       if (videoExtensions.includes(extension)) {
         guessedDimensions.width = VIDEO_DIMENSIONS.WIDTH;    // 720 for portrait
         guessedDimensions.height = VIDEO_DIMENSIONS.HEIGHT;  // 1280 for portrait
-        console.log(`Using standard video dimensions for inaccessible video: ${guessedDimensions.width}×${guessedDimensions.height}`);
+        fileLogger.debug(`Using standard video dimensions for inaccessible video: ${guessedDimensions.width}×${guessedDimensions.height}`);
       }
       
       return {
@@ -804,7 +812,7 @@ const extractFileMetadata = async (filePath, providedDate = null) => {
       };
     }
   } catch (error) {
-    console.error('Error extracting file metadata:', error);
+    fileLogger.error('Error extracting file metadata:', error);
     return {
       date: providedDate || new Date(),
       width: 1920, // Default width for images
@@ -821,7 +829,7 @@ const getAllTags = async () => {
     const tagNames = tags.map(tag => tag.name);
     return tagNames;
   } catch (error) {
-    console.error('Error getting all tags:', error);
+    apiLogger.error('Error getting all tags:', error);
     return [];
   }
 };
@@ -859,7 +867,7 @@ const processTags = async (tagsList) => {
       }
     }
   } catch (error) {
-    console.error('Error processing tags:', error);
+    apiLogger.error('Error processing tags:', error);
   }
 };
 
@@ -891,7 +899,7 @@ const updateTagCounts = async (tagsList) => {
       }
     }
   } catch (error) {
-    console.error('Error updating tag counts:', error);
+    dbLogger.error('Error updating tag counts:', error);
   }
 };
 
@@ -932,7 +940,7 @@ app.post('/api/auth/login', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    authLogger.error('Login error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -972,7 +980,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       await sendPasswordResetEmail(user.email, resetToken, user.username);
       res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
     } catch (emailError) {
-      console.error('Error sending password reset email:', emailError);
+      authLogger.error('Error sending password reset email:', emailError);
       // Clear the reset token if email failed
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
@@ -980,7 +988,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(500).json({ error: 'Failed to send password reset email. Please try again later.' });
     }
   } catch (error) {
-    console.error('Forgot password error:', error);
+    authLogger.error('Forgot password error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1022,7 +1030,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
     res.json({ message: 'Password has been reset successfully' });
   } catch (error) {
-    console.error('Reset password error:', error);
+    authLogger.error('Reset password error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1111,7 +1119,7 @@ app.get('/api/cards', async (req, res) => {
       availableTags,
     });
   } catch (error) {
-    console.error('Error getting cards:', error);
+    apiLogger.error('Error getting cards:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1157,7 +1165,7 @@ app.get('/api/cards/:id', async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error('Error getting card:', error);
+    apiLogger.error('Error getting card:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1200,7 +1208,7 @@ const validateFiles = (files, requiredFields) => {
   // Check if required files are present
   for (const field of requiredFields) {
     if (!files || !files[field] || files[field].length === 0) {
-      console.log(`Missing required file field: ${field}`);
+      apiLogger.warn(`Missing required file field: ${field}`);
       return { valid: false, missingField: field };
     }
   }
@@ -1241,16 +1249,16 @@ const validateCardType = (type, files) => {
 
 // Debug utility to log received files
 const logReceivedFiles = (files) => {
-  console.log('Received files:');
+  apiLogger.debug('Received files:');
   if (!files) {
-    console.log('  No files received');
+    apiLogger.debug('  No files received');
     return;
   }
 
   Object.keys(files).forEach(fieldName => {
     const file = files[fieldName][0];
     if (file) {
-      console.log(`  ${fieldName}: ${file.originalname} (${file.mimetype}, ${Math.round(file.size/1024)}KB)`);
+      apiLogger.debug(`  ${fieldName}: ${file.originalname} (${file.mimetype}, ${Math.round(file.size/1024)}KB)`);
     }
   });
 };
@@ -1274,7 +1282,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
     if (type === 'social') {
       const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
       if (sequenceCount <= 0) {
-        console.log('Social card submission without image sequence detected');
+        apiLogger.debug('Social card submission without image sequence detected');
         return res.status(400).json({ error: 'At least one image is required for social cards' });
       }
     }
@@ -1311,7 +1319,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
 
     // Helper function to get file path from multer/multer-s3 file
     const getFilePath = (file) => {
-      console.log(`getFilePath called with file:`, file ? {
+      fileLogger.debug(`getFilePath called with file:`, file ? {
         originalname: file.originalname,
         filename: file.filename,
         mimetype: file.mimetype,
@@ -1327,13 +1335,13 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       if (isS3Configured && file) {
         // For multer-s3, the path is in file.location
         const path = file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
-        console.log(`getFilePath (S3): isS3Configured=${isS3Configured}, returning path: ${path}`);
+        s3Logger.info(`getFilePath (S3): isS3Configured=${isS3Configured}, returning path: ${path}`);
         return path;
       }
 
       // For local storage
       const path = file ? `/uploads/${file.filename}` : null;
-      console.log(`getFilePath (local): returning path: ${path}`);
+      apiLogger.info(`getFilePath (local): returning path: ${path}`);
       return path;
     };
 
@@ -1403,7 +1411,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
         });
       }
       
-      console.log(`Processing social card with ${sequenceCount} images in sequence`);
+      apiLogger.info(`Processing social card with ${sequenceCount} images in sequence`);
       
       // Process optional preview image if provided
       if (req.files.preview && req.files.preview.length > 0) {
@@ -1450,7 +1458,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       // If no preview was provided, use the first image in the sequence
       if (!newCard.preview && newCard.imageSequence && newCard.imageSequence.length > 0) {
         newCard.preview = newCard.imageSequence[0];
-        console.log(`Using first image in sequence as preview: ${newCard.preview}`);
+        apiLogger.info(`Using first image in sequence as preview: ${newCard.preview}`);
       }
       
       // Process optional document copy if provided
@@ -1507,7 +1515,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       // Handle manual preview image upload if provided
       let hasManualPreview = false;
       if (req.files.preview && req.files.preview.length > 0) {
-        console.log('Using manually uploaded preview image');
+        fileLogger.info('Using manually uploaded preview image');
         const previewFile = req.files.preview[0];
         newCard.preview = await processFileAndGetPath(previewFile);
         hasManualPreview = true;
@@ -1538,23 +1546,23 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
       
       // Process the video and generate preview if no manual preview was provided
       if (!hasManualPreview) {
-        console.log('No manual preview provided, will auto-generate one from video');
+        fileLogger.info('No manual preview provided, will auto-generate one from video');
         
         // Use our helper function to process video and generate preview in one go
         const { videoPath, previewPath } = await processVideoAndGeneratePreview(movieFile, newCard);
         
         if (videoPath) {
-          console.log(`Setting video path to: ${videoPath}`);
+          fileLogger.info(`Setting video path to: ${videoPath}`);
           newCard.movie = videoPath;
         } else {
           // Fallback to local path if processing failed
-          console.log(`Video processing failed, using local path: /uploads/${movieFile.filename}`);
+          fileLogger.info(`Video processing failed, using local path: /uploads/${movieFile.filename}`);
           newCard.movie = `/uploads/${movieFile.filename}`;
           preserveOriginalFileName(req, movieFile, 'movie', newCard);
         }
         
         if (previewPath) {
-          console.log(`Setting preview path to: ${previewPath}`);
+          apiLogger.info(`Setting preview path to: ${previewPath}`);
           newCard.preview = previewPath;
         }
         
@@ -1564,7 +1572,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
         }
       } else {
         // If we have a manual preview, just process the video file normally
-        console.log('Using manual preview, processing video separately');
+        fileLogger.info('Using manual preview, processing video separately');
         
         // Keep the video local first
         newCard.movie = `/uploads/${movieFile.filename}`;
@@ -1588,26 +1596,26 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
             try {
               const s3Url = await uploadLocalFileToS3(movieFullPath);
               if (s3Url) {
-                console.log(`Uploaded video to S3: ${s3Url}`);
+                s3Logger.info(`Uploaded video to S3: ${s3Url}`);
                 newCard.movie = s3Url;
                 
                 // Clean up the local file after successful S3 upload
                 try {
                   if (fs.existsSync(movieFullPath)) {
                     fs.unlinkSync(movieFullPath);
-                    console.log(`Deleted local file ${movieFullPath} after S3 upload`);
+                    s3Logger.info(`Deleted local file ${movieFullPath} after S3 upload`);
                   }
                 } catch (cleanupError) {
-                  console.error(`Error cleaning up local file ${movieFullPath}:`, cleanupError);
+                  fileLogger.error(`Error cleaning up local file ${movieFullPath}:`, cleanupError);
                   // Continue even if cleanup fails - file will be stored in S3
                 }
               }
             } catch (s3Error) {
-              console.error('Error uploading video to S3:', s3Error);
+              s3Logger.error('Error uploading video to S3:', s3Error);
             }
           }
         } catch (error) {
-          console.error('Error getting video metadata:', error);
+          apiLogger.error('Error getting video metadata:', error);
           
           // Still try to upload to S3 if metadata extraction failed
           if (isS3Configured) {
@@ -1615,22 +1623,22 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
               const movieFullPath = path.join(__dirname, 'uploads', movieFile.filename);
               const s3Url = await uploadLocalFileToS3(movieFullPath);
               if (s3Url) {
-                console.log(`Uploaded video to S3: ${s3Url}`);
+                s3Logger.info(`Uploaded video to S3: ${s3Url}`);
                 newCard.movie = s3Url;
                 
                 // Clean up the local file after successful S3 upload
                 try {
                   if (fs.existsSync(movieFullPath)) {
                     fs.unlinkSync(movieFullPath);
-                    console.log(`Deleted local file ${movieFullPath} after S3 upload`);
+                    s3Logger.info(`Deleted local file ${movieFullPath} after S3 upload`);
                   }
                 } catch (cleanupError) {
-                  console.error(`Error cleaning up local file ${movieFullPath}:`, cleanupError);
+                  fileLogger.error(`Error cleaning up local file ${movieFullPath}:`, cleanupError);
                   // Continue even if cleanup fails - file will be stored in S3
                 }
               }
             } catch (s3Error) {
-              console.error('Error uploading video to S3:', s3Error);
+              s3Logger.error('Error uploading video to S3:', s3Error);
             }
           }
         }
@@ -1665,7 +1673,7 @@ app.post('/api/cards', authMiddleware, handleCardUpload, async (req, res) => {
 
     res.status(201).json(response);
   } catch (error) {
-    console.error('Error creating card:', error);
+    apiLogger.error('Error creating card:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1674,7 +1682,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
   try {
     // Log all received files for debugging
     logReceivedFiles(req.files);
-    console.log('Request body:', req.body);
+    apiLogger.info('Request body:', req.body);
 
     const cardId = req.params.id;
     const card = await Card.findById(cardId);
@@ -1688,7 +1696,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
     // Extract date if provided in the form, otherwise use existing or create new
     let date = req.body.date ? new Date(req.body.date) : (card.fileMetadata?.date || new Date());
-    console.log('Update date value:', date);
+    apiLogger.info('Update date value:', date);
 
     if (!type || !description) {
       return res.status(400).json({ error: 'Type and description are required' });
@@ -1696,7 +1704,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
     // Prevent changing card type after creation
     if (type !== card.type) {
-      console.log(`Card type change attempted: ${card.type} -> ${type}`);
+      apiLogger.info(`Card type change attempted: ${card.type} -> ${type}`);
       return res.status(400).json({
         error: 'Card type cannot be changed after creation'
       });
@@ -1714,13 +1722,13 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     const shouldRegeneratePreview = req.body.generatePreview === 'true' && !hasNewMovie && card.movie;
     
     // For logging
-    console.log('Update parameters:');
-    console.log(`- Card type: ${type}`);
-    console.log(`- Needs auto-preview: ${needsAutoPreview}`);
-    console.log(`- Has new movie: ${hasNewMovie}`);
-    console.log(`- Remove preview requested: ${req.body.remove_preview === 'true'}`);
-    console.log(`- Has preview files: ${!!(req.files && req.files.preview && req.files.preview.length > 0)}`);
-    console.log(`- S3 configured: ${isS3Configured}`);
+    apiLogger.info('Update parameters:');
+    apiLogger.info(`- Card type: ${type}`);
+    apiLogger.info(`- Needs auto-preview: ${needsAutoPreview}`);
+    apiLogger.info(`- Has new movie: ${hasNewMovie}`);
+    apiLogger.info(`- Remove preview requested: ${req.body.remove_preview === 'true'}`);
+    fileLogger.info(`- Has preview files: ${!!(req.files && req.files.preview && req.files.preview.length > 0)}`);
+    s3Logger.info(`- S3 configured: ${isS3Configured}`);
     
     // In this updated workflow:
     // 1. Files are always processed locally first
@@ -1765,7 +1773,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
     // Helper function to get file path from multer/multer-s3 file
     const getFilePath = (file) => {
-      console.log(`getFilePath called with file:`, file ? {
+      fileLogger.debug(`getFilePath called with file:`, file ? {
         originalname: file.originalname,
         filename: file.filename,
         mimetype: file.mimetype,
@@ -1781,13 +1789,13 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       if (isS3Configured && file) {
         // For multer-s3, the path is in file.location
         const path = file.location || file.key || (file.filename ? `/uploads/${file.filename}` : null);
-        console.log(`getFilePath (S3): isS3Configured=${isS3Configured}, returning path: ${path}`);
+        s3Logger.info(`getFilePath (S3): isS3Configured=${isS3Configured}, returning path: ${path}`);
         return path;
       }
 
       // For local storage
       const path = file ? `/uploads/${file.filename}` : null;
-      console.log(`getFilePath (local): returning path: ${path}`);
+      apiLogger.info(`getFilePath (local): returning path: ${path}`);
       return path;
     };
 
@@ -1796,19 +1804,19 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       const removeFlag = req.body[`remove_${field}`] === 'true';
 
       if (removeFlag) {
-        console.log(`Removing ${field} with flag: remove_${field}=${req.body[`remove_${field}`]}`);
+        apiLogger.info(`Removing ${field} with flag: remove_${field}=${req.body[`remove_${field}`]}`);
 
         // Check if the file is orphaned and delete if it is
         if (currentValue) {
           try {
             const wasDeleted = await safeDeleteOrphanedFile(currentValue, Card);
             if (wasDeleted) {
-              console.log(`Orphaned file ${currentValue} deleted successfully`);
+              fileLogger.info(`Orphaned file ${currentValue} deleted successfully`);
             } else {
-              console.log(`File ${currentValue} still in use by other cards, not deleted`);
+              apiLogger.info(`File ${currentValue} still in use by other cards, not deleted`);
             }
           } catch (err) {
-            console.error(`Error safely deleting file ${currentValue}:`, err);
+            fileLogger.error(`Error safely deleting file ${currentValue}:`, err);
             // Continue even if file deletion fails
           }
         }
@@ -1824,13 +1832,13 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         return null; // Using null signals that we want to remove this field
       } else if (req.files && req.files[field] && req.files[field].length > 0) {
         const file = req.files[field][0];
-        console.log(`Updating ${field} with new file: ${file.filename || file.key || 'S3 file'}`);
+        s3Logger.info(`Updating ${field} with new file: ${file.filename || file.key || 'S3 file'}`);
         const newPath = await processFileAndGetPath(file);
 
         // For existing files, we need to check if they'll be orphaned
         if (currentValue) {
           try {
-            console.log(`Checking if file ${currentValue} will be orphaned after update`);
+            fileLogger.info(`Checking if file ${currentValue} will be orphaned after update`);
             
             // Create a copy of the current card with the updated field for orphan checking
             const tempCard = { ...card.toObject() };
@@ -1850,14 +1858,14 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
             
             // If no other cards use this file, we can mark it for deletion
             if (otherCardCount === 0) {
-              console.log(`File ${currentValue} will be orphaned - marking for deletion after update`);
+              apiLogger.info(`File ${currentValue} will be orphaned - marking for deletion after update`);
               req.filesToDeleteAfterUpdate = req.filesToDeleteAfterUpdate || [];
               req.filesToDeleteAfterUpdate.push(currentValue);
             } else {
-              console.log(`File ${currentValue} is used by ${otherCardCount} other cards - will not delete`);
+              apiLogger.info(`File ${currentValue} is used by ${otherCardCount} other cards - will not delete`);
             }
           } catch (err) {
-            console.error(`Error checking file usage for ${currentValue}:`, err);
+            fileLogger.error(`Error checking file usage for ${currentValue}:`, err);
             // Continue even if the check fails
           }
         }
@@ -1889,7 +1897,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
         return newPath;
       } else if (currentValue) {
-        console.log(`Keeping existing ${field}: ${currentValue}`);
+        apiLogger.info(`Keeping existing ${field}: ${currentValue}`);
         // Keep existing metadata for this field
         return currentValue;
       }
@@ -1923,7 +1931,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       
       // Process image sequence updates
       const sequenceCount = parseInt(req.body.imageSequenceCount || '0', 10);
-      console.log(`Updating social card with ${sequenceCount} images in sequence`);
+      apiLogger.info(`Updating social card with ${sequenceCount} images in sequence`);
       
       // Process all images in the sequence (both new and existing)
       const date = updatedCard.fileMetadata?.date || new Date();
@@ -1942,7 +1950,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       // If no preview was provided and sequence exists, use the first image in the sequence as preview
       if (!updatedCard.preview && updatedCard.imageSequence && updatedCard.imageSequence.length > 0) {
         updatedCard.preview = updatedCard.imageSequence[0];
-        console.log(`Using first image in sequence as preview: ${updatedCard.preview}`);
+        apiLogger.info(`Using first image in sequence as preview: ${updatedCard.preview}`);
       }
       
       if (updatedCard.imageSequence.length === 0 && (!card.imageSequence || card.imageSequence.length === 0)) {
@@ -1954,38 +1962,38 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
       // If no sequence is provided in the update but it exists in the card, keep existing sequence
     } else if (type === 'reel') {
       // Handle preview field (optional)
-      console.log('Reel update - handling preview field');
+      apiLogger.info('Reel update - handling preview field');
       updatedCard.preview = await handleFileField('preview', card.preview);
-      console.log('Reel update - preview result:', updatedCard.preview);
+      apiLogger.info('Reel update - preview result:', updatedCard.preview);
 
       // Handle movie field (required for reel cards)
-      console.log('Reel update - handling movie field');
+      apiLogger.info('Reel update - handling movie field');
       
       // If a new movie was uploaded, process it using our optimized workflow
       if (hasNewMovie) {
-        console.log('New movie file detected, processing with local-first approach');
+        fileLogger.info('New movie file detected, processing with local-first approach');
         const movieFile = req.files.movie[0];
         
         // Process the video with our helper function to properly generate preview and handle S3 upload
         const { videoPath, previewPath } = await processVideoAndGeneratePreview(movieFile, updatedCard);
         
         if (videoPath) {
-          console.log(`Using processed video path: ${videoPath}`);
+          fileLogger.info(`Using processed video path: ${videoPath}`);
           updatedCard.movie = videoPath;
         } else {
           // Fall back to standard method if our helper failed
-          console.log('Video processing helper failed, falling back to standard method');
+          apiLogger.info('Video processing helper failed, falling back to standard method');
           updatedCard.movie = await handleFileField('movie', card.movie);
         }
         
         // If auto-preview was generated and we need it, use it
         if (previewPath && (needsAutoPreview || req.body.remove_preview === 'true')) {
-          console.log(`Using auto-generated preview from new video: ${previewPath}`);
+          fileLogger.info(`Using auto-generated preview from new video: ${previewPath}`);
           updatedCard.preview = previewPath;
         }
       } else if (shouldRegeneratePreview) {
         // Regenerate preview for existing video
-        console.log('Regenerating preview for existing video');
+        fileLogger.info('Regenerating preview for existing video');
         
         // Get the movie URL from the card
         const movieUrl = card.movie;
@@ -2013,33 +2021,33 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           };
           
           // Download the file
-          console.log(`Attempting to download video from ${movieUrl} to ${tempVideoPath}`);
+          fileLogger.info(`Attempting to download video from ${movieUrl} to ${tempVideoPath}`);
           const downloaded = await downloadFile(movieUrl, tempVideoPath);
           
           if (downloaded) {
-            console.log('Successfully downloaded video file for preview generation');
+            fileLogger.info('Successfully downloaded video file for preview generation');
             
             // Verify the file exists and has content
             try {
               const stats = fs.statSync(tempVideoPath);
-              console.log(`Downloaded file size: ${stats.size} bytes`);
+              fileLogger.info(`Downloaded file size: ${stats.size} bytes`);
               
               if (stats.size === 0) {
-                console.error("Downloaded file is empty");
+                fileLogger.error("Downloaded file is empty");
                 throw new Error("Downloaded file is empty");
               }
             } catch (statError) {
-              console.error(`Error checking downloaded file: ${statError.message}`);
+              fileLogger.error(`Error checking downloaded file: ${statError.message}`);
               throw statError;
             }
             
             // Now generate a preview from the downloaded file
             tempFile.path = tempVideoPath; // Ensure the path is correct
-            console.log(`Using tempFile for preview generation:`, tempFile);
+            apiLogger.info(`Using tempFile for preview generation:`, tempFile);
             const { previewPath } = await processVideoAndGeneratePreview(tempFile, updatedCard);
             
             if (previewPath) {
-              console.log(`Using regenerated preview: ${previewPath}`);
+              apiLogger.info(`Using regenerated preview: ${previewPath}`);
               updatedCard.preview = previewPath;
               
               // Mark the preview as autogenerated
@@ -2051,15 +2059,15 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
             // Clean up the temp file
             try {
               fs.unlinkSync(tempVideoPath);
-              console.log('Temporary video file cleaned up');
+              fileLogger.info('Temporary video file cleaned up');
             } catch (cleanupError) {
-              console.error('Error cleaning up temp file:', cleanupError);
+              fileLogger.error('Error cleaning up temp file:', cleanupError);
             }
           } else {
-            console.error('Failed to download video file for preview generation');
+            fileLogger.error('Failed to download video file for preview generation');
           }
         } catch (previewError) {
-          console.error('Error regenerating preview:', previewError);
+          apiLogger.error('Error regenerating preview:', previewError);
         }
         
         // Keep existing movie file unchanged
@@ -2069,7 +2077,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         updatedCard.movie = await handleFileField('movie', card.movie);
       }
       
-      console.log('Reel update - movie result:', updatedCard.movie);
+      apiLogger.info('Reel update - movie result:', updatedCard.movie);
 
       // Handle transcript field (optional for reel cards)
       updatedCard.transcript = await handleFileField('transcript', card.transcript);
@@ -2089,7 +2097,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     // We use our renamed 'needsAutoPreview' variable here (was 'needsLocalAutoPreview')
     if (needsAutoPreview && card.movie) {
       try {
-        console.log('Auto-generating preview image from video...');
+        fileLogger.info('Auto-generating preview image from video...');
         // Don't prepend paths to URLs
         const moviePath = card.movie.startsWith('http') ? card.movie : path.join(__dirname, card.movie);
         const uploadDir = path.join(__dirname, 'uploads');
@@ -2110,11 +2118,11 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           
           try {
             // Download the file
-            console.log(`Downloading video from ${moviePath} to ${localVideoPath}`);
+            fileLogger.info(`Downloading video from ${moviePath} to ${localVideoPath}`);
             await downloadFile(moviePath, localVideoPath);
             needsCleanup = true;
           } catch (dlError) {
-            console.error('Error downloading video file:', dlError);
+            fileLogger.error('Error downloading video file:', dlError);
             throw new Error('Failed to download video file');
           }
         } else {
@@ -2130,17 +2138,17 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           
           // Check if the file is actually a video
           const fileCheck = require('child_process').execSync(`file "${localVideoPath}"`).toString();
-          console.log(`File check result: ${fileCheck}`);
+          fileLogger.info(`File check result: ${fileCheck}`);
           
           if (fileCheck.includes('HTML') || !fileCheck.includes('video')) {
-            console.warn('Not a valid video file - using fallback colored preview');
+            fileLogger.warn('Not a valid video file - using fallback colored preview');
             // Clean up temp file if needed before continuing
             if (needsCleanup && fs.existsSync(localVideoPath)) {
               try {
                 fs.unlinkSync(localVideoPath);
-                console.log(`Cleaned up invalid video file: ${localVideoPath}`);
+                fileLogger.info(`Cleaned up invalid video file: ${localVideoPath}`);
               } catch (cleanupErr) {
-                console.warn(`Failed to clean up temp file: ${cleanupErr.message}`);
+                fileLogger.warn(`Failed to clean up temp file: ${cleanupErr.message}`);
               }
             }
             throw new Error('Invalid video file format');
@@ -2151,7 +2159,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           
           // Get relative path for storage
           const previewRelativePath = '/uploads/' + path.basename(previewPath);
-          console.log(`Generated preview image at ${previewRelativePath}`);
+          apiLogger.info(`Generated preview image at ${previewRelativePath}`);
           
           // Update the card with the new preview
           updatedCard.preview = previewRelativePath;
@@ -2165,20 +2173,20 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           if (previewMetadata.width) updatedCard.fileMetadata.width = previewMetadata.width;
           if (previewMetadata.height) updatedCard.fileMetadata.height = previewMetadata.height;
         } catch (error) {
-          console.error('Error extracting preview frame from video:', error);
+          apiLogger.error('Error extracting preview frame from video:', error);
           
           // Clean up temp file if it exists
           if (needsCleanup && fs.existsSync(localVideoPath)) {
             try {
               fs.unlinkSync(localVideoPath);
-              console.log(`Cleaned up temp file after error: ${localVideoPath}`);
+              fileLogger.info(`Cleaned up temp file after error: ${localVideoPath}`);
             } catch (cleanupErr) {
-              console.warn(`Failed to clean up temp file: ${cleanupErr.message}`);
+              fileLogger.warn(`Failed to clean up temp file: ${cleanupErr.message}`);
             }
           }
           
           // Create a fallback colored image using sharp
-          console.log('Creating fallback colored preview image...');
+          apiLogger.info('Creating fallback colored preview image...');
           
           // Generate a video-like preview with a play button
           const width = 720;
@@ -2193,7 +2201,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           const g = Math.floor(Math.random() * 200) + 25;
           const b = Math.floor(Math.random() * 200) + 25;
           
-          console.log(`Using random color: rgb(${r},${g},${b})`);
+          apiLogger.info(`Using random color: rgb(${r},${g},${b})`);
           
           await sharp({
             create: {
@@ -2218,7 +2226,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           .jpeg({ quality: 90 })
           .toFile(previewPath);
           
-          console.log(`Created fallback preview image at ${previewPath}`);
+          apiLogger.info(`Created fallback preview image at ${previewPath}`);
           updatedCard.preview = '/uploads/' + previewFilename;
           
           // Add metadata
@@ -2228,17 +2236,17 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           updatedCard.fileMetadata.height = height;
         }
       } catch (error) {
-        console.error('All preview generation attempts failed:', error);
+        apiLogger.error('All preview generation attempts failed:', error);
         // Continue without preview if generation fails
       }
     } else if (needsAutoPreview && isS3Configured && card.movie) {
       // Handle S3-stored videos
       try {
-        console.log('Creating preview for S3-stored video during edit...');
+        s3Logger.info('Creating preview for S3-stored video during edit...');
         
         // Get movie URL
         const movieUrl = card.movie;
-        console.log('Movie URL:', movieUrl);
+        apiLogger.info('Movie URL:', movieUrl);
         
         if (!movieUrl) {
           throw new Error('Cannot determine S3 location for the video file');
@@ -2259,25 +2267,25 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         updatedCard.fileMetadata.width = 720; // Default width from the generator
         updatedCard.fileMetadata.height = 1280; // Default height from the generator
         
-        console.log('Successfully added preview URL to card:', previewUrl);
+        apiLogger.info('Successfully added preview URL to card:', previewUrl);
       } catch (error) {
-        console.error('Error handling S3 video preview during edit:', error);
+        s3Logger.error('Error handling S3 video preview during edit:', error);
       }
     }
 
     // Generate a preview for a newly uploaded movie to S3 when no preview was provided
-    console.log('================== S3 PREVIEW GENERATION CHECK ==================');
-    console.log('S3 preview check - isS3Configured:', isS3Configured);
-    console.log('S3 preview check - hasNewMovie:', hasNewMovie);
-    console.log('S3 preview check - type:', type);
-    console.log('S3 preview check - hasPreviewFiles:', !!(req.files && req.files.preview && req.files.preview.length > 0));
-    console.log('S3 preview check - updatedCard.preview:', updatedCard.preview);
-    console.log('S3 preview check - req.body.remove_preview:', req.body.remove_preview);
-    console.log('S3 preview check - shouldRemovePreview param:', req.body.remove_preview === 'true');
-    console.log('S3 preview check - updatedCard.movie:', updatedCard.movie);
-    console.log('S3 preview check - movie file exists:', !!(req.files && req.files.movie && req.files.movie.length > 0));
+    s3Logger.info('================== S3 PREVIEW GENERATION CHECK ==================');
+    s3Logger.info('S3 preview check - isS3Configured:', isS3Configured);
+    s3Logger.info('S3 preview check - hasNewMovie:', hasNewMovie);
+    s3Logger.info('S3 preview check - type:', type);
+    s3Logger.debug('S3 preview check - hasPreviewFiles:', !!(req.files && req.files.preview && req.files.preview.length > 0));
+    s3Logger.info('S3 preview check - updatedCard.preview:', updatedCard.preview);
+    s3Logger.info('S3 preview check - req.body.remove_preview:', req.body.remove_preview);
+    s3Logger.info('S3 preview check - shouldRemovePreview param:', req.body.remove_preview === 'true');
+    s3Logger.info('S3 preview check - updatedCard.movie:', updatedCard.movie);
+    s3Logger.info('S3 preview check - movie file exists:', !!(req.files && req.files.movie && req.files.movie.length > 0));
     if (req.files && req.files.movie && req.files.movie.length > 0) {
-      console.log('S3 preview check - movie file details:', {
+      s3Logger.debug('S3 preview check - movie file details:', {
         originalname: req.files.movie[0].originalname,
         mimetype: req.files.movie[0].mimetype,
         size: req.files.movie[0].size,
@@ -2290,20 +2298,20 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     // We no longer need to check for preview removal as it's handled in our 
     // optimized workflow with the processVideoAndGeneratePreview function
     
-    console.log('================== FILE PROCESSING SUMMARY ==================');
-    console.log('File processing complete with the following results:');
-    console.log(`- Type: ${type}`);
-    console.log(`- Uses S3: ${isS3Configured ? 'Yes' : 'No'}`);
-    console.log(`- Changed movie file: ${hasNewMovie ? 'Yes' : 'No'}`);
-    console.log(`- Provided preview file: ${!!(req.files && req.files.preview && req.files.preview.length > 0) ? 'Yes' : 'No'}`);
-    console.log(`- Final movie path: ${updatedCard.movie || '(none)'}`);
-    console.log(`- Final preview path: ${updatedCard.preview || '(none)'}`);
-    console.log(`- Final transcript path: ${updatedCard.transcript || '(none)'}`);
+    apiLogger.info('================== FILE PROCESSING SUMMARY ==================');
+    apiLogger.info('File processing complete with the following results:');
+    apiLogger.info(`- Type: ${type}`);
+    s3Logger.info(`- Uses S3: ${isS3Configured ? 'Yes' : 'No'}`);
+    fileLogger.info(`- Changed movie file: ${hasNewMovie ? 'Yes' : 'No'}`);
+    fileLogger.info(`- Provided preview file: ${!!(req.files && req.files.preview && req.files.preview.length > 0) ? 'Yes' : 'No'}`);
+    apiLogger.info(`- Final movie path: ${updatedCard.movie || '(none)'}`);
+    apiLogger.info(`- Final preview path: ${updatedCard.preview || '(none)'}`);
+    apiLogger.info(`- Final transcript path: ${updatedCard.transcript || '(none)'}`);
     
     // Log movie file details for debugging
     if (req.files && req.files.movie && req.files.movie.length > 0) {
-      console.log('S3 preview check - movie file exists:', true);
-      console.log('S3 preview check - movie file details:', {
+      s3Logger.info('S3 preview check - movie file exists:', true);
+      s3Logger.debug('S3 preview check - movie file details:', {
         originalname: req.files.movie[0].originalname,
         mimetype: req.files.movie[0].mimetype,
         size: req.files.movie[0].size,
@@ -2312,9 +2320,9 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         bucket: req.files.movie[0].bucket
       });
     } else if (updatedCard.movie) {
-      console.log('S3 preview check - movie URL:', updatedCard.movie);
+      s3Logger.info('S3 preview check - movie URL:', updatedCard.movie);
     } else {
-      console.log('S3 preview check - movie file exists:', false);
+      s3Logger.info('S3 preview check - movie file exists:', false);
     }
     
     // Define conditions for generating a preview
@@ -2329,16 +2337,16 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
                                  (hasNewMovie || shouldRemovePreview || generatePreviewFlag) && 
                                  (!req.files || !req.files.preview || req.files.preview.length === 0);
                                  
-    console.log('S3 preview generation conditions met:', shouldGeneratePreview);
-    console.log('Conditions breakdown:');
-    console.log('- isS3Configured:', isS3Configured);
-    console.log('- type === \'reel\':', type === 'reel');
-    console.log('- hasNewMovie:', hasNewMovie);
-    console.log('- shouldRemovePreview:', shouldRemovePreview);
-    console.log('- generatePreviewFlag:', generatePreviewFlag);
-    console.log('- previewAlreadyGenerated:', previewAlreadyGenerated);
-    console.log('- Current preview:', updatedCard.preview);
-    console.log('- !hasPreviewFiles:', !req.files || !req.files.preview || req.files.preview.length === 0);
+    s3Logger.info('S3 preview generation conditions met:', shouldGeneratePreview);
+    apiLogger.info('Conditions breakdown:');
+    s3Logger.info('- isS3Configured:', isS3Configured);
+    apiLogger.info('- type === \'reel\':', type === 'reel');
+    apiLogger.info('- hasNewMovie:', hasNewMovie);
+    apiLogger.info('- shouldRemovePreview:', shouldRemovePreview);
+    apiLogger.info('- generatePreviewFlag:', generatePreviewFlag);
+    apiLogger.info('- previewAlreadyGenerated:', previewAlreadyGenerated);
+    apiLogger.info('- Current preview:', updatedCard.preview);
+    fileLogger.info('- !hasPreviewFiles:', !req.files || !req.files.preview || req.files.preview.length === 0);
     // Preview generation is now handled in our optimized workflow
     
     // Generate preview if:
@@ -2350,17 +2358,17 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     
     // If we need to generate a preview but haven't already done so, do it now
     if (shouldGeneratePreview && updatedCard.movie) {
-      console.log('Conditions met for preview generation from existing movie:', updatedCard.movie);
+      apiLogger.info('Conditions met for preview generation from existing movie:', updatedCard.movie);
       
       try {
-        console.log('================== PREVIEW REGENERATION START ==================');
-        console.log(`Source movie URL: ${updatedCard.movie}`);
+        apiLogger.info('================== PREVIEW REGENERATION START ==================');
+        apiLogger.info(`Source movie URL: ${updatedCard.movie}`);
         
         // Create a temp directory if needed
         const tempDir = path.join(__dirname, PREVIEW_SETTINGS.TEMP_DIR);
         if (!fs.existsSync(tempDir)) {
           fs.mkdirSync(tempDir, { recursive: true });
-          console.log(`Created temp directory: ${tempDir}`);
+          apiLogger.info(`Created temp directory: ${tempDir}`);
         }
         
         // Create a unique filename for the temp file
@@ -2368,7 +2376,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         const tempVideoPath = path.join(tempDir, `temp-download-${uuid.substring(0, 8)}${path.extname(updatedCard.movie) || '.mp4'}`);
         
         // Download the movie to a temp file
-        console.log(`Downloading movie from ${updatedCard.movie} to ${tempVideoPath}`);
+        apiLogger.info(`Downloading movie from ${updatedCard.movie} to ${tempVideoPath}`);
         await downloadFile(updatedCard.movie, tempVideoPath);
         
         // Check if the download worked
@@ -2381,7 +2389,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           throw new Error(`Downloaded movie file is empty (0 bytes)`);
         }
         
-        console.log(`Downloaded movie file successfully, size: ${fileSize} bytes`);
+        fileLogger.info(`Downloaded movie file successfully, size: ${fileSize} bytes`);
         
         // Create a temp file object that mimics multer's file object
         const tempFile = {
@@ -2391,40 +2399,40 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           size: fileSize
         };
         
-        console.log('Temp file object created:', tempFile);
+        fileLogger.info('Temp file object created:', tempFile);
         
         // Generate the preview
-        console.log('Calling processVideoAndGeneratePreview...');
+        apiLogger.info('Calling processVideoAndGeneratePreview...');
         const { previewPath } = await processVideoAndGeneratePreview(tempFile, updatedCard);
         
         if (!previewPath) {
           throw new Error('Failed to generate preview - no preview path returned');
         }
         
-        console.log(`Generated preview successfully: ${previewPath}`);
+        apiLogger.info(`Generated preview successfully: ${previewPath}`);
         updatedCard.preview = previewPath;
         
         // Mark the preview as autogenerated
         if (!updatedCard.fileMetadata) updatedCard.fileMetadata = {};
         updatedCard.fileMetadata.isPreviewGenerated = true;
         updatedCard.fileMetadata.previewOriginalFileName = "Auto-generated from video frame";
-        console.log('Updated card metadata for autogenerated preview');
+        apiLogger.info('Updated card metadata for autogenerated preview');
         
         // Clean up the temp file
         try {
           fs.unlinkSync(tempVideoPath);
-          console.log('Temporary video file cleaned up');
+          fileLogger.info('Temporary video file cleaned up');
         } catch (cleanupError) {
-          console.error('Error cleaning up temp file:', cleanupError);
+          fileLogger.error('Error cleaning up temp file:', cleanupError);
           // Continue even if cleanup fails
         }
         
-        console.log('================== PREVIEW REGENERATION SUCCESS ==================');
+        apiLogger.info('================== PREVIEW REGENERATION SUCCESS ==================');
       } catch (previewError) {
-        console.error('================== PREVIEW REGENERATION ERROR ==================');
-        console.error('Error generating preview from existing movie:', previewError);
-        console.error('Error stack:', previewError.stack);
-        console.error('================== END PREVIEW REGENERATION ERROR ==================');
+        apiLogger.error('================== PREVIEW REGENERATION ERROR ==================');
+        apiLogger.error('Error generating preview from existing movie:', previewError);
+        apiLogger.error('Error stack:', previewError.stack);
+        apiLogger.error('================== END PREVIEW REGENERATION ERROR ==================');
         // Continue without failing the whole update
       }
     }
@@ -2433,10 +2441,10 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     // 1. Process videos locally first
     // 2. Generate previews from local files
     // 3. Upload files to S3 only after processing
-    console.log('================== END FILE PROCESSING ==================');
+    apiLogger.info('================== END FILE PROCESSING ==================');
     
     // Log the update operation for debugging purposes
-    console.log('Updating card with the following data:', JSON.stringify(updatedCard, null, 2));
+    apiLogger.info('Updating card with the following data:', JSON.stringify(updatedCard, null, 2));
 
     // Create an explicit $unset operation for any null fields
     const unsetFields = {};
@@ -2451,13 +2459,13 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
     const updateOperation = { $set: updatedCard };
     if (Object.keys(unsetFields).length > 0) {
       updateOperation.$unset = unsetFields;
-      console.log('Explicitly unsetting fields:', JSON.stringify(unsetFields, null, 2));
+      apiLogger.info('Explicitly unsetting fields:', JSON.stringify(unsetFields, null, 2));
     }
 
     // Update the card in the database
     let updated;
     try {
-      console.log(`Updating card ${cardId} in database with operation:`, JSON.stringify(updateOperation, null, 2));
+      apiLogger.info(`Updating card ${cardId} in database with operation:`, JSON.stringify(updateOperation, null, 2));
       updated = await Card.findByIdAndUpdate(cardId, updateOperation, { 
         new: true,     // Return the updated document
         runValidators: true  // Run mongoose validators
@@ -2467,9 +2475,9 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         throw new Error(`Failed to update card ${cardId} - no document returned`);
       }
       
-      console.log(`Card ${cardId} successfully updated`);
+      apiLogger.info(`Card ${cardId} successfully updated`);
     } catch (updateError) {
-      console.error('MongoDB update error:', updateError);
+      apiLogger.error('MongoDB update error:', updateError);
       return res.status(500).json({ 
         error: 'Failed to update card in database',
         details: updateError.message 
@@ -2478,7 +2486,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
     // Process any files marked for deletion during the update
     if (req.filesToDeleteAfterUpdate && req.filesToDeleteAfterUpdate.length > 0) {
-      console.log(`Cleaning up ${req.filesToDeleteAfterUpdate.length} orphaned files after update`);
+      fileLogger.info(`Cleaning up ${req.filesToDeleteAfterUpdate.length} orphaned files after update`);
       
       for (const fileToDelete of req.filesToDeleteAfterUpdate) {
         try {
@@ -2486,18 +2494,18 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           const isOrphaned = await isFileOrphaned(fileToDelete, Card);
           
           if (isOrphaned) {
-            console.log(`Confirmed file ${fileToDelete} is orphaned, deleting...`);
+            fileLogger.info(`Confirmed file ${fileToDelete} is orphaned, deleting...`);
             await deleteFile(fileToDelete);
-            console.log(`Successfully deleted orphaned file: ${fileToDelete}`);
+            fileLogger.info(`Successfully deleted orphaned file: ${fileToDelete}`);
           } else {
-            console.log(`File ${fileToDelete} is no longer orphaned, not deleting`);
+            fileLogger.info(`File ${fileToDelete} is no longer orphaned, not deleting`);
           }
         } catch (err) {
-          console.error(`Error deleting orphaned file ${fileToDelete}:`, err);
+          fileLogger.error(`Error deleting orphaned file ${fileToDelete}:`, err);
         }
       }
     } else {
-      console.log('No orphaned files to clean up after update');
+      fileLogger.info('No orphaned files to clean up after update');
     }
     
     // Final check for any files that might have been orphaned
@@ -2514,12 +2522,12 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
           try {
             const wasDeleted = await safeDeleteOrphanedFile(originalCard[field], Card);
             if (wasDeleted) {
-              console.log(`Orphaned file ${originalCard[field]} deleted successfully in final check`);
+              fileLogger.info(`Orphaned file ${originalCard[field]} deleted successfully in final check`);
             } else {
-              console.log(`File ${originalCard[field]} still in use by other cards, not deleted`);
+              apiLogger.info(`File ${originalCard[field]} still in use by other cards, not deleted`);
             }
           } catch (err) {
-            console.error(`Error safely deleting file ${originalCard[field]}:`, err);
+            fileLogger.error(`Error safely deleting file ${originalCard[field]}:`, err);
           }
         }
       }
@@ -2532,21 +2540,21 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
         for (const imagePath of originalCard.imageSequence) {
           if (imagePath && !currentImageSequence.includes(imagePath)) {
             try {
-              console.log(`Checking if removed sequence image ${imagePath} is now orphaned`);
+              apiLogger.info(`Checking if removed sequence image ${imagePath} is now orphaned`);
               const wasDeleted = await safeDeleteOrphanedFile(imagePath, Card);
               if (wasDeleted) {
-                console.log(`Orphaned sequence image ${imagePath} deleted successfully`);
+                apiLogger.info(`Orphaned sequence image ${imagePath} deleted successfully`);
               } else {
-                console.log(`Sequence image ${imagePath} still in use by other cards, not deleted`);
+                apiLogger.info(`Sequence image ${imagePath} still in use by other cards, not deleted`);
               }
             } catch (err) {
-              console.error(`Error safely deleting sequence image ${imagePath}:`, err);
+              apiLogger.error(`Error safely deleting sequence image ${imagePath}:`, err);
             }
           }
         }
       }
     } else {
-      console.log('Skipping orphaned file check - no updated card available');
+      fileLogger.info('Skipping orphaned file check - no updated card available');
     }
 
     // Convert relative URLs to absolute URLs for response
@@ -2568,7 +2576,7 @@ app.put('/api/cards/:id', authMiddleware, handleCardUpload, async (req, res) => 
 
     res.json(response);
   } catch (error) {
-    console.error('Error updating card:', error);
+    apiLogger.error('Error updating card:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2604,7 +2612,7 @@ app.delete('/api/cards/:id', authMiddleware, async (req, res) => {
 
     // Delete the card first to ensure files become orphaned
     await Card.findByIdAndDelete(cardId);
-    console.log(`Card ${cardId} deleted from database`);
+    apiLogger.info(`Card ${cardId} deleted from database`);
 
     // Collect all files to check and delete if orphaned
     const filesToCheck = [];
@@ -2633,19 +2641,19 @@ app.delete('/api/cards/:id', authMiddleware, async (req, res) => {
       try {
         const wasDeleted = await safeDeleteOrphanedFile(file, Card);
         if (wasDeleted) {
-          console.log(`Orphaned file ${file} deleted successfully`);
+          fileLogger.info(`Orphaned file ${file} deleted successfully`);
         } else {
-          console.log(`File ${file} still in use by other cards, not deleted`);
+          fileLogger.info(`File ${file} still in use by other cards, not deleted`);
         }
       } catch (err) {
-        console.error(`Error checking/deleting file ${file}:`, err);
+        fileLogger.error(`Error checking/deleting file ${file}:`, err);
         // Continue even if file deletion fails
       }
     }
 
     res.status(204).end();
   } catch (error) {
-    console.error('Error deleting card:', error);
+    apiLogger.error('Error deleting card:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2656,7 +2664,7 @@ app.get('/api/tags', async (req, res) => {
     const tags = await getAllTags();
     res.json(tags);
   } catch (error) {
-    console.error('Error getting tags:', error);
+    apiLogger.error('Error getting tags:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2665,7 +2673,7 @@ app.get('/api/tags', async (req, res) => {
 app.get('/api/cards/:id/download-package', async (req, res) => {
   try {
     const cardId = req.params.id;
-    console.log(`Preparing download package for card ${cardId}`);
+    fileLogger.info(`Preparing download package for card ${cardId}`);
     
     // Get the card
     const card = await Card.findById(cardId);
@@ -2673,7 +2681,7 @@ app.get('/api/cards/:id/download-package', async (req, res) => {
       return res.status(404).json({ error: 'Card not found' });
     }
     
-    console.log(`Creating download package for ${card.type} card`);
+    fileLogger.info(`Creating download package for ${card.type} card`);
     
     // Make sure we're working with a plain object, not a Mongoose document
     const cardData = card.toObject ? card.toObject() : JSON.parse(JSON.stringify(card));
@@ -2687,7 +2695,7 @@ app.get('/api/cards/:id/download-package', async (req, res) => {
     const localZipUrl = `${baseUrl}/api/download-zip/${zipFilename}`;
     res.json({ downloadUrl: localZipUrl });
   } catch (error) {
-    console.error('Error creating download package:', error);
+    apiLogger.error('Error creating download package:', error);
     res.status(500).json({ error: 'Failed to create download package' });
   }
 });
@@ -2713,19 +2721,19 @@ app.get('/api/download-zip/:filename', (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     
     // Stream the file
-    console.log(`Serving ZIP file: ${zipPath}`);
+    fileLogger.info(`Serving ZIP file: ${zipPath}`);
     const fileStream = fs.createReadStream(zipPath);
     fileStream.pipe(res);
     
     fileStream.on('error', (err) => {
-      console.error('Error streaming ZIP file:', err);
+      fileLogger.error('Error streaming ZIP file:', err);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Error downloading file' });
       }
     });
     
   } catch (error) {
-    console.error('Error serving ZIP file:', error);
+    fileLogger.error('Error serving ZIP file:', error);
     res.status(500).json({ error: 'Failed to serve ZIP file' });
   }
 });
@@ -2745,7 +2753,7 @@ app.get('/api/users', authMiddleware, async (req, res) => {
     const users = await User.find({}, { password: 0 });
     res.json(users);
   } catch (error) {
-    console.error('Error fetching users:', error);
+    apiLogger.error('Error fetching users:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2765,7 +2773,7 @@ app.get('/api/users/:id', authMiddleware, async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    console.error('Error fetching user:', error);
+    apiLogger.error('Error fetching user:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2818,13 +2826,13 @@ app.post('/api/users', authMiddleware, async (req, res) => {
     if (isEmailConfigured()) {
       try {
         await sendWelcomeEmail(email, resetToken, username);
-        console.log(`Welcome email sent to new user: ${username} (${email})`);
+        apiLogger.info(`Welcome email sent to new user: ${username} (${email})`);
       } catch (emailError) {
-        console.error('Error sending welcome email:', emailError);
+        apiLogger.error('Error sending welcome email:', emailError);
         // Don't fail user creation if email fails, but log the error
       }
     } else {
-      console.log(`User ${username} created but welcome email not sent (email service not configured)`);
+      apiLogger.info(`User ${username} created but welcome email not sent (email service not configured)`);
     }
 
     // Return the user without the password
@@ -2839,7 +2847,7 @@ app.post('/api/users', authMiddleware, async (req, res) => {
         : 'User created successfully. Email service is not configured, so no welcome email was sent.'
     });
   } catch (error) {
-    console.error('Error creating user:', error);
+    apiLogger.error('Error creating user:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2896,7 +2904,7 @@ app.put('/api/users/:id', authMiddleware, async (req, res) => {
 
     res.json(updatedUser);
   } catch (error) {
-    console.error('Error updating user:', error);
+    apiLogger.error('Error updating user:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2930,7 +2938,7 @@ app.delete('/api/users/:id', authMiddleware, async (req, res) => {
 
     res.status(204).end();
   } catch (error) {
-    console.error('Error deleting user:', error);
+    apiLogger.error('Error deleting user:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -3019,7 +3027,7 @@ app.patch('/api/cards/:id/social-copy', authMiddleware, async (req, res) => {
     
     res.json(response);
   } catch (error) {
-    console.error('Error updating social copy:', error);
+    apiLogger.error('Error updating social copy:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -3048,7 +3056,7 @@ app.post('/api/files/signed-url', async (req, res) => {
       s3Key = urlParts.slice(3).join('/'); // Everything after the domain
     }
     
-    console.log(`Generating signed URL for S3 key: ${s3Key}`);
+    s3Logger.info(`Generating signed URL for S3 key: ${s3Key}`);
     
     // Generate signed URL (valid for 1 hour)
     const signedUrl = await getSignedFileUrl(s3Key, 3600);
@@ -3059,7 +3067,7 @@ app.post('/api/files/signed-url', async (req, res) => {
     
     res.json({ signedUrl });
   } catch (error) {
-    console.error('Error generating signed URL:', error);
+    apiLogger.error('Error generating signed URL:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -3069,7 +3077,7 @@ async function resetAdminPassword() {
   try {
     const admin = await User.findOne({ username: 'admin' });
     if (!admin) {
-      console.log('Admin user not found. Cannot reset password.');
+      apiLogger.info('Admin user not found. Cannot reset password.');
       return;
     }
 
@@ -3084,9 +3092,9 @@ async function resetAdminPassword() {
     admin.password = hashedPassword;
     await admin.save();
 
-    console.log('Admin password has been reset successfully.');
+    apiLogger.info('Admin password has been reset successfully.');
   } catch (error) {
-    console.error('Error resetting admin password:', error);
+    authLogger.error('Error resetting admin password:', error);
   }
 }
 
@@ -3104,10 +3112,10 @@ async function startApp() {
 
     // Start the server
     const server = app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-      console.log(`Max file upload size: 500MB`);
-      console.log(`Auto-preview generation for videos: Enabled (local & S3)`);
-      console.log(`Image sequence support: Enabled`);
+      apiLogger.info(`Server is running on port ${PORT}`);
+      fileLogger.info(`Max file upload size: 500MB`);
+      s3Logger.info(`Auto-preview generation for videos: Enabled (local & S3)`);
+      apiLogger.info(`Image sequence support: Enabled`);
     });
     
     // Set longer timeout for large file uploads (10 minutes)
@@ -3118,16 +3126,16 @@ async function startApp() {
       try {
         await cleanupOrphanedZipFiles();
       } catch (error) {
-        console.error('Error in scheduled ZIP cleanup:', error);
+        apiLogger.error('Error in scheduled ZIP cleanup:', error);
       }
     }, 24 * 60 * 60 * 1000); // Run every 24 hours
     
     // Run initial cleanup when starting
     cleanupOrphanedZipFiles().catch(err => {
-      console.error('Error in initial ZIP cleanup:', err);
+      apiLogger.error('Error in initial ZIP cleanup:', err);
     });
   } catch (error) {
-    console.error('Error starting application:', error);
+    apiLogger.error('Error starting application:', error);
     process.exit(1);
   }
 }

@@ -4,6 +4,10 @@
 const path = require('path');
 const fs = require('fs');
 const { uploadLocalFileToS3, isS3Configured } = require('./utils/s3Storage');
+const logger = require('./utils/logger');
+
+// Create child logger for this module
+const imageProcessor = logger.child({ module: 'imageProcessor' });
 
 /**
  * Process all images in a sequence and return paths and metadata
@@ -34,7 +38,7 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
     try {
       // Parse the existingImageSequence JSON string
       existingImageSequence = JSON.parse(req.body.existingImageSequence);
-      console.log(`Found ${existingImageSequence.length} existing images in sequence`);
+      imageProcessor.debug(`Found ${existingImageSequence.length} existing images in sequence`);
       
       // Get existing metadata if available
       if (existingCardData.fileMetadata) {
@@ -43,7 +47,7 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
         existingTotalSize = existingCardData.fileMetadata.totalSequenceSize || 0;
       }
     } catch (error) {
-      console.error('Error parsing existingImageSequence:', error);
+      imageProcessor.error('Error parsing existingImageSequence:', error);
       // Default to empty arrays if parsing fails
       existingImageSequence = [];
       existingOriginalFileNames = [];
@@ -54,7 +58,7 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
   
   // If no new files and no existing files, return empty arrays
   if (sequenceCount <= 0 && existingImageSequence.length === 0) {
-    console.log('No image sequence files detected');
+    imageProcessor.debug('No image sequence files detected');
     return {
       imageSequence: [],
       imageSequenceOriginalFileNames: [],
@@ -64,7 +68,7 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
     };
   }
   
-  console.log(`Processing ${sequenceCount} new image sequence files (plus ${existingImageSequence.length} existing files)`);
+  imageProcessor.info(`Processing ${sequenceCount} new image sequence files (plus ${existingImageSequence.length} existing files)`);
   const sequencePaths = [...existingImageSequence]; // Start with existing images
   const originalFileNames = [...existingOriginalFileNames];
   const fileSizes = [...existingFileSizes];
@@ -77,11 +81,11 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
   // Process each new image in the sequence
   for (let i = 0; i < sequenceCount; i++) {
     const fieldName = `imageSequence_${i}`;
-    console.log(`Looking for field: ${fieldName}`);
+    imageProcessor.debug(`Looking for field: ${fieldName}`);
     
     if (files[fieldName] && files[fieldName].length > 0) {
       const file = files[fieldName][0];
-      console.log(`Processing image ${i}: ${file.originalname}`);
+      imageProcessor.debug(`Processing image ${i}: ${file.originalname}`);
       
       // Get local path and add to uploads directory
       const localFilePath = path.join(__dirname, 'uploads', file.filename);
@@ -103,11 +107,11 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
             if (width === null && height === null) {
               width = metadata.width;
               height = metadata.height;
-              console.log(`Extracted dimensions for image sequence: ${width}×${height}`);
+              imageProcessor.debug(`Extracted dimensions for image sequence: ${width}×${height}`);
             }
           }
         } catch (metadataError) {
-          console.error(`Error extracting metadata for sequence image ${i}:`, metadataError);
+          imageProcessor.error(`Error extracting metadata for sequence image ${i}:`, metadataError);
         }
       }
       
@@ -116,22 +120,22 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
         try {
           const s3Url = await uploadLocalFileToS3(localFilePath);
           if (s3Url) {
-            console.log(`Uploaded sequence image ${i} to S3: ${s3Url}`);
+            imageProcessor.info(`Uploaded sequence image ${i} to S3: ${s3Url}`);
             storagePath = s3Url;
             
             // Clean up the local file after successful S3 upload
             try {
               if (fs.existsSync(localFilePath)) {
                 fs.unlinkSync(localFilePath);
-                console.log(`Deleted local file ${localFilePath} after S3 upload`);
+                imageProcessor.debug(`Deleted local file ${localFilePath} after S3 upload`);
               }
             } catch (cleanupError) {
-              console.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
+              imageProcessor.error(`Error cleaning up local file ${localFilePath}:`, cleanupError);
               // Continue even if cleanup fails - file will be stored in S3
             }
           }
         } catch (s3Error) {
-          console.error(`Error uploading sequence image ${i} to S3:`, s3Error);
+          imageProcessor.error(`Error uploading sequence image ${i} to S3:`, s3Error);
         }
       }
       
@@ -143,7 +147,7 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
     }
   }
   
-  console.log(`Processed total of ${sequencePaths.length} images in sequence (${sequencePaths.length - existingImageSequence.length} new, ${existingImageSequence.length} existing), total size: ${totalSize} bytes`);
+  imageProcessor.info(`Processed total of ${sequencePaths.length} images in sequence (${sequencePaths.length - existingImageSequence.length} new, ${existingImageSequence.length} existing), total size: ${totalSize} bytes`);
   
   return {
     imageSequence: sequencePaths,

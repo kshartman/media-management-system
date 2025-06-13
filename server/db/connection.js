@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 require('dotenv').config();
+
+// Create a child logger for database operations
+const dbLogger = logger.child({ component: 'database' });
 
 // Connect to MongoDB
 async function connectToDatabase() {
@@ -12,11 +16,11 @@ async function connectToDatabase() {
     await mongoose.connect(process.env.MONGODB_URI, {
       dbName: dbName // Explicitly set the database name
     });
-    console.log('Connected to MongoDB successfully!');
+    dbLogger.info('Connected to MongoDB successfully!');
     return mongoose.connection;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    console.error('Please check your MongoDB credentials and make sure the database is accessible');
+    dbLogger.error('MongoDB connection error:', error);
+    dbLogger.error('Please check your MongoDB credentials and make sure the database is accessible');
     process.exit(1);
   }
 }
