@@ -20,6 +20,7 @@ const { createCardZip } = require('./utils/zipCardFiles');
 const { cleanupOrphanedZipFiles } = require('./utils/cleanupOrphanedFiles');
 const { VIDEO_DIMENSIONS } = require('./utils/mediaConstants');
 const { isEmailConfigured, sendPasswordResetEmail, sendWelcomeEmail } = require('./utils/emailService');
+const HealthChecker = require('./utils/healthCheck');
 const logger = require('./utils/logger');
 require('dotenv').config();
 
@@ -903,7 +904,58 @@ const updateTagCounts = async (tagsList) => {
   }
 };
 
+// Health check routes
+apiLogger.info('Setting up health check routes');
+
+// Simple liveness probe - always returns 200 if server is responding
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'alive',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime())
+  });
+});
+
+// Comprehensive health check
+app.get('/api/health', async (req, res) => {
+  const healthChecker = new HealthChecker();
+  const healthCheck = await healthChecker.performHealthCheck();
+  
+  const statusCode = healthCheck.status === 'healthy' ? 200 :
+                     healthCheck.status === 'degraded' ? 200 : 503;
+  
+  apiLogger.info('Health check performed', {
+    status: healthCheck.status,
+    responseTime: healthCheck.responseTime
+  });
+  
+  res.status(statusCode).json(healthCheck);
+});
+
+// Readiness probe - checks if app is ready to serve traffic
+app.get('/api/health/ready', async (req, res) => {
+  try {
+    // Check critical dependencies only
+    await mongoose.connection.db.admin().ping();
+    
+    res.status(200).json({
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      database: 'connected'
+    });
+  } catch (error) {
+    apiLogger.warn('Readiness check failed', error);
+    res.status(503).json({
+      status: 'not-ready',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
 // Auth routes
+apiLogger.info('Setting up authentication routes');
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;

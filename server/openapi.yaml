@@ -1,0 +1,1308 @@
+openapi: 3.0.3
+info:
+  title: Media Management System API
+  description: |
+    Backend API for a comprehensive media management system supporting images, social media content, and video reels.
+    
+    ## Features
+    - Card management (image, social, reel types)
+    - File uploads with automatic processing
+    - User authentication and management
+    - Password reset via email
+    - Tag management
+    - Health monitoring
+    - Both local and S3 storage support
+    
+    ## Authentication
+    Most endpoints require JWT authentication via Bearer token in the Authorization header.
+    
+    ## File Upload
+    File uploads use multipart/form-data and support up to 500MB files with automatic preview generation.
+  version: 1.0.0
+  contact:
+    name: Media Management System
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:5001
+    description: Development server
+  - url: https://resources.shopzive.com
+    description: Production server
+
+paths:
+  # Health Check Endpoints
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Simple liveness check
+      description: Basic health check endpoint for container liveness probes
+      responses:
+        '200':
+          description: Server is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Comprehensive health check
+      description: Detailed health status including database, storage, and system metrics
+      responses:
+        '200':
+          description: Health check results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/health/ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      description: Kubernetes-style readiness probe
+      responses:
+        '200':
+          description: Service ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  # Authentication Endpoints
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with username/password and receive JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: Send password reset email to user (requires SendGrid configuration)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Reset email sent (if email service configured)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid request or email service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password
+      description: Reset user password using token from email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Card Management Endpoints
+  /api/cards:
+    get:
+      tags:
+        - Cards
+      summary: Get cards with pagination and filtering
+      description: Retrieve cards with optional search, type filtering, and tag filtering
+      parameters:
+        - name: page
+          in: query
+          description: Page number (default 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Items per page (default 12)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 12
+        - name: search
+          in: query
+          description: Search term for description
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Filter by card type
+          schema:
+            oneOf:
+              - type: string
+                enum: [image, social, reel]
+              - type: array
+                items:
+                  type: string
+                  enum: [image, social, reel]
+        - name: tag
+          in: query
+          description: Filter by tags
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+      responses:
+        '200':
+          description: Cards retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardsResponse'
+
+    post:
+      tags:
+        - Cards
+      summary: Create new card
+      description: Create a new card with file uploads
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '201':
+          description: Card created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cards/{id}:
+    get:
+      tags:
+        - Cards
+      summary: Get card by ID
+      description: Retrieve a single card by its ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '200':
+          description: Card retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Cards
+      summary: Update card
+      description: Update an existing card with optional file uploads
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateCardRequest'
+      responses:
+        '200':
+          description: Card updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Cards
+      summary: Delete card
+      description: Delete a card and all associated files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '204':
+          description: Card deleted successfully
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cards/{id}/social-copy:
+    patch:
+      tags:
+        - Cards
+      summary: Update social copy
+      description: Update Instagram and Facebook copy for social or reel cards
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocialCopyRequest'
+      responses:
+        '200':
+          description: Social copy updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+        '400':
+          description: Invalid request or not a social/reel card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cards/{id}/download-package:
+    get:
+      tags:
+        - Files
+      summary: Create download package
+      description: Create a ZIP package containing all files for a card
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '200':
+          description: Download URL created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadPackageResponse'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/download-zip/{filename}:
+    get:
+      tags:
+        - Files
+      summary: Download ZIP package
+      description: Download a previously created ZIP package
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: ZIP filename
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ZIP file download
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/files/signed-url:
+    post:
+      tags:
+        - Files
+      summary: Generate signed URL
+      description: Generate a signed URL for S3 files (only works when S3 is configured)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignedUrlRequest'
+      responses:
+        '200':
+          description: Signed URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedUrlResponse'
+        '400':
+          description: Invalid URL or S3 not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Tag Management
+  /api/tags:
+    get:
+      tags:
+        - Tags
+      summary: Get all tags
+      description: Retrieve all available tags
+      responses:
+        '200':
+          description: Tags retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example: ["marketing", "social", "campaign"]
+
+  # User Management (Admin Only)
+  /api/users:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      description: Retrieve all users (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Create a new user account (admin only, sends welcome email if configured)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/User'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Welcome email sent successfully"
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieve a single user by ID (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Update user account (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Delete user account (admin only, cannot delete last admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '204':
+          description: User deleted successfully
+        '400':
+          description: Cannot delete last admin user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /api/auth/login
+
+  schemas:
+    # Health Schemas
+    LivenessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [alive]
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+          description: Server uptime in seconds
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+        version:
+          type: string
+        environment:
+          type: string
+        responseTime:
+          type: string
+        checks:
+          type: object
+          properties:
+            database:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [healthy, unhealthy]
+                responseTime:
+                  type: string
+                database:
+                  type: string
+                host:
+                  type: string
+                port:
+                  type: number
+                collections:
+                  type: number
+                dataSize:
+                  type: string
+            storage:
+              type: object
+              properties:
+                s3:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [healthy, unhealthy, not-configured]
+                    responseTime:
+                      type: string
+                    bucket:
+                      type: string
+                    region:
+                      type: string
+                local:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [healthy, unhealthy]
+                    responseTime:
+                      type: string
+                    path:
+                      type: string
+                    fileCount:
+                      type: number
+                    accessible:
+                      type: boolean
+                    writable:
+                      type: boolean
+            email:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [configured, not-configured]
+                provider:
+                  type: string
+                  nullable: true
+                features:
+                  type: array
+                  items:
+                    type: string
+            system:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [healthy, warning]
+                memory:
+                  type: object
+                  properties:
+                    heapUsed:
+                      type: number
+                    heapTotal:
+                      type: number
+                    external:
+                      type: number
+                    unit:
+                      type: string
+                    percentage:
+                      type: number
+                uptime:
+                  type: number
+                pid:
+                  type: number
+                nodeVersion:
+                  type: string
+                platform:
+                  type: string
+            dependencies:
+              type: object
+              properties:
+                ffmpeg:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [available, unavailable]
+                    path:
+                      type: string
+                chromium:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [available, unavailable]
+                    executablePath:
+                      type: string
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, not-ready]
+        timestamp:
+          type: string
+          format: date-time
+        database:
+          type: string
+          nullable: true
+
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "admin"
+        password:
+          type: string
+          format: password
+          example: "password123"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token for authentication
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/User'
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: "admin@example.com"
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+          description: Reset token from email
+          example: "abc123def456"
+        newPassword:
+          type: string
+          format: password
+          minLength: 6
+          example: "newpassword123"
+
+    # Card Schemas
+    Card:
+      type: object
+      properties:
+        _id:
+          type: string
+          pattern: '^[0-9a-fA-F]{24}$'
+          example: "507f1f77bcf86cd799439011"
+        type:
+          type: string
+          enum: [image, social, reel]
+          example: "social"
+        description:
+          type: string
+          example: "Summer campaign carousel"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["marketing", "summer", "carousel"]
+        preview:
+          type: string
+          nullable: true
+          description: URL to preview image
+          example: "https://example.com/uploads/preview_123.jpg"
+        download:
+          type: string
+          nullable: true
+          description: URL to downloadable file (required for image cards)
+          example: "https://example.com/uploads/download_123.jpg"
+        imageSequence:
+          type: array
+          items:
+            type: string
+          description: Array of image URLs (required for social cards)
+          example: ["https://example.com/uploads/img1.jpg", "https://example.com/uploads/img2.jpg"]
+        movie:
+          type: string
+          nullable: true
+          description: URL to video file (required for reel cards)
+          example: "https://example.com/uploads/video_123.mp4"
+        transcript:
+          type: string
+          nullable: true
+          description: URL to transcript file
+          example: "https://example.com/uploads/transcript_123.txt"
+        instagramCopy:
+          type: string
+          nullable: true
+          description: Instagram post copy
+          example: "Check out our summer collection! #summer #fashion"
+        facebookCopy:
+          type: string
+          nullable: true
+          description: Facebook post copy
+          example: "Discover amazing summer styles at our store!"
+        fileMetadata:
+          $ref: '#/components/schemas/FileMetadata'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FileMetadata:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+          description: Content creation date
+        width:
+          type: number
+          nullable: true
+          description: Width in pixels
+        height:
+          type: number
+          nullable: true
+          description: Height in pixels
+        fileSize:
+          type: number
+          nullable: true
+          description: File size in bytes
+        totalSequenceSize:
+          type: number
+          nullable: true
+          description: Total size of image sequence
+        imageSequenceCount:
+          type: number
+          nullable: true
+          description: Number of images in sequence
+        originalFileName:
+          type: string
+          nullable: true
+        previewOriginalFileName:
+          type: string
+          nullable: true
+        downloadOriginalFileName:
+          type: string
+          nullable: true
+        movieOriginalFileName:
+          type: string
+          nullable: true
+        transcriptOriginalFileName:
+          type: string
+          nullable: true
+        instagramCopyOriginalFileName:
+          type: string
+          nullable: true
+        facebookCopyOriginalFileName:
+          type: string
+          nullable: true
+        imageSequenceOriginalFileNames:
+          type: array
+          items:
+            type: string
+        imageSequenceFileSizes:
+          type: array
+          items:
+            type: number
+
+    CardsResponse:
+      type: object
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Card'
+        totalCount:
+          type: number
+          description: Total number of cards matching filters
+          example: 156
+        availableTags:
+          type: array
+          items:
+            type: string
+          description: All available tags in the system
+          example: ["marketing", "social", "campaign", "summer"]
+
+    CreateCardRequest:
+      type: object
+      required:
+        - type
+        - description
+      properties:
+        type:
+          type: string
+          enum: [image, social, reel]
+          description: Type of card to create
+        description:
+          type: string
+          description: Card description
+        tags:
+          type: string
+          description: Comma-separated list of tags
+          example: "marketing,summer,campaign"
+        date:
+          type: string
+          format: date-time
+          description: Content creation date (optional)
+        instagramCopy:
+          type: string
+          description: Instagram post copy (for social/reel cards)
+        facebookCopy:
+          type: string
+          description: Facebook post copy (for social/reel cards)
+        imageSequenceCount:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: Number of images in sequence (for social cards)
+        preview:
+          type: string
+          format: binary
+          description: Preview image file (optional)
+        download:
+          type: string
+          format: binary
+          description: Downloadable file (required for image cards)
+        movie:
+          type: string
+          format: binary
+          description: Video file (required for reel cards)
+        transcript:
+          type: string
+          format: binary
+          description: Transcript file (optional)
+        documentCopy:
+          type: string
+          format: binary
+          description: Document copy file (optional for social cards)
+        # Dynamic fields for image sequence
+        imageSequence_0:
+          type: string
+          format: binary
+          description: First image in sequence
+        imageSequence_1:
+          type: string
+          format: binary
+          description: Second image in sequence
+        # ... up to imageSequence_49
+
+    UpdateCardRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateCardRequest'
+        - type: object
+          properties:
+            remove_preview:
+              type: string
+              enum: [true]
+              description: Set to 'true' to remove preview image
+            remove_download:
+              type: string
+              enum: [true]
+              description: Set to 'true' to remove download file
+            remove_movie:
+              type: string
+              enum: [true]
+              description: Set to 'true' to remove movie file
+            remove_transcript:
+              type: string
+              enum: [true]
+              description: Set to 'true' to remove transcript file
+            generatePreview:
+              type: string
+              enum: [true]
+              description: Set to 'true' to regenerate preview from video (reel cards)
+
+    SocialCopyRequest:
+      type: object
+      properties:
+        instagramCopy:
+          type: string
+          description: Instagram post copy
+        facebookCopy:
+          type: string
+          description: Facebook post copy
+
+    # File Schemas
+    DownloadPackageResponse:
+      type: object
+      properties:
+        downloadUrl:
+          type: string
+          description: URL to download ZIP package
+          example: "/api/download-zip/card_123_files.zip"
+
+    SignedUrlRequest:
+      type: object
+      required:
+        - fileUrl
+      properties:
+        fileUrl:
+          type: string
+          format: uri
+          description: S3 file URL to generate signed URL for
+          example: "https://bucket.s3.amazonaws.com/uploads/file.jpg"
+
+    SignedUrlResponse:
+      type: object
+      properties:
+        signedUrl:
+          type: string
+          format: uri
+          description: Temporary signed URL for file access
+          example: "https://bucket.s3.amazonaws.com/uploads/file.jpg?X-Amz-Signature=..."
+
+    # User Schemas
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          pattern: '^[0-9a-fA-F]{24}$'
+          example: "507f1f77bcf86cd799439011"
+        username:
+          type: string
+          example: "admin"
+        email:
+          type: string
+          format: email
+          example: "admin@example.com"
+        role:
+          type: string
+          enum: [admin, user]
+          example: "admin"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - email
+      properties:
+        username:
+          type: string
+          minLength: 1
+          example: "newuser"
+        email:
+          type: string
+          format: email
+          example: "newuser@example.com"
+        role:
+          type: string
+          enum: [admin, user]
+          default: user
+          example: "user"
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          example: "updateduser"
+        email:
+          type: string
+          format: email
+          example: "updated@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: "newpassword123"
+        role:
+          type: string
+          enum: [admin, user]
+          example: "admin"
+
+    # Common Schemas
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request parameters"
+        details:
+          type: string
+          description: Additional error details
+          example: "Username is required"
+
+tags:
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Authentication
+    description: User authentication and password management
+  - name: Cards
+    description: Media card management (images, social content, reels)
+  - name: Files
+    description: File operations and downloads
+  - name: Tags
+    description: Tag management
+  - name: Users
+    description: User account management (admin only)

@@ -48,6 +48,12 @@ services:
       - ${HOST_UPLOAD_PATH:-./uploads}:/uploads
     ports:
       - "5001:5001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - media-network
 

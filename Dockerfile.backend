@@ -6,6 +6,7 @@ WORKDIR /app
 # Note: ffmpeg is not needed here as @ffmpeg-installer/ffmpeg provides its own binary
 RUN apt-get update && apt-get install -y \
     chromium \
+    curl \
     fonts-liberation \
     libappindicator3-1 \
     libasound2 \
