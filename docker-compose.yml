@@ -37,6 +37,10 @@ services:
       - S3_BUCKET=${S3_BUCKET}
       - UPLOAD_PATH=/uploads
       - DOMAIN=${DOMAIN:-marketing.shopzive.com}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     volumes:
       - ${HOST_UPLOAD_PATH:-./uploads}:/uploads
     ports:

@@ -38,6 +38,9 @@ This guide explains how to build and deploy the Media Management System using Do
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | your-secret |
 | `S3_BUCKET_NAME` | S3 bucket name | your-bucket |
 | `HOST_UPLOAD_PATH` | Host path for uploads | /data/uploads |
+| `SENDGRID_API_KEY` | SendGrid API key (optional) | your-sendgrid-key |
+| `SENDGRID_FROM_EMAIL` | From email address (optional) | noreply@domain.com |
+| `FRONTEND_URL` | Frontend URL for reset links (optional) | https://domain.com |
 
 ## Deployment Steps
 
@@ -76,6 +79,9 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=us-east-1
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
+      - FRONTEND_URL=${FRONTEND_URL}
     volumes:
       - /data/uploads:/uploads
     networks:

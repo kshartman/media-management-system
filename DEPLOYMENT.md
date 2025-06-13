@@ -48,6 +48,9 @@ Configure these in your `.env` file:
 - `AWS_REGION`: AWS region (default: us-east-1)
 - `S3_BUCKET_NAME`: S3 bucket for file storage
 - `UPLOAD_PATH`: Local path for file uploads (will be mounted as volume)
+- `SENDGRID_API_KEY`: SendGrid API key for password reset emails (optional)
+- `SENDGRID_FROM_EMAIL`: Sender email for password reset emails (optional)
+- `FRONTEND_URL`: Frontend URL for password reset links (optional)
 
 ## Deployment Options
 

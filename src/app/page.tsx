@@ -7,6 +7,7 @@ import TagDropdown from '../components/filters/TagDropdown';
 import SortDropdown, { SortOption } from '../components/filters/SortDropdown';
 import SearchField from '../components/filters/SearchField';
 import LoginForm from '../components/auth/LoginForm';
+import ForgotPasswordForm from '../components/auth/ForgotPasswordForm';
 import AdminBar from '../components/admin/AdminBar';
 import CardUploadModal from '../components/admin/CardUploadModal';
 import CardGrid from '../components/layout/CardGrid';
@@ -59,6 +60,7 @@ const SampleCards: CardProps[] = [
 export default function Home() {
   const { isAdmin, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -500,6 +502,16 @@ export default function Home() {
     setShowLoginModal(false);
   };
 
+  const handleForgotPassword = () => {
+    setShowLoginModal(false);
+    setShowForgotPasswordModal(true);
+  };
+
+  const handleBackToLogin = () => {
+    setShowForgotPasswordModal(false);
+    setShowLoginModal(true);
+  };
+
   const handleEditCard = (id: string) => {
     
     // First check if the card exists in our current state
@@ -682,9 +694,9 @@ export default function Home() {
     }
   };
 
-  // Body scroll locking effect for login modal
+  // Body scroll locking effect for login and forgot password modals
   useEffect(() => {
-    if (!showLoginModal) return;
+    if (!showLoginModal && !showForgotPasswordModal) return;
 
     // Store the original styles and scroll position
     const originalStyle = window.getComputedStyle(document.body).overflow;
@@ -711,7 +723,27 @@ export default function Home() {
       // Restore scroll position
       window.scrollTo(0, scrollPosForThisModal);
     };
-  }, [showLoginModal]);
+  }, [showLoginModal, showForgotPasswordModal]);
+
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (showForgotPasswordModal) {
+          setShowForgotPasswordModal(false);
+        } else if (showLoginModal) {
+          setShowLoginModal(false);
+        }
+      }
+    };
+
+    if (showLoginModal || showForgotPasswordModal) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [showLoginModal, showForgotPasswordModal]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -894,8 +926,15 @@ export default function Home() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto">
-          <div className="bg-white rounded-lg shadow-xl absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4" style={{ top: '120px' }}>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto"
+          onClick={() => setShowLoginModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4" 
+            style={{ top: '120px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="relative">
               <button
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -905,7 +944,33 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <LoginForm onLoginSuccess={handleLoginSuccess} />
+              <LoginForm onLoginSuccess={handleLoginSuccess} onForgotPassword={handleForgotPassword} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto"
+          onClick={() => setShowForgotPasswordModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4" 
+            style={{ top: '120px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <button
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                onClick={() => setShowForgotPasswordModal(false)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <ForgotPasswordForm onBackToLogin={handleBackToLogin} />
             </div>
           </div>
         </div>

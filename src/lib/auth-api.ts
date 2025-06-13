@@ -34,3 +34,51 @@ export const logout = (): void => {
     localStorage.removeItem('auth_token');
   }
 };
+
+// Forgot password API function
+export const forgotPassword = async (email: string): Promise<{ message: string }> => {
+  try {
+    const response = await fetch(`${API_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to send password reset email');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    throw error;
+  }
+};
+
+// Reset password API function
+export const resetPassword = async (token: string, newPassword: string): Promise<{ message: string }> => {
+  try {
+    const response = await fetch(`${API_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token, newPassword }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to reset password');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Reset password error:', error);
+    throw error;
+  }
+};

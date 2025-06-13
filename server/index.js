@@ -19,6 +19,7 @@ const { processImageSequence } = require('./processImageSequence');
 const { createCardZip } = require('./utils/zipCardFiles');
 const { cleanupOrphanedZipFiles } = require('./utils/cleanupOrphanedFiles');
 const { VIDEO_DIMENSIONS } = require('./utils/mediaConstants');
+const { isEmailConfigured, sendPasswordResetEmail, sendWelcomeEmail } = require('./utils/emailService');
 require('dotenv').config();
 
 /**
@@ -932,6 +933,96 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Password reset request endpoint
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if email service is configured
+    if (!isEmailConfigured()) {
+      return res.status(503).json({ error: 'Password reset is not available. Email service is not configured.' });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal that the email doesn't exist
+      return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Set token and expiration (1 hour from now)
+    user.resetPasswordToken = resetTokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    // Send reset email
+    try {
+      await sendPasswordResetEmail(user.email, resetToken, user.username);
+      res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    } catch (emailError) {
+      console.error('Error sending password reset email:', emailError);
+      // Clear the reset token if email failed
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+      return res.status(500).json({ error: 'Failed to send password reset email. Please try again later.' });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Password reset confirmation endpoint
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Hash the token to compare with stored version
+    const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update password and clear reset token
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2687,11 +2778,11 @@ app.post('/api/users', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
     }
 
-    const { username, email, password, role } = req.body;
+    const { username, email, role } = req.body;
 
     // Validate required fields
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required' });
+    if (!username || !email) {
+      return res.status(400).json({ error: 'Username and email are required' });
     }
 
     // Check if username or email already exists
@@ -2705,22 +2796,48 @@ app.post('/api/users', authMiddleware, async (req, res) => {
       });
     }
 
-    // Hash the password
-    const hashedPassword = await hashPassword(password);
+    // Create the user with a temporary password (they'll set their real password via email)
+    const tempPassword = crypto.randomBytes(32).toString('hex');
+    const hashedPassword = await hashPassword(tempPassword);
+
+    // Generate reset token for welcome email
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     // Create the user
     const newUser = await User.create({
       username,
       email,
-      password: hashedPassword,
-      role: role || 'user' // Default to 'user' role if not specified
+      password: hashedPassword, // Temporary password
+      role: role || 'user', // Default to 'user' role if not specified
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpires: new Date(Date.now() + 60 * 60 * 1000) // 1 hour
     });
+
+    // Send welcome email with password setup link if email service is configured
+    if (isEmailConfigured()) {
+      try {
+        await sendWelcomeEmail(email, resetToken, username);
+        console.log(`Welcome email sent to new user: ${username} (${email})`);
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError);
+        // Don't fail user creation if email fails, but log the error
+      }
+    } else {
+      console.log(`User ${username} created but welcome email not sent (email service not configured)`);
+    }
 
     // Return the user without the password
     const userResponse = newUser.toObject();
     delete userResponse.password;
+    delete userResponse.resetPasswordToken; // Don't expose the token
 
-    res.status(201).json(userResponse);
+    res.status(201).json({
+      ...userResponse,
+      message: isEmailConfigured() 
+        ? 'User created successfully. A welcome email has been sent with password setup instructions.'
+        : 'User created successfully. Email service is not configured, so no welcome email was sent.'
+    });
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Server error' });

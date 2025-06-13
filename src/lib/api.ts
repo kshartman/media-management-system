@@ -274,7 +274,7 @@ export interface User {
 export interface UserCreateInput {
   username: string;
   email: string;
-  password: string;
+  password?: string; // Optional - users will set password via welcome email
   role: 'admin' | 'user';
 }
 

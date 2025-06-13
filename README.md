@@ -12,6 +12,7 @@ A comprehensive system for browsing, categorizing, and managing digital media as
 - **Admin Features**: Upload, edit, and delete media assets
 - **Cloud Storage**: Support for Amazon S3 storage
 - **User Management**: Admin interface for managing users
+- **Password Reset**: Email-based password reset functionality via SendGrid
 
 ## System Architecture
 
@@ -83,6 +84,13 @@ S3_CUSTOM_DOMAIN=cdn.example.com  # Optional: Set if you're using a CDN
 
 # Storage Configuration
 USE_S3_STORAGE=true  # Set to true for S3, false for local storage
+
+# SendGrid Configuration (for password reset emails)
+SENDGRID_API_KEY=your-sendgrid-api-key-here
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+
+# Frontend URL (for password reset links)
+FRONTEND_URL=http://localhost:3000
 ```
 
 Replace all placeholders with your actual values. The S3 configuration is only required if you're using S3 storage (`USE_S3_STORAGE=true`).
@@ -139,6 +147,25 @@ Replace `your-bucket-name` with your actual bucket name.
 4. Add these credentials to your `.env` file
 
 For detailed instructions, see the [S3 IAM Setup Guide](./server/s3-iam-setup-guide.md).
+
+## SendGrid Setup (Optional)
+
+The password reset feature requires SendGrid for sending emails:
+
+1. **Create a SendGrid account** at [sendgrid.com](https://sendgrid.com)
+2. **Generate an API key**:
+   - Go to Settings > API Keys in SendGrid dashboard
+   - Create a new API key with "Mail Send" permissions
+   - Copy the API key (you won't see it again)
+3. **Configure environment variables**:
+   ```bash
+   SENDGRID_API_KEY=your-sendgrid-api-key-here
+   SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+   FRONTEND_URL=https://yourdomain.com
+   ```
+4. **Verify sender identity** in SendGrid (required for production)
+
+**Note**: If SendGrid is not configured, the password reset feature will be automatically disabled and users will see an appropriate error message.
 
 ### S3 Integration Details
 
@@ -280,6 +307,8 @@ No code changes are required when switching between storage options.
 ### Authentication
 
 - `POST /api/auth/login` - Login with username and password
+- `POST /api/auth/forgot-password` - Request password reset email
+- `POST /api/auth/reset-password` - Reset password with token
 
 The system uses JWT tokens for authentication:
 1. Admin users log in via the login form
@@ -443,7 +472,7 @@ A: For basic security, ensure your S3 bucket has the correct CORS and bucket pol
 - Implement JWT verification for file downloads
 
 **Q: How do I change the admin password?**
-A: The default admin password is set in `server/index.js`. Change it there before the first run, or use the admin interface to update it after logging in.
+A: The default admin password is set in `server/index.js`. Change it there before the first run, or use the admin interface to update it after logging in. If you forget your password, you can use the "Forgot Password" feature on the login page (requires SendGrid configuration).
 
 ### Performance Optimization
 
