@@ -9,8 +9,8 @@
  */
 
 const mongoose = require('mongoose');
-const { Card } = require('./models');
-const logger = require('./utils/logger');
+const { Card } = require('../models');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 const scriptLogger = logger.child({ module: 'fix-specific-card' });

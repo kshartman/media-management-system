@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
@@ -11,10 +11,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
   // Keep all props to pass to BaseCard
   const { ...baseProps } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
   const videoId = `video-${props.id}`; // Use the card ID as the unique video ID
-  const [isInView, setIsInView] = useState(false);
-  const [isVideoPreloaded, setIsVideoPreloaded] = useState(false);
   
   // Get video context
   const { playVideo, isPlaying, registerVideoRef } = useVideoPlayer();
@@ -26,50 +23,6 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
     }
   }, [videoId, registerVideoRef]);
 
-  // Intersection observer to detect when card is in view
-  useEffect(() => {
-    const currentCardRef = cardRef.current;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsInView(true);
-          }
-        });
-      },
-      { 
-        threshold: 0.1,
-        rootMargin: '50px' // Start preloading when card is 50px away from view
-      }
-    );
-
-    if (currentCardRef) {
-      observer.observe(currentCardRef);
-    }
-
-    return () => {
-      if (currentCardRef) {
-        observer.unobserve(currentCardRef);
-      }
-    };
-  }, []);
-
-  // Preload video when card comes into view
-  useEffect(() => {
-    if (isInView && !isVideoPreloaded && props.movie) {
-      const preloadVideo = document.createElement('video');
-      preloadVideo.src = getProxiedImageUrl(props.movie);
-      preloadVideo.preload = 'metadata';
-      preloadVideo.muted = true; // Muted preload is more likely to work on mobile
-      
-      preloadVideo.addEventListener('loadedmetadata', () => {
-        setIsVideoPreloaded(true);
-      });
-
-      // Start preloading
-      preloadVideo.load();
-    }
-  }, [isInView, isVideoPreloaded, props.movie]);
 
   const handlePlay = () => {
     playVideo(videoId);
@@ -84,7 +37,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
       instagramCopy={props.instagramCopy} 
       facebookCopy={props.facebookCopy}
     >
-      <div ref={cardRef} className="relative group">
+      <div className="relative group">
         <div 
           className="w-full aspect-[9/16] relative cursor-pointer" 
           onClick={handlePlay}
@@ -129,22 +82,9 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               >
                 {/* Play button styled to match the provided image */}
                 <div className="w-24 h-24 rounded-full bg-gray-800/30 flex items-center justify-center shadow-lg hover:bg-gray-800/50 transition-colors">
-                  {isVideoPreloaded ? (
-                    <div className="w-0 h-0 border-t-[20px] border-t-transparent border-l-[35px] border-l-white border-b-[20px] border-b-transparent ml-2.5"></div>
-                  ) : isInView ? (
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <div className="w-0 h-0 border-t-[20px] border-t-transparent border-l-[35px] border-l-white border-b-[20px] border-b-transparent ml-2.5"></div>
-                  )}
+                  <div className="w-0 h-0 border-t-[20px] border-t-transparent border-l-[35px] border-l-white border-b-[20px] border-b-transparent ml-2.5"></div>
                 </div>
               </div>
-              
-              {/* Preload status indicator */}
-              {isInView && !isVideoPreloaded && (
-                <div className="absolute top-2 left-2 text-xs text-white bg-black/50 px-2 py-1 rounded">
-                  Buffering...
-                </div>
-              )}
               
               {/* Download Icon Overlay */}
               <a
@@ -205,10 +145,12 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 controls
                 autoPlay
                 playsInline
-                preload={isVideoPreloaded ? "auto" : "metadata"}
+                preload="metadata"
                 muted={false}
                 onEnded={() => playVideo("")} // Clear the current playing video when ended
-                onError={(e) => console.error('Video error:', e)}
+                onError={(e) => {
+                  console.error('Video error:', e.type, e.target?.error?.code, e.target?.error?.message);
+                }}
                 aria-label={props.description || "Video content"}
                 className="w-full h-full object-cover"
               >

@@ -14,9 +14,9 @@ const fs = require('fs');
 const path = require('path');
 const { S3Client, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const mongoose = require('mongoose');
-const { Card } = require('./models');
-const { getFilenameFromUrl, isS3Configured } = require('./utils/s3Storage');
-const logger = require('./utils/logger');
+const { Card } = require('../models');
+const { getFilenameFromUrl, isS3Configured } = require('../utils/s3Storage');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 // Create child logger for this script
@@ -93,8 +93,8 @@ function checkLocalFileExists(url) {
   // Handle local paths like /uploads/filename
   const filename = path.basename(url);
   const possiblePaths = [
-    path.join(__dirname, 'uploads', filename),
-    path.join(__dirname, '..', 'uploads', filename)
+    path.join(__dirname, '..', 'uploads', filename),
+    path.join(__dirname, '..', '..', 'uploads', filename)
   ];
   
   for (const filePath of possiblePaths) {

@@ -7,8 +7,8 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
-const { connectToDatabase } = require('./db/connection');
-const { Card, Tag } = require('./models');
+const { connectToDatabase } = require('../db/connection');
+const { Card, Tag } = require('../models');
 
 async function migrateTagsToCollection() {
   try {

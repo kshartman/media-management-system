@@ -11,16 +11,16 @@ const fs = require('fs');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const mongoose = require('mongoose');
-const { Card } = require('./models');
-const { getFileUrl } = require('./utils/s3Storage');
-const logger = require('./utils/logger');
+const { Card } = require('../models');
+const { getFileUrl } = require('../utils/s3Storage');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 // Create child logger for migration
 const migrationLogger = logger.child({ module: 'migration' });
 
 // Configuration
-const LOCAL_UPLOADS_DIR = path.join(__dirname, 'uploads');
+const LOCAL_UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 const S3_FOLDER = 'dams';
 const DRY_RUN = false; // Set to true to simulate without making changes
 

@@ -17,8 +17,8 @@ const fs = require('fs');
 const path = require('path');
 const { S3Client, ListObjectsV2Command, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const mongoose = require('mongoose');
-const { Card } = require('./models');
-const logger = require('./utils/logger');
+const { Card } = require('../models');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 // Create child logger for this script
@@ -178,8 +178,8 @@ async function fixMissingVideoFile() {
     
     // 5. Check local file system
     const localPaths = [
-      path.join(__dirname, 'uploads', filename),
-      path.join(__dirname, '..', 'uploads', filename)
+      path.join(__dirname, '..', 'uploads', filename),
+      path.join(__dirname, '..', '..', 'uploads', filename)
     ];
     
     let foundLocalPath = null;
@@ -218,7 +218,7 @@ async function fixMissingVideoFile() {
       scriptLogger.info(`  S3 destination: dams/${filename}`);
       
       if (!DRY_RUN) {
-        const { uploadLocalFileToS3 } = require('./utils/s3Storage');
+        const { uploadLocalFileToS3 } = require('../utils/s3Storage');
         const s3Url = await uploadLocalFileToS3(foundLocalPath, filename);
         if (s3Url) {
           await Card.findByIdAndUpdate(CARD_ID, { movie: s3Url });

@@ -15,9 +15,9 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
-const { connectToDatabase } = require('./db/connection');
-const { Card } = require('./models');
-const { isS3Configured } = require('./utils/s3Storage');
+const { connectToDatabase } = require('../db/connection');
+const { Card } = require('../models');
+const { isS3Configured } = require('../utils/s3Storage');
 const os = require('os');
 const sharp = require('sharp');
 

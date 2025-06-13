@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
-const { connectToDatabase } = require('./db/connection');
-const { Card } = require('./models');
-const { isS3Configured } = require('./utils/s3Storage');
+const { connectToDatabase } = require('../db/connection');
+const { Card } = require('../models');
+const { isS3Configured } = require('../utils/s3Storage');
 
 // Import image-size properly
 console.log('Importing image-size module...');
@@ -92,7 +92,7 @@ async function extractFileMetadata(filePath, providedDate = null) {
     }
     
     // Handle local files
-    const fullPath = path.join(__dirname, filePath);
+    const fullPath = path.join(__dirname, '..', filePath);
     console.log(`  Processing local file: ${fullPath}`);
 
     // Check if the file exists

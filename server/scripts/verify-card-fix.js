@@ -1,7 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const { connectToDatabase } = require('./db/connection');
-const { Card } = require('./models');
+const { connectToDatabase } = require('../db/connection');
+const { Card } = require('../models');
 
 async function verifyCardFix() {
   try {
