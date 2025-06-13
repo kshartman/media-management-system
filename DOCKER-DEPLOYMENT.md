@@ -6,7 +6,7 @@ This guide explains how to build and deploy the Media Management System using Do
 ## Prerequisites
 - Docker and Docker Compose installed on build machine
 - External MongoDB instance
-- Domain name (e.g., marketing.shopzive.com) with SSL certificates
+- Domain name (e.g., resources.shopzive.com) with SSL certificates
 - Persistent storage location for uploads
 
 ## Building Images
@@ -30,8 +30,8 @@ This guide explains how to build and deploy the Media Management System using Do
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DOMAIN` | Your domain name | marketing.shopzive.com |
-| `NEXT_PUBLIC_API_URL` | Public API URL | https://marketing.shopzive.com/api |
+| `DOMAIN` | Your domain name | resources.shopzive.com |
+| `NEXT_PUBLIC_API_URL` | Public API URL | https://resources.shopzive.com/api |
 | `MONGODB_URI` | MongoDB connection string | mongodb://user:pass@host:port/db |
 | `JWT_SECRET` | Secret for JWT tokens | random-secret-string |
 | `AWS_ACCESS_KEY_ID` | AWS access key for S3 | your-key |
@@ -101,7 +101,7 @@ Example nginx configuration:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name marketing.shopzive.com;
+    server_name resources.shopzive.com;
 
     ssl_certificate /etc/ssl/certs/your-cert.pem;
     ssl_certificate_key /etc/ssl/private/your-key.pem;
@@ -130,7 +130,7 @@ server {
 # Redirect HTTP to HTTPS
 server {
     listen 80;
-    server_name marketing.shopzive.com;
+    server_name resources.shopzive.com;
     return 301 https://$server_name$request_uri;
 }
 ```

@@ -8,7 +8,7 @@ This guide explains how to build and deploy the Media Management System using Do
 
 - Docker installed on build machine
 - Access to a MongoDB instance (external)
-- Domain name configured (e.g., marketing.shopzive.com)
+- Domain name configured (e.g., resources.shopzive.com)
 - SSL certificates for HTTPS
 - Storage location for uploaded files
 
@@ -35,8 +35,8 @@ This guide explains how to build and deploy the Media Management System using Do
 Configure these in your `.env` file:
 
 ### Domain Configuration
-- `DOMAIN`: Your domain name (default: marketing.shopzive.com)
-- `NEXT_PUBLIC_API_URL`: Full URL for API access (e.g., https://marketing.shopzive.com/api)
+- `DOMAIN`: Your domain name (default: resources.shopzive.com)
+- `NEXT_PUBLIC_API_URL`: Full URL for API access (e.g., https://resources.shopzive.com/api)
 - `NEXT_PUBLIC_DOMAIN`: Public domain for frontend
 
 ### Backend Configuration
@@ -86,7 +86,7 @@ docker-compose up -d
    ```nginx
    server {
        listen 443 ssl http2;
-       server_name marketing.shopzive.com;
+       server_name resources.shopzive.com;
 
        ssl_certificate /path/to/cert.pem;
        ssl_certificate_key /path/to/key.pem;

@@ -35,7 +35,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const CORS_ALLOWED_ORIGINS = process.env.CORS_ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:3000',
   'http://localhost:5000',
-  'https://marketing.shopzive.com',
   'https://resources.shopzive.com'
 ];
 

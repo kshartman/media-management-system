@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://marketing.shopzive.com/api}
-        NEXT_PUBLIC_DOMAIN: ${DOMAIN:-marketing.shopzive.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://resources.shopzive.com/api}
+        NEXT_PUBLIC_DOMAIN: ${DOMAIN:-resources.shopzive.com}
     image: media-management-frontend:latest
     container_name: media-frontend
     restart: unless-stopped
@@ -38,7 +38,7 @@ services:
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - S3_BUCKET=${S3_BUCKET}
       - UPLOAD_PATH=/uploads
-      - DOMAIN=${DOMAIN:-marketing.shopzive.com}
+      - DOMAIN=${DOMAIN:-resources.shopzive.com}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
       - FRONTEND_URL=${FRONTEND_URL}
