@@ -55,11 +55,24 @@ Configure these in your `.env` file:
 
 ## Deployment Options
 
-### Option 1: Using Docker Compose (for testing)
+### Option 1: Using Docker Compose (recommended for production)
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+
+The `-d` flag runs containers in detached mode (background). The containers are configured with `restart: unless-stopped` policy for automatic recovery.
+
+### Production Docker Options Explained
+
+When running containers in production, these additional flags are recommended:
+
+- `--restart unless-stopped`: Automatically restart containers if they crash or after server reboot
+- `--memory="2g"`: Limit memory usage (backend needs more for file processing)
+- `--log-driver="json-file"`: Use structured JSON logging
+- `--log-opt max-size="10m"`: Rotate logs when they reach 10MB
+- `--log-opt max-file="3"`: Keep only 3 rotated log files
+- `-d`: Run in detached mode (background)
 
 ### Option 2: Manual Deployment with Nginx
 
@@ -67,9 +80,14 @@ docker-compose up -d
    ```bash
    docker run -d \
      --name media-backend \
+     --restart unless-stopped \
      -p 5001:5001 \
      -v /path/to/uploads:/uploads \
      --env-file .env \
+     --memory="2g" \
+     --log-driver="json-file" \
+     --log-opt max-size="10m" \
+     --log-opt max-file="3" \
      media-management-backend:latest
    ```
 
@@ -77,8 +95,13 @@ docker-compose up -d
    ```bash
    docker run -d \
      --name media-frontend \
+     --restart unless-stopped \
      -p 5000:3000 \
      --env-file .env \
+     --memory="512m" \
+     --log-driver="json-file" \
+     --log-opt max-size="10m" \
+     --log-opt max-file="3" \
      media-management-frontend:latest
    ```
 

@@ -136,9 +136,13 @@ server {
 ```
 
 ### 4. Start Services
+
+For production deployment:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+
+The `-d` flag runs containers in detached mode (background), which is essential for production deployments.
 
 ## Volumes and Persistence
 
@@ -153,9 +157,37 @@ docker-compose up -d
 4. Configure S3 bucket policies correctly
 5. Keep SSL certificates up to date
 
+## Container Management
+
+### Starting and Stopping
+```bash
+# Start services (production)
+docker compose up -d
+
+# Stop services
+docker compose down
+
+# Restart services
+docker compose restart
+
+# View logs
+docker compose logs -f
+
+# View logs for specific service
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+### Restart Policy
+The containers are configured with `restart: unless-stopped` policy, which means:
+- Containers will automatically restart if they crash
+- Containers will restart when Docker daemon starts (after server reboot)
+- Containers will NOT restart if manually stopped with `docker compose down`
+
 ## Troubleshooting
 
-- Check logs: `docker logs container-name`
-- Verify environment variables: `docker exec container-name env`
-- Test connectivity between containers
+- Check logs: `docker compose logs container-name`
+- Verify environment variables: `docker compose exec container-name env`
+- Test connectivity between containers: `docker compose exec backend ping frontend`
 - Ensure MongoDB is accessible from containers
+- Check container status: `docker compose ps`

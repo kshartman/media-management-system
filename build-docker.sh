@@ -32,8 +32,10 @@ echo -e "${GREEN}Images created:${NC}"
 echo "  - media-management-backend:latest"
 echo "  - media-management-frontend:latest"
 
-echo -e "\n${YELLOW}To run locally with docker-compose:${NC}"
-echo "  docker-compose up"
+echo -e "\n${YELLOW}To run locally:${NC}"
+echo "  docker compose up"
+echo -e "\n${YELLOW}For production deployment:${NC}"
+echo "  docker compose up -d"
 
 echo -e "\n${YELLOW}To push to a registry:${NC}"
 echo "  docker tag media-management-backend:latest your-registry/media-management-backend:latest"
