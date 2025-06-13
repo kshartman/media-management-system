@@ -8,7 +8,7 @@ const getLogLevel = () => {
   if (process.env.LOG_LEVEL) {
     return process.env.LOG_LEVEL;
   }
-  return isDevelopment ? 'debug' : 'warn';
+  return isDevelopment ? 'debug' : 'info';
 };
 
 // Define custom colors for log levels

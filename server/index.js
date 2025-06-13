@@ -104,7 +104,7 @@ async function initializeApp() {
     // Seed database with initial data
     await seedDatabase();
     
-    dbLogger.info('Database initialization completed');
+    dbLogger.warn('Database initialization completed');
   } catch (error) {
     dbLogger.error('Failed to initialize database:', error);
     process.exit(1);
@@ -152,7 +152,7 @@ app.use((req, res, next) => {
 });
 
 // Setup routes
-apiLogger.info('Setting up route handlers...');
+apiLogger.warn('Setting up route handlers...');
 
 // Health routes (no prefix needed as they handle both /health and /api/health)
 app.use('/', healthRoutes);
@@ -219,7 +219,7 @@ async function resetAdminPassword() {
 async function performCleanup() {
   try {
     await cleanupOrphanedZipFiles();
-    apiLogger.info('Cleanup completed successfully');
+    apiLogger.warn('Cleanup completed successfully');
   } catch (error) {
     apiLogger.error('Error during cleanup:', error);
   }
@@ -237,11 +237,11 @@ async function startServer() {
     setInterval(performCleanup, 60 * 60 * 1000);
     
     app.listen(PORT, () => {
-      apiLogger.info(`🚀 Server running on port ${PORT}`);
-      apiLogger.info(`📁 Serving static files from: ${path.join(__dirname, 'uploads')}`);
-      apiLogger.info(`🔒 CORS enabled for origins: ${CORS_ALLOWED_ORIGINS.join(', ')}`);
-      apiLogger.info(`📧 Email service: ${isEmailConfigured() ? 'Configured' : 'Not configured'}`);
-      apiLogger.info('✅ Media Management System API is ready');
+      apiLogger.warn(`🚀 Server running on port ${PORT}`);
+      apiLogger.warn(`📁 Serving static files from: ${path.join(__dirname, 'uploads')}`);
+      apiLogger.warn(`🔒 CORS enabled for origins: ${CORS_ALLOWED_ORIGINS.join(', ')}`);
+      apiLogger.warn(`📧 Email service: ${isEmailConfigured() ? 'Configured' : 'Not configured'}`);
+      apiLogger.warn('✅ Media Management System API is ready');
     });
   } catch (error) {
     apiLogger.error('Failed to start server:', error);
@@ -251,12 +251,12 @@ async function startServer() {
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  apiLogger.info('Received SIGINT, shutting down gracefully...');
+  apiLogger.warn('Received SIGINT, shutting down gracefully...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  apiLogger.info('Received SIGTERM, shutting down gracefully...');
+  apiLogger.warn('Received SIGTERM, shutting down gracefully...');
   process.exit(0);
 });
 
