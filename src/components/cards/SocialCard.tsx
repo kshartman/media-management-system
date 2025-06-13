@@ -183,7 +183,7 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
             {props.imageSequence && props.imageSequence.length > 0 && (
               <button
                 onClick={handleExpandClick}
-                className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200"
                 title="View fullscreen"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -201,18 +201,10 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
                 rel="noopener noreferrer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  e.preventDefault(); 
-                  // Create a temporary link and trigger a direct download
-                  const link = document.createElement('a');
-                  link.href = props.transcript as string;
-                  link.download = props.fileMetadata?.transcriptOriginalFileName || 'transcript';
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
                 }}
                 title={`Download ${props.fileMetadata?.transcriptOriginalFileName || 'transcript'}`}
               >
-                <div className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <div className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>

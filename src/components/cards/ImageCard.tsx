@@ -100,16 +100,19 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
             </div>
           )}
           
-          {/* Download Icon Overlay */}
+          {/* Download Icon Overlay - moved to top-right corner */}
           <a
             href={props.download}
             download={props.fileMetadata?.downloadOriginalFileName || undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity duration-200"
+            className="absolute top-2 right-2 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
             title={`Download ${props.fileMetadata?.downloadOriginalFileName || 'image'}`}
           >
-            <div className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>

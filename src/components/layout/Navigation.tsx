@@ -16,6 +16,7 @@ const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
     { href: '/images', label: 'Images', icon: '🖼️' },
     { href: '/posts', label: 'Posts', icon: '📱' },
     { href: '/reels', label: 'Reels', icon: '🎬' },
+    { href: '/help', label: 'Help', icon: '❓' },
   ];
 
   return (

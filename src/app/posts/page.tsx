@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import Image from 'next/image';
 import TagDropdown from '../../components/filters/TagDropdown';
 import SortDropdown, { SortOption } from '../../components/filters/SortDropdown';
 import SearchField from '../../components/filters/SearchField';
@@ -9,13 +8,13 @@ import LoginForm from '../../components/auth/LoginForm';
 import AdminBar from '../../components/admin/AdminBar';
 import CardUploadModal from '../../components/admin/CardUploadModal';
 import CardGrid from '../../components/layout/CardGrid';
-import Navigation from '../../components/layout/Navigation';
+import AppHeader from '../../components/layout/AppHeader';
 import { CardProps, SocialCardProps } from '../../types';
 import { useAuth } from '../../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags, fetchCardById } from '../../lib/api';
 
 export default function PostsPage() {
-  const { isAdmin, logout } = useAuth();
+  const { isAdmin } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -29,7 +28,6 @@ export default function PostsPage() {
   const [loading, setLoading] = useState(true);
   const [lastEditedCardId, setLastEditedCardId] = useState<string | null>(null);
   const [totalCardCount, setTotalCardCount] = useState<number>(0);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Event handler for image drop on social cards
   useEffect(() => {
@@ -298,12 +296,9 @@ export default function PostsPage() {
     }
   }, [selectedTags, currentSort, applyFiltersAndSort]);
 
+
   const handleLoginClick = () => {
-    if (isAdmin) {
-      logout();
-    } else {
-      setShowLoginModal(true);
-    }
+    setShowLoginModal(true);
   };
 
   const handleLoginSuccess = () => {
@@ -481,136 +476,72 @@ export default function PostsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#d9f2fc] border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          {/* Top row with title, logo, and menu */}
-          <div className="flex justify-between items-center relative">
-            <div className="relative">
-              <button
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="flex items-center justify-center w-10 h-10 text-gray-700 hover:text-gray-900 focus:outline-none"
-                aria-label="Menu"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              
-              {showMobileMenu && (
-                <div className="absolute left-0 top-12 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
-                  <button
-                    onClick={() => {
-                      handleLoginClick();
-                      setShowMobileMenu(false);
-                    }}
-                    className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                  >
-                    {isAdmin ? 'Logout' : 'Admin Login'}
-                  </button>
-                  <a
-                    href="https://affiliates.shopzive.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowMobileMenu(false)}
-                  >
-                    Affiliate Portal
-                  </a>
-                  <a
-                    href="https://shopzive.com/pages/zivepro-affiliate-resources"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowMobileMenu(false)}
-                  >
-                    Affiliate Training
-                  </a>
+      <AppHeader 
+        title="Social Post Resources"
+        showControls={true}
+        onLoginClick={handleLoginClick}
+        controlsSlot={
+          <>
+            <div className="flex items-center gap-4">
+              {isAdmin && (
+                <div className="mr-2">
+                  <AdminBar
+                    onCardCreated={handleCardCreated}
+                    availableTags={availableTags}
+                    selectedCardType="social"
+                  />
                 </div>
               )}
-            </div>
-
-            <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
-              <Image
-                src="/zive-logo.png"
-                alt="ZIVE logo"
-                className="h-8 w-auto"
-                width={96}
-                height={32}
-                priority
+              <TagDropdown
+                onFilterChange={handleFilterChange}
+                selectedTags={selectedTags}
+                availableTags={availableTags}
               />
-            </div>
-
-            <h1 className="text-xl font-bold text-gray-900 hidden sm:block">Social Post Resources</h1>
-          </div>
-          
-          {/* Navigation row */}
-          <div className="mt-3 flex justify-center">
-            <Navigation />
-          </div>
-        </div>
-      </header>
-
-      <div className="sticky top-[100px] z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-4">
-            {isAdmin && (
-              <div className="mr-2">
-                <AdminBar
-                  onCardCreated={handleCardCreated}
-                  availableTags={availableTags}
-                  selectedCardType="social"
+              <SortDropdown
+                onSortChange={handleSortChange}
+                currentSort={currentSort}
+              />
+              <div className="ml-auto">
+                <SearchField
+                  onSearch={handleSearch}
+                  initialSearchTerm={searchTerm}
                 />
               </div>
-            )}
-            <TagDropdown
-              onFilterChange={handleFilterChange}
-              selectedTags={selectedTags}
-              availableTags={availableTags}
-            />
-            <SortDropdown
-              onSortChange={handleSortChange}
-              currentSort={currentSort}
-            />
-            <div className="ml-auto">
-              <SearchField
-                onSearch={handleSearch}
-                initialSearchTerm={searchTerm}
-              />
             </div>
-          </div>
 
-          {selectedTags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2 ml-0 items-center">
-              <button
-                onClick={() => handleFilterChange({ tags: [] })}
-                className="flex items-center justify-center text-red-600 hover:text-red-800 mr-1 focus:outline-none"
-                title="Clear all tag filters"
-              >
-                <span className="font-bold text-xl">×</span>
-              </button>
-              <span className="font-semibold text-sm text-gray-700 mr-1">Filter Tags:</span>
-              {selectedTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium"
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2 ml-0 items-center">
+                <button
+                  onClick={() => handleFilterChange({ tags: [] })}
+                  className="flex items-center justify-center text-red-600 hover:text-red-800 mr-1 focus:outline-none"
+                  title="Clear all tag filters"
                 >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newTags = selectedTags.filter(t => t !== tag);
-                      handleFilterChange({ tags: newTags });
-                    }}
-                    className="ml-1.5 text-blue-600 hover:text-blue-800"
+                  <span className="font-bold text-xl">×</span>
+                </button>
+                <span className="font-semibold text-sm text-gray-700 mr-1">Filter Tags:</span>
+                {selectedTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium"
                   >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTags = selectedTags.filter(t => t !== tag);
+                        handleFilterChange({ tags: newTags });
+                      }}
+                      className="ml-1.5 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        }
+      />
 
       <main className="max-w-7xl mx-auto px-4 pt-6">
         {!loading && totalCardCount > 0 && (
