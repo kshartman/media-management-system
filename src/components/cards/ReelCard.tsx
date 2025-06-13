@@ -149,7 +149,8 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 muted={false}
                 onEnded={() => playVideo("")} // Clear the current playing video when ended
                 onError={(e) => {
-                  console.error('Video error:', e.type, e.target?.error?.code, e.target?.error?.message);
+                  const videoElement = e.target as HTMLVideoElement;
+                  console.error('Video error:', e.type, videoElement?.error?.code, videoElement?.error?.message);
                 }}
                 aria-label={props.description || "Video content"}
                 className="w-full h-full object-cover"
