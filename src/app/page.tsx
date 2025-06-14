@@ -586,15 +586,20 @@ export default function Home() {
   };
 
   const handleCardCreated = async () => {
-    // Refetch cards and tags from the API
+    // Refetch cards and tags from the API with current filters to maintain proper sorting
     try {
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(),
+        fetchCards(1, {
+          type: selectedTypes,
+          tags: selectedTags,
+          search: searchTerm
+        }, 100), // Use larger limit to get more cards
         getAllTags()
       ]);
 
       setCards(cardsResponse.cards);
       setAvailableTags(tagsResponse);
+      setTotalCardCount(cardsResponse.totalCount);
 
       // Apply all current filters and sorting
       const filteredAndSorted = applyFiltersAndSort(
@@ -605,6 +610,34 @@ export default function Home() {
         searchTerm
       );
       setFilteredCards(filteredAndSorted);
+
+      // If we don't have all cards, load more
+      if (cardsResponse.cards.length < cardsResponse.totalCount) {
+        setTimeout(async () => {
+          try {
+            const page2Response = await fetchCards(2, {
+              type: selectedTypes,
+              tags: selectedTags,
+              search: searchTerm
+            }, 100);
+            
+            // Combine cards and re-sort
+            const allCards = [...cardsResponse.cards, ...page2Response.cards];
+            setCards(allCards);
+            
+            const newFilteredAndSorted = applyFiltersAndSort(
+              allCards,
+              selectedTypes,
+              selectedTags,
+              currentSort,
+              searchTerm
+            );
+            setFilteredCards(newFilteredAndSorted);
+          } catch (error) {
+            console.error('Error loading additional cards after creation:', error);
+          }
+        }, 100);
+      }
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
