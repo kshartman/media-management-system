@@ -110,33 +110,7 @@ async function convertHtmlToPdf(htmlContent) {
   
   let browser;
   try {
-    // Try to use the environment variable first, then fallback to known paths
-    const possiblePaths = [
-      process.env.PUPPETEER_EXECUTABLE_PATH,
-      '/usr/lib/chromium/chromium',  // Actual chromium binary in Debian
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser',
-      '/usr/bin/google-chrome',
-      '/usr/bin/google-chrome-stable'
-    ].filter(Boolean);
-    
-    let executablePath;
-    for (const path of possiblePaths) {
-      try {
-        if (fs.existsSync(path)) {
-          executablePath = path;
-          zipFiles.info(`Found chromium at: ${path}`);
-          break;
-        }
-      } catch (e) {
-        // Continue to next path
-      }
-    }
-    
-    if (!executablePath) {
-      throw new Error(`Chromium executable not found. Tried paths: ${possiblePaths.join(', ')}`);
-    }
-    
+    // Use Puppeteer's bundled Chromium with Docker-optimized flags
     browser = await puppeteer.launch({
       headless: 'new',
       args: [
@@ -151,10 +125,9 @@ async function convertHtmlToPdf(htmlContent) {
         '--single-process',
         '--no-zygote',
         '--use-gl=swiftshader',
-        '--user-data-dir=/tmp/puppeteer-chrome-profile',
         '--disable-blink-features=AutomationControlled'
-      ],
-      executablePath: executablePath
+      ]
+      // No executablePath - let Puppeteer use its bundled Chromium
     });
     
     const page = await browser.newPage();
