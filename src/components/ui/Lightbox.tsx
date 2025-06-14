@@ -255,7 +255,7 @@ const Lightbox: React.FC<LightboxProps> = ({
                       const url = window.URL.createObjectURL(downloadBlob);
                       const link = document.createElement('a');
                       link.href = url;
-                      link.download = imageMetadata.names[currentIndex] || `image-${currentIndex + 1}`;
+                      link.download = imageMetadata.names?.[currentIndex] || `image-${currentIndex + 1}`;
                       link.style.display = 'none';
                       
                       document.body.appendChild(link);
