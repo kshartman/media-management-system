@@ -553,7 +553,13 @@ const CardFormNew: React.FC<CardFormProps> = ({
   // Handle click outside of the dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (tagInputRef.current && !tagInputRef.current.contains(event.target as Node)) {
+      const dropdown = document.getElementById('tags-dropdown');
+      const targetNode = event.target as Node;
+      
+      // Don't close if clicking on the input or the dropdown itself
+      if (tagInputRef.current && 
+          !tagInputRef.current.contains(targetNode) && 
+          (!dropdown || !dropdown.contains(targetNode))) {
         setIsTagsDropdownOpen(false);
       }
     };
