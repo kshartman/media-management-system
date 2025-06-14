@@ -855,12 +855,12 @@ export default function Home() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto"
           onClick={() => setShowLoginModal(false)}
         >
-          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
           <div 
             className="bg-white rounded-lg shadow-xl absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4" 
             style={{ top: '120px' }}
@@ -883,12 +883,12 @@ export default function Home() {
 
       {/* Forgot Password Modal */}
       {showForgotPasswordModal && (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto"
           onClick={() => setShowForgotPasswordModal(false)}
         >
-          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
           <div 
             className="bg-white rounded-lg shadow-xl absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4" 
             style={{ top: '120px' }}

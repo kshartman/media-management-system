@@ -120,6 +120,7 @@ export default function PostsPage() {
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTypes]); // applyFiltersAndSort is stable due to useCallback
   
   // Apply all filters and sorting

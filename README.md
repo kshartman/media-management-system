@@ -142,6 +142,52 @@ Create an IAM policy with the following JSON to restrict access to just your S3 
 
 Replace `your-bucket-name` with your actual bucket name.
 
+### CORS Configuration (Required for Downloads)
+
+Configure CORS on your S3 bucket to enable browser downloads from the lightbox feature:
+
+1. Go to AWS Console → S3 → your bucket
+2. **Permissions** tab → **Cross-origin resource sharing (CORS)**
+3. Edit and paste this configuration:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": [
+      "Content-Length",
+      "Content-Type",
+      "Content-Disposition",
+      "ETag",
+      "Last-Modified"
+    ],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+**Note**: This CORS configuration is required for the lightbox download feature to work properly. Without it, downloads will open images in the browser instead of downloading them.
+
+### Bucket Policy
+
+Ensure your bucket has this public read policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
+    }
+  ]
+}
+```
+
 ### IAM User Setup
 
 1. Create an IAM user in AWS with programmatic access

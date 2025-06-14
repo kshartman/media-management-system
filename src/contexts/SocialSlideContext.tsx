@@ -33,6 +33,7 @@ export const SocialSlideProvider = ({ children }: { children: ReactNode }) => {
       Object.keys(currentTimers).forEach(key => {
         clearTimeout(currentTimers[key]);
       });
+      timersRef.current = {};
     };
   }, []);
 

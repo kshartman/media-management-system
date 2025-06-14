@@ -252,14 +252,13 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
               }, 100);
             }
           }}
-          tabIndex={-1}
+          tabIndex={0}
         >
           <div 
             className="bg-white rounded-lg p-6 absolute left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 max-h-[80vh] overflow-auto" 
             style={{ top: '120px' }}
             role="document"
             onClick={e => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">

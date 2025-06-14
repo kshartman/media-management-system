@@ -33,7 +33,6 @@ const TagDropdown: React.FC<TagDropdownProps> = ({ onFilterChange, selectedTags,
   };
 
   // This function is used by the parent component directly
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleTagRemove = (tagToRemove: string) => {
     const newTags = selectedTags.filter(tag => tag !== tagToRemove);
     onFilterChange({ tags: newTags });

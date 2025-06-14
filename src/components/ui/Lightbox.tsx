@@ -125,13 +125,12 @@ const Lightbox: React.FC<LightboxProps> = ({
           onClose();
         }
       }}
-      tabIndex={-1}
+      tabIndex={0}
     >
       <div 
         className="w-full h-full max-w-7xl flex flex-col items-center justify-center p-4"
         role="document"
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
-        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button 
@@ -150,23 +149,30 @@ const Lightbox: React.FC<LightboxProps> = ({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <div className="relative w-full h-[70vh] max-w-full max-h-full">
+          <div className="relative flex items-center justify-center w-full h-[80vh]">
             {images.map((src, index) => (
               <div 
                 key={src}
-                className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${
+                className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ease-in-out ${
                   index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
                 }`}
               >
-                <div className="relative w-full h-full">
-                  <Image
-                    src={src}
-                    alt={imageMetadata?.captions?.[index] || `Image ${index + 1} of ${images.length}`}
-                    fill
-                    className="object-contain"
-                    priority
-                  />
-                </div>
+                <Image
+                  src={src}
+                  alt={imageMetadata?.captions?.[index] || `Image ${index + 1} of ${images.length}`}
+                  width={0}
+                  height={0}
+                  sizes="100vw"
+                  style={{ 
+                    width: 'auto', 
+                    height: 'auto',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    objectFit: 'contain'
+                  }}
+                  className="max-w-full max-h-full"
+                  priority={index === currentIndex}
+                />
               </div>
             ))}
           </div>
@@ -230,9 +236,55 @@ const Lightbox: React.FC<LightboxProps> = ({
           </div>
 
           {/* Image name/caption if available */}
-          <div className="text-white text-sm truncate max-w-md">
-            {imageMetadata?.names && imageMetadata.names[currentIndex] ? 
-              imageMetadata.names[currentIndex] : ''}
+          <div className="flex items-center gap-2 text-white text-sm truncate max-w-md">
+            {imageMetadata?.names && imageMetadata.names[currentIndex] && (
+              <>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Fetch the image directly (works after S3 CORS is configured)
+                      const response = await fetch(images[currentIndex]);
+                      
+                      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+                      
+                      const blob = await response.blob();
+                      
+                      // Force download by setting MIME type to octet-stream
+                      const downloadBlob = new Blob([blob], { type: 'application/octet-stream' });
+                      
+                      const url = window.URL.createObjectURL(downloadBlob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = imageMetadata.names[currentIndex] || `image-${currentIndex + 1}`;
+                      link.style.display = 'none';
+                      
+                      document.body.appendChild(link);
+                      link.click();
+                      
+                      // Clean up
+                      setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                      }, 100);
+                      
+                    } catch (error) {
+                      console.error('Download failed:', error);
+                      // Fallback: open in new tab (right-click to save)
+                      window.open(images[currentIndex], '_blank');
+                    }
+                  }}
+                  className="p-1 rounded hover:bg-white hover:bg-opacity-20 transition-colors"
+                  aria-label="Download image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </button>
+                <span className="truncate">
+                  {imageMetadata.names[currentIndex]}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

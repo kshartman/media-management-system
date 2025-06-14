@@ -2,6 +2,7 @@
   "name": "media-management-system",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "next3k": "cp .env.local.next3k .env.local && next dev",
@@ -13,6 +14,7 @@
     "lint:strict": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --max-warnings=0"
   },
   "dependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@tiptap/extension-bold": "^2.12.0",
     "@tiptap/extension-bullet-list": "^2.12.0",
     "@tiptap/extension-color": "^2.12.0",

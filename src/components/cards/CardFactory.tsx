@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ImageCardProps, SocialCardProps, ReelCardProps, BaseCardProps } from '../../types';
 import ImageCard from './ImageCard';
 import SocialCard from './SocialCard';

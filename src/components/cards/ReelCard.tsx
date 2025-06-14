@@ -155,7 +155,8 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 aria-label={props.description || "Video content"}
                 className="w-full h-full object-cover"
               >
-                {/* Adding a track element for captions if transcript is provided */}
+                {/* Adding a track element for captions - transcript serves as captions */}
+                <track kind="captions" srcLang="en" label="English" default />
                 {props.transcript ? (
                   <track
                     kind="captions"

@@ -166,6 +166,53 @@ src/
 - **Backend**: Port 5001
 - **MongoDB**: Configured via environment variables
 
+### AWS S3 Configuration
+
+**CORS Configuration Required for Downloads**
+
+The S3 bucket (`zivepublic`) must have CORS configured to allow browser downloads from the lightbox. This enables the download button to fetch images and force downloads instead of opening in browser.
+
+**Required CORS Configuration:**
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": [
+      "Content-Length",
+      "Content-Type",
+      "Content-Disposition",
+      "ETag",
+      "Last-Modified"
+    ],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+**How to Apply:**
+1. AWS Console → S3 → `zivepublic` bucket
+2. Permissions tab → Cross-origin resource sharing (CORS)
+3. Edit and paste the configuration above
+
+**Existing Bucket Policy** (preserve this):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::zivepublic/*"
+    }
+  ]
+}
+```
+
+**Note**: CORS is required for lightbox downloads but doesn't affect other S3 access patterns.
+
 ## Code Patterns
 
 ### Component Props

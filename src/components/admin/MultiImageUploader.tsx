@@ -384,7 +384,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
               setShowLightbox(false);
             }
           }}
-          tabIndex={-1}
+          tabIndex={0}
         >
           <div className="relative max-w-4xl max-h-[90vh] overflow-auto absolute left-1/2 transform -translate-x-1/2 w-full px-4" style={{ top: '120px' }}>
             <button
@@ -395,11 +395,19 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={lightboxImage} 
               alt="Enlarged view" 
               className="max-w-full max-h-[85vh] object-contain"
               onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on image
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                }
+              }}
+              role="button"
+              tabIndex={0}
             />
           </div>
         </div>
@@ -493,6 +501,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                 onMouseUp={handleSafeMouseUp}
                 aria-label={`View image ${index + 1}`}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   src={url} 
                   alt={`Selected file ${index + 1}`} 
@@ -546,6 +555,7 @@ const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({
                 onMouseDown={(e) => e.currentTarget.setAttribute('dragging', 'true')}
                 onMouseUp={handleSafeMouseUp}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   src={url} 
                   alt={`Existing file ${index + 1}`} 
