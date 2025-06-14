@@ -23,8 +23,13 @@ const zipFiles = logger.child({ component: 'zipFiles' });
 function getOriginalFilename(cardMetadata, fieldName, filePath) {
   const metadataField = `${fieldName}OriginalFileName`;
   
+  zipFiles.debug(`getOriginalFilename called with fieldName: ${fieldName}, filePath: ${filePath}`);
+  zipFiles.debug(`Metadata field: ${metadataField}, value: ${cardMetadata?.[metadataField]}`);
+  zipFiles.debug(`Preview source: ${cardMetadata?.previewSource}`);
+  
   // Use the original filename from metadata if available
   if (cardMetadata && cardMetadata[metadataField]) {
+    zipFiles.debug(`Using metadata filename: ${cardMetadata[metadataField]}`);
     return cardMetadata[metadataField];
   }
   
@@ -32,12 +37,16 @@ function getOriginalFilename(cardMetadata, fieldName, filePath) {
   if (fieldName === 'preview' && cardMetadata?.previewSource === 'auto-generated') {
     // Extract extension from the path
     const extension = path.extname(filePath) || '.jpg'; // Default to jpg if no extension
-    return `Auto-generated from video frame${extension}`;
+    const filename = `Auto-generated from video frame${extension}`;
+    zipFiles.debug(`Using auto-generated preview filename: ${filename}`);
+    return filename;
   }
   
   // Otherwise extract from the path or use a placeholder
   const extension = path.extname(filePath);
-  return `${fieldName}${extension}`;
+  const filename = `${fieldName}${extension}`;
+  zipFiles.debug(`Using default filename: ${filename}`);
+  return filename;
 }
 
 /**
