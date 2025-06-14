@@ -67,6 +67,9 @@ ENV NODE_ENV=production
 # Install dependencies (production only)
 RUN npm ci --only=production
 
+# Verify Puppeteer installation and download Chromium
+RUN npx puppeteer browsers install chrome
+
 # Copy server code
 COPY server/ ./
 
