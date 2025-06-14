@@ -26,7 +26,7 @@ COPY server/package*.json ./
 
 # Configure Puppeteer to use system Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/app/chromium-wrapper.sh
 
 # Set production environment
 ENV NODE_ENV=production
@@ -36,6 +36,9 @@ RUN npm ci --only=production
 
 # Copy server code
 COPY server/ ./
+
+# Make chromium wrapper executable
+RUN chmod +x chromium-wrapper.sh
 
 # Create uploads directory with proper permissions
 RUN mkdir -p /uploads && \
