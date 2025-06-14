@@ -67,6 +67,7 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
               className="object-cover"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               priority
+              draggable={false}
             />
           ) : (
             <>
@@ -80,6 +81,7 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
                     className="object-contain"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     priority
+                    draggable={false}
                   />
                 ) : (
                   <div className="text-xl font-bold text-blue-600">IMAGE</div>
