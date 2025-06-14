@@ -5,12 +5,14 @@ import Image from 'next/image';
 import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useAuth } from '../../lib/authContext';
+import Lightbox from '../ui/Lightbox';
 
 const ImageCard: React.FC<ImageCardProps> = (props) => {
   // Don't destructure preview and download here since we need to pass them to BaseCard
   const { ...baseProps } = props;
   const { isAdmin } = useAuth();
   const [isDragging, setIsDragging] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
   
   // Handle drag events
@@ -49,15 +51,55 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
     document.dispatchEvent(event);
   };
 
+  // Handle image click to open lightbox
+  const handleImageClick = (e: React.MouseEvent) => {
+    // Don't open lightbox if clicking on admin drag/drop area
+    if (isAdmin && isDragging) return;
+    
+    e.stopPropagation();
+    const imageUrl = props.preview || props.download;
+    if (imageUrl) {
+      setLightboxOpen(true);
+    }
+  };
+
+  // Get the image URL for lightbox
+  const getImageUrl = () => {
+    return props.preview || props.download;
+  };
+
   return (
     <BaseCard {...baseProps} preview={props.preview} download={props.download}>
+      {/* Lightbox Component */}
+      {getImageUrl() && (
+        <Lightbox
+          images={[getImageUrl()!]}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          initialIndex={0}
+          imageMetadata={{
+            names: [props.fileMetadata?.downloadOriginalFileName || 'Image'],
+            captions: [props.description || '']
+          }}
+        />
+      )}
       <div className="relative group">
         <div 
           ref={imageRef}
-          className={`w-full h-56 relative ${isAdmin ? 'cursor-pointer' : ''} ${isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+          className={`w-full h-56 relative cursor-pointer ${isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClick={handleImageClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const mouseEvent = e as unknown as React.MouseEvent;
+              handleImageClick(mouseEvent);
+            }
+          }}
+          aria-label="View image in lightbox"
         >
           {props.preview ? (
             <Image 
