@@ -95,7 +95,7 @@ const Lightbox: React.FC<LightboxProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'auto';
     };
-  }, [isOpen, currentIndex, isPlaying, imagesCount, goToNext, goToPrevious, onClose, togglePlay]);
+  }, [isOpen, currentIndex, isPlaying, imagesCount, goToNext, goToPrevious, onClose, togglePlay, onNavigateCard, canNavigateCard]);
 
   // Handle auto-play functionality
   useEffect(() => {

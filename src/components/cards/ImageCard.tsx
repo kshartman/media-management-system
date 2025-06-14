@@ -63,10 +63,6 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
     }
   };
 
-  // Get the image URL for lightbox
-  const getImageUrl = () => {
-    return props.preview || props.download;
-  };
 
   return (
     <BaseCard {...baseProps} preview={props.preview} download={props.download}>

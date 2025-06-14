@@ -114,6 +114,9 @@ async function initializeApp() {
 // Create Express app
 const app = express();
 
+// Trust proxy for proper HTTPS detection behind reverse proxy
+app.set('trust proxy', 1);
+
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {

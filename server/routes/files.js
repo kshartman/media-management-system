@@ -12,7 +12,9 @@ const s3Logger = logger.child({ component: 's3-files' });
 
 // Helper function to get base URL
 const getBaseUrl = (req) => {
-  return `${req.protocol}://${req.get('host')}`;
+  // Force HTTPS in production environment
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+  return `${protocol}://${req.get('host')}`;
 };
 
 // Route to download all card files as a ZIP
