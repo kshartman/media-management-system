@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { CardProps } from '../../types';
 import CardFactory from '../cards/CardFactory';
+import { CardGridProvider } from '../../contexts/CardGridContext';
+import { useLightbox } from '../../contexts/LightboxContext';
 
 // Type mapping for section titles
 const TYPE_LABELS = {
@@ -32,6 +34,7 @@ const CardGrid: React.FC<CardGridProps> = ({
   selectedTypes = [],
   lastEditedCardId = null
 }) => {
+  const { openLightbox } = useLightbox();
   // Create a ref map to keep track of each card's DOM element
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [cards, setCards] = useState<CardProps[]>(initialCards);
@@ -215,28 +218,33 @@ const CardGrid: React.FC<CardGridProps> = ({
   };
 
   return (
-    <div>
-      {renderGroupedCards()}
-      
-      {loading && (
-        <div className="flex justify-center p-4 mt-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      )}
-      
-      {!loading && !hasMore && cards.length > 0 && (
-        <div className="text-center text-gray-500 mt-8 mb-4 text-sm">
-          All cards loaded
-        </div>
-      )}
-      
-      {!loading && cards.length === 0 && (
-        <div className="text-center text-gray-500 mt-8 p-8">
-          <p className="text-lg">No cards found matching your filters.</p>
-          <p className="text-sm mt-2">Try changing your filter settings or search criteria.</p>
-        </div>
-      )}
-    </div>
+    <CardGridProvider 
+      cards={cards} 
+      onOpenLightbox={(allCards, cardId, imageIndex) => openLightbox(allCards, cardId, imageIndex)}
+    >
+      <div>
+        {renderGroupedCards()}
+        
+        {loading && (
+          <div className="flex justify-center p-4 mt-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        )}
+        
+        {!loading && !hasMore && cards.length > 0 && (
+          <div className="text-center text-gray-500 mt-8 mb-4 text-sm">
+            All cards loaded
+          </div>
+        )}
+        
+        {!loading && cards.length === 0 && (
+          <div className="text-center text-gray-500 mt-8 p-8">
+            <p className="text-lg">No cards found matching your filters.</p>
+            <p className="text-sm mt-2">Try changing your filter settings or search criteria.</p>
+          </div>
+        )}
+      </div>
+    </CardGridProvider>
   );
 };
 

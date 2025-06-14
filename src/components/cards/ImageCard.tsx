@@ -5,14 +5,14 @@ import Image from 'next/image';
 import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useAuth } from '../../lib/authContext';
-import Lightbox from '../ui/Lightbox';
+import { useCardGrid } from '../../contexts/CardGridContext';
 
 const ImageCard: React.FC<ImageCardProps> = (props) => {
   // Don't destructure preview and download here since we need to pass them to BaseCard
   const { ...baseProps } = props;
   const { isAdmin } = useAuth();
+  const { openLightbox } = useCardGrid();
   const [isDragging, setIsDragging] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
   
   // Handle drag events
@@ -59,7 +59,7 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
     e.stopPropagation();
     const imageUrl = props.preview || props.download;
     if (imageUrl) {
-      setLightboxOpen(true);
+      openLightbox(props.id, 0);
     }
   };
 
@@ -70,19 +70,6 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
 
   return (
     <BaseCard {...baseProps} preview={props.preview} download={props.download}>
-      {/* Lightbox Component */}
-      {getImageUrl() && (
-        <Lightbox
-          images={[getImageUrl()!]}
-          isOpen={lightboxOpen}
-          onClose={() => setLightboxOpen(false)}
-          initialIndex={0}
-          imageMetadata={{
-            names: [props.fileMetadata?.downloadOriginalFileName || 'Image'],
-            captions: [props.description || '']
-          }}
-        />
-      )}
       <div className="relative group">
         <div 
           ref={imageRef}

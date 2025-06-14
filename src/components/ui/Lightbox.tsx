@@ -14,6 +14,16 @@ interface LightboxProps {
     names?: string[];
     captions?: string[];
   };
+  onNavigateCard?: (direction: 'next' | 'prev') => void;
+  canNavigateCard?: {
+    prev: boolean;
+    next: boolean;
+  };
+  cardInfo?: {
+    current: number;
+    total: number;
+    type: string;
+  };
 }
 
 const Lightbox: React.FC<LightboxProps> = ({
@@ -23,7 +33,10 @@ const Lightbox: React.FC<LightboxProps> = ({
   initialIndex = 0,
   autoPlay = false,
   interval = 5000,
-  imageMetadata
+  imageMetadata,
+  onNavigateCard,
+  canNavigateCard,
+  cardInfo
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
@@ -50,9 +63,21 @@ const Lightbox: React.FC<LightboxProps> = ({
       if (event.key === 'Escape') {
         onClose();
       } else if (event.key === 'ArrowLeft') {
-        goToPrevious();
+        if (event.shiftKey && onNavigateCard && canNavigateCard?.prev) {
+          // Shift + Left Arrow = Previous card
+          onNavigateCard('prev');
+        } else {
+          // Left Arrow = Previous image
+          goToPrevious();
+        }
       } else if (event.key === 'ArrowRight') {
-        goToNext();
+        if (event.shiftKey && onNavigateCard && canNavigateCard?.next) {
+          // Shift + Right Arrow = Next card
+          onNavigateCard('next');
+        } else {
+          // Right Arrow = Next image
+          goToNext();
+        }
       } else if (event.key === ' ') {
         // Space bar toggles play/pause
         event.preventDefault();
@@ -209,34 +234,75 @@ const Lightbox: React.FC<LightboxProps> = ({
         </div>
 
         {/* Controls footer */}
-        <div className="w-full bg-black bg-opacity-60 mt-auto py-4 px-6 flex items-center justify-between z-20">
-          {/* Play/pause button */}
-          {images.length > 1 && (
-            <button 
-              className="text-white p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70"
-              onClick={togglePlay}
-              aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
-            >
-              {isPlaying ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-            </button>
-          )}
+        <div className="w-full bg-black bg-opacity-60 mt-auto py-4 px-6 relative z-20">
+          {/* Left controls */}
+          <div className="absolute left-6 top-1/2 -translate-y-1/2 flex items-center gap-3">
+            {/* Play/pause button */}
+            {images.length > 1 && (
+              <button 
+                className="text-white p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70"
+                onClick={togglePlay}
+                aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
+              >
+                {isPlaying ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </button>
+            )}
 
-          {/* Counter */}
-          <div className="text-white text-sm">
-            {currentIndex + 1} / {images.length}
+            {/* Card navigation buttons - only for image cards */}
+            {onNavigateCard && canNavigateCard && cardInfo?.type === 'image' && (
+              <>
+                <button
+                  className={`text-white p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 ${!canNavigateCard.prev ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => canNavigateCard.prev && onNavigateCard('prev')}
+                  disabled={!canNavigateCard.prev}
+                  aria-label="Previous card (Shift + Left Arrow)"
+                  title="Previous card (Shift + Left Arrow)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  className={`text-white p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 ${!canNavigateCard.next ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => canNavigateCard.next && onNavigateCard('next')}
+                  disabled={!canNavigateCard.next}
+                  aria-label="Next card (Shift + Right Arrow)"
+                  title="Next card (Shift + Right Arrow)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Image name/caption if available */}
-          <div className="flex items-center gap-2 text-white text-sm truncate max-w-md">
+          {/* Center - Counter and card info - always centered */}
+          <div className="flex flex-col items-center text-white text-sm">
+            {/* Only show image counter for multiple images (social cards) */}
+            {images.length > 1 && (
+              <div>
+                {currentIndex + 1} / {images.length}
+              </div>
+            )}
+            {cardInfo && (
+              <div className={`text-xs text-gray-300 ${images.length > 1 ? 'mt-1' : ''}`}>
+                {cardInfo.type} {cardInfo.current} of {cardInfo.total}
+              </div>
+            )}
+          </div>
+
+          {/* Right side - Image name/caption if available */}
+          <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 text-white text-sm truncate max-w-md">
             {imageMetadata?.names && imageMetadata.names[currentIndex] && (
               <>
                 <button
