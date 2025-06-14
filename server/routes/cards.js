@@ -30,7 +30,7 @@ const {
   deleteFile,
   isS3Configured
 } = require('../utils/s3Storage');
-const processImageSequence = require('../processImageSequence');
+const { processImageSequence } = require('../processImageSequence');
 const logger = require('../utils/logger');
 
 const cardLogger = logger.child({ component: 'cards' });
@@ -236,14 +236,15 @@ router.post('/', authMiddleware, handleCardUpload, async (req, res) => {
       
       // Process the image sequence
       try {
-        const { imageSequencePaths, totalSequenceSize, fileSizes } = await processImageSequence(imageSequenceFiles);
-        cardData.imageSequence = imageSequencePaths;
+        const result = await processImageSequence(req, req.files, cardData.fileMetadata.date, extractFileMetadata);
+        const { imageSequence, imageSequenceOriginalFileNames, imageSequenceFileSizes, totalSequenceSize, imageSequenceCount } = result;
+        cardData.imageSequence = imageSequence;
         cardData.fileMetadata.totalSequenceSize = totalSequenceSize;
-        cardData.fileMetadata.imageSequenceCount = imageSequencePaths.length;
-        cardData.fileMetadata.imageSequenceFileSizes = fileSizes;
+        cardData.fileMetadata.imageSequenceCount = imageSequenceCount;
+        cardData.fileMetadata.imageSequenceFileSizes = imageSequenceFileSizes;
         
         // Store original filenames
-        cardData.fileMetadata.imageSequenceOriginalFileNames = imageSequenceFiles.map(f => f.originalname);
+        cardData.fileMetadata.imageSequenceOriginalFileNames = imageSequenceOriginalFileNames;
         
         // Use first image metadata if no preview
         if (!cardData.preview && imageSequenceFiles.length > 0) {
@@ -508,12 +509,13 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
         
         // Process new image sequence
         try {
-          const { imageSequencePaths, totalSequenceSize, fileSizes } = await processImageSequence(imageSequenceFiles);
-          updateData.imageSequence = imageSequencePaths;
+          const result = await processImageSequence(req, req.files, updateData.fileMetadata.date, extractFileMetadata, existingCard);
+          const { imageSequence, imageSequenceOriginalFileNames, imageSequenceFileSizes, totalSequenceSize, imageSequenceCount } = result;
+          updateData.imageSequence = imageSequence;
           updateData.fileMetadata.totalSequenceSize = totalSequenceSize;
-          updateData.fileMetadata.imageSequenceCount = imageSequencePaths.length;
-          updateData.fileMetadata.imageSequenceFileSizes = fileSizes;
-          updateData.fileMetadata.imageSequenceOriginalFileNames = imageSequenceFiles.map(f => f.originalname);
+          updateData.fileMetadata.imageSequenceCount = imageSequenceCount;
+          updateData.fileMetadata.imageSequenceFileSizes = imageSequenceFileSizes;
+          updateData.fileMetadata.imageSequenceOriginalFileNames = imageSequenceOriginalFileNames;
         } catch (error) {
           fileLogger.error('Error processing updated image sequence:', error);
           return res.status(500).json({ error: 'Failed to process image sequence' });
