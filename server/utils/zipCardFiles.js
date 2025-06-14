@@ -25,7 +25,18 @@ function getOriginalFilename(cardMetadata, fieldName, filePath) {
   
   // Use the original filename from metadata if available
   if (cardMetadata && cardMetadata[metadataField]) {
-    return cardMetadata[metadataField];
+    const metadataFilename = cardMetadata[metadataField];
+    
+    // Special case: if it's an auto-generated preview without extension, add one
+    if (fieldName === 'preview' && 
+        cardMetadata.previewSource === 'auto-generated' && 
+        metadataFilename === 'Auto-generated from video frame' &&
+        !path.extname(metadataFilename)) {
+      const extension = path.extname(filePath) || '.jpg';
+      return `${metadataFilename}${extension}`;
+    }
+    
+    return metadataFilename;
   }
   
   // Special handling for preview files
