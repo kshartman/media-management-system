@@ -101,14 +101,20 @@ export const fetchCards = async (
   
 
   // Map MongoDB _id to id for client-side compatibility
-  const mappedCards = response.cards.map((card: any) => {
+  interface RawCard {
+    _id?: string;
+    id?: string;
+    [key: string]: unknown; // For other properties
+  }
+  
+  const mappedCards = response.cards.map((card: RawCard) => {
     if ('_id' in card && !('id' in card)) {
       return {
         ...card,
         id: card._id,
-      } as CardProps;
+      } as unknown as CardProps;
     }
-    return card as CardProps;
+    return card as unknown as CardProps;
   });
 
   return {

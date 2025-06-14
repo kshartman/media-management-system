@@ -120,7 +120,7 @@ export default function PostsPage() {
     };
 
     loadData();
-  }, [selectedTypes]);
+  }, [selectedTypes]); // applyFiltersAndSort is stable due to useCallback
   
   // Apply all filters and sorting
   const applyFiltersAndSort = useCallback((

@@ -24,8 +24,9 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onBackToLogin }
       const response = await forgotPassword(email);
       setMessage(response.message);
       setSubmitted(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to send password reset email');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send password reset email';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -80,7 +81,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onBackToLogin }
             )}
             
             <p className="text-gray-600 text-sm">
-              Enter your email address and we'll send you a link to reset your password.
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
             
             <div>

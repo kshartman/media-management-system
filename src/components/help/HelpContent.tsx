@@ -218,7 +218,7 @@ export default function HelpContent() {
               </span>
               button
             </li>
-            <li>Click "Add New User"</li>
+            <li>Click &quot;Add New User&quot;</li>
             <li>Enter username and email</li>
             <li>Set initial password</li>
             <li>Choose role (User or Admin)</li>
