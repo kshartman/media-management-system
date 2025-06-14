@@ -99,6 +99,27 @@ async function convertHtmlToPdf(htmlContent) {
   
   let browser;
   try {
+    // Try to use the environment variable first, then fallback to known paths
+    const possiblePaths = [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable'
+    ].filter(Boolean);
+    
+    let executablePath;
+    for (const path of possiblePaths) {
+      try {
+        if (fs.existsSync(path)) {
+          executablePath = path;
+          break;
+        }
+      } catch (e) {
+        // Continue to next path
+      }
+    }
+    
     browser = await puppeteer.launch({
       headless: 'new',
       args: [
@@ -108,10 +129,15 @@ async function convertHtmlToPdf(htmlContent) {
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
         '--disable-gpu',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gl-drawing-for-tests',
         '--single-process',
-        '--no-zygote'
+        '--no-zygote',
+        '--use-gl=swiftshader',
+        '--user-data-dir=/tmp/puppeteer-chrome-profile',
+        '--disable-blink-features=AutomationControlled'
       ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+      executablePath: executablePath
     });
     
     const page = await browser.newPage();
@@ -183,9 +209,8 @@ async function addHtmlContentToZip(zip, html, baseName) {
     zip.file(`${baseName}.txt`, textContent);
     zipFiles.info(`✓ Added ${baseName}.txt to ZIP`);
     
-    // Convert to PDF
+    // Convert to PDF - but don't let it fail the whole process
     try {
-      zipFiles.debug(`Attempting to create PDF for ${baseName}...`);
       const pdfBuffer = await convertHtmlToPdf(html);
       if (pdfBuffer && pdfBuffer.length > 0) {
         zip.file(`${baseName}.pdf`, pdfBuffer);
@@ -194,11 +219,11 @@ async function addHtmlContentToZip(zip, html, baseName) {
         zipFiles.warn(`PDF buffer empty for ${baseName}`);
       }
     } catch (pdfError) {
-      zipFiles.error(`✗ Error creating PDF for ${baseName}:`, pdfError);
-      // Continue without PDF
+      zipFiles.warn(`PDF generation failed for ${baseName}, continuing with text file only`);
+      // Add a fallback message in the text file
+      const fallbackContent = textContent + '\n\n---\nNote: PDF version could not be generated due to technical limitations.';
+      zip.file(`${baseName}_with_note.txt`, fallbackContent);
     }
-    
-    zipFiles.debug(`Completed processing ${baseName} content in text and PDF formats`);
   } catch (error) {
     zipFiles.error(`✗ Error adding HTML content to ZIP: ${baseName}`, error);
     // Continue with other files
