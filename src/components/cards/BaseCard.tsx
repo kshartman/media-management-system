@@ -365,14 +365,14 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
         
         {/* Tags and Description Section */}
         <div className="px-4 pt-3">
-          {/* Tags - Always take up space for 2 rows */}
-          <div className="h-12 mb-2 overflow-hidden">
-            <div className={`tags-container flex flex-wrap gap-1 ${isTagsExpanded ? '' : 'h-12 overflow-hidden'}`}>
+          {/* Tags - Always reserve space for 2 rows (48px) */}
+          <div className="mb-2" style={{ minHeight: '48px' }}>
+            <div className={`tags-container flex flex-wrap gap-1 ${isTagsExpanded ? '' : 'overflow-hidden'}`} style={{ maxHeight: isTagsExpanded ? 'none' : '48px' }}>
               {tags && tags.length > 0 ? (
                 tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                    className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full h-6"
                   >
                     {tag}
                   </span>
