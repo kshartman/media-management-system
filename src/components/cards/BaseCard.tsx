@@ -33,6 +33,8 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   const [localInstagramCopy, setLocalInstagramCopy] = useState<string | undefined>(instagramCopy);
   const [localFacebookCopy, setLocalFacebookCopy] = useState<string | undefined>(facebookCopy);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isTagsExpanded, setIsTagsExpanded] = useState(false);
+  const [showMoreVisible, setShowMoreVisible] = useState(false);
 
   // Function to fetch a file and return it as an ArrayBuffer
   const _fetchFileAsArrayBuffer = async (url: string): Promise<{ data: ArrayBuffer, filename: string }> => {
@@ -168,6 +170,33 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
     }
   }, [updatedCard]);
 
+  // Effect to check if tags overflow beyond 2 rows
+  useEffect(() => {
+    // Check if tags would overflow beyond 2 rows
+    const checkTagsOverflow = () => {
+      const tagsContainer = document.querySelector(`[data-card-id="${id}"] .tags-container`);
+      if (tagsContainer) {
+        const tempContainer = tagsContainer.cloneNode(true) as HTMLElement;
+        tempContainer.style.height = 'auto';
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.visibility = 'hidden';
+        tempContainer.style.width = tagsContainer.clientWidth + 'px';
+        document.body.appendChild(tempContainer);
+        
+        const actualHeight = tempContainer.scrollHeight;
+        const twoRowHeight = 48; // h-12 = 48px
+        
+        setShowMoreVisible(actualHeight > twoRowHeight);
+        document.body.removeChild(tempContainer);
+      }
+    };
+
+    if (tags && tags.length > 0) {
+      // Small delay to ensure DOM is rendered
+      setTimeout(checkTagsOverflow, 100);
+    }
+  }, [tags, id]);
+
   // Body scroll locking effect for social copy modal
   useEffect(() => {
     if (!showSocialCopyModal) return;
@@ -200,7 +229,7 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   }, [showSocialCopyModal]);
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full">
+    <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full" data-card-id={id}>
       {/* Social Copy Viewer Modal */}
       {showSocialCopyModal && activeSocialCopy && (
         <div 
@@ -334,43 +363,46 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
       <div className="flex-1 flex flex-col">
         {children}
         
-        {/* Tags - positioned right after image content */}
+        {/* Tags and Description Section */}
         <div className="px-4 pt-3">
-          <div className="h-6 mb-2 flex flex-wrap gap-1">
-            {tags && tags.length > 0 ? (
-              tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-                >
-                  {tag}
-                </span>
-              ))
-            ) : (
-              // Empty space to maintain consistent layout
-              <div className="h-6"></div>
-            )}
+          {/* Tags - Always take up space for 2 rows */}
+          <div className="h-12 mb-2 overflow-hidden">
+            <div className={`tags-container flex flex-wrap gap-1 ${isTagsExpanded ? '' : 'h-12 overflow-hidden'}`}>
+              {tags && tags.length > 0 ? (
+                tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    {tag}
+                  </span>
+                ))
+              ) : null}
+            </div>
           </div>
-        </div>
 
-        {/* Description - positioned right after tags */}
-        <div className="px-4">
-          {description && (
-            <div className="mb-3">
+          {/* Description - Always show 2 lines */}
+          <div className="mb-3">
+            {description && (
               <p className={`text-sm text-gray-700 break-words ${
                 isDescriptionExpanded ? '' : 'line-clamp-2'
               }`}>
                 {description}
               </p>
-              {description.length > 70 && (
-                <button
-                  onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                  className="text-blue-600 hover:text-blue-800 text-xs font-medium mt-1 transition-colors"
-                >
-                  {isDescriptionExpanded ? 'Show less' : 'Show more'}
-                </button>
-              )}
-            </div>
+            )}
+          </div>
+
+          {/* Show More Button - Only show if tags overflow 2 rows OR description is long */}
+          {(showMoreVisible || (description && description.length > 100)) && (
+            <button
+              onClick={() => {
+                setIsDescriptionExpanded(!isDescriptionExpanded);
+                setIsTagsExpanded(!isTagsExpanded);
+              }}
+              className="text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors"
+            >
+              {isDescriptionExpanded ? 'Show less' : 'Show more'}
+            </button>
           )}
         </div>
 
