@@ -19,6 +19,7 @@ const healthRoutes = require('./routes/health');
 const fileRoutes = require('./routes/files');
 const tagRoutes = require('./routes/tags');
 const userRoutes = require('./routes/users');
+const debugRoutes = require('./routes/debug');
 
 // Create child loggers for different components
 const dbLogger = logger.child({ component: 'database' });
@@ -176,6 +177,9 @@ app.use('/api/tags', tagRoutes);
 
 // User routes
 app.use('/api/users', userRoutes);
+
+// Debug routes
+app.use('/api/debug', debugRoutes);
 
 // Fallback route for undefined endpoints
 app.use('*', (req, res) => {

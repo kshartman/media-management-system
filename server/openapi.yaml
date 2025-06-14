@@ -86,6 +86,72 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReadinessResponse'
 
+  # Debug Endpoints
+  /api/debug/loglevel:
+    get:
+      tags:
+        - Debug
+      summary: Get current log level
+      description: |
+        Returns the current log level setting. 
+        
+        **Note:** This endpoint is restricted to internal networks only via nginx configuration.
+      responses:
+        '200':
+          description: Current log level retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogLevelResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Debug
+      summary: Set log level dynamically
+      description: |
+        Dynamically change the log level without restarting the container.
+        Valid levels are: error, warn, info, debug.
+        
+        **Note:** This endpoint is restricted to internal networks only via nginx configuration.
+        
+        **Example usage:**
+        ```bash
+        curl -X POST https://resources.shopzive.com/api/debug/loglevel \
+          -H "Content-Type: application/json" \
+          -d '{"logLevel": "debug"}'
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetLogLevelRequest'
+      responses:
+        '200':
+          description: Log level changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetLogLevelResponse'
+        '400':
+          description: Invalid log level provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # Authentication Endpoints
   /api/auth/login:
     post:
@@ -887,6 +953,58 @@ components:
           type: string
           nullable: true
 
+    # Debug Schemas
+    LogLevelResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        logLevel:
+          type: string
+          enum: [error, warn, info, debug]
+          description: Current log level
+          example: "warn"
+        validLevels:
+          type: array
+          items:
+            type: string
+            enum: [error, warn, info, debug]
+          description: All valid log levels
+          example: ["error", "warn", "info", "debug"]
+
+    SetLogLevelRequest:
+      type: object
+      required:
+        - logLevel
+      properties:
+        logLevel:
+          type: string
+          enum: [error, warn, info, debug]
+          description: New log level to set
+          example: "debug"
+
+    SetLogLevelResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        previousLevel:
+          type: string
+          enum: [error, warn, info, debug]
+          description: Previous log level
+          example: "warn"
+        newLevel:
+          type: string
+          enum: [error, warn, info, debug]
+          description: New log level
+          example: "debug"
+        message:
+          type: string
+          description: Success message
+          example: "Log level successfully changed to 'debug'"
+
     # Authentication Schemas
     LoginRequest:
       type: object
@@ -1296,6 +1414,8 @@ components:
 tags:
   - name: Health
     description: Health check and monitoring endpoints
+  - name: Debug
+    description: Debug and diagnostics endpoints (restricted to internal networks)
   - name: Authentication
     description: User authentication and password management
   - name: Cards
