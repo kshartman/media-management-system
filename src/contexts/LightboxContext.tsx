@@ -48,17 +48,17 @@ export const LightboxProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Get images from current card
-  const getCurrentImages = () => {
+  const getCurrentImages = (): string[] => {
     if (!allCards[currentCardIndex]) return [];
     
     const card = allCards[currentCardIndex];
     switch (card.type) {
       case 'image':
-        return [card.preview || card.download].filter(Boolean);
+        return [card.preview || card.download].filter((url): url is string => Boolean(url));
       case 'social':
         return card.imageSequence || [];
       case 'reel':
-        return [card.preview].filter(Boolean);
+        return [card.preview].filter((url): url is string => Boolean(url));
       default:
         return [];
     }
