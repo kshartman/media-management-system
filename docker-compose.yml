@@ -45,7 +45,7 @@ services:
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - S3_BUCKET=${S3_BUCKET}
       - USE_S3_STORAGE=${USE_S3_STORAGE}
-      - S3_CUSTOM_DOMAIN=${S3_CUSTOM_DOMAIN}
+      - S3_CUSTOM_DOMAIN=${S3_CUSTOM_DOMAIN:-}
       - UPLOAD_PATH=/uploads
       - DOMAIN=${DOMAIN:-resources.shopzive.com}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
