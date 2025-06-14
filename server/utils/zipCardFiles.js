@@ -28,6 +28,13 @@ function getOriginalFilename(cardMetadata, fieldName, filePath) {
     return cardMetadata[metadataField];
   }
   
+  // Special handling for preview files
+  if (fieldName === 'preview' && cardMetadata?.previewSource === 'auto-generated') {
+    // Extract extension from the path
+    const extension = path.extname(filePath) || '.jpg'; // Default to jpg if no extension
+    return `Auto-generated from video frame${extension}`;
+  }
+  
   // Otherwise extract from the path or use a placeholder
   const extension = path.extname(filePath);
   return `${fieldName}${extension}`;
