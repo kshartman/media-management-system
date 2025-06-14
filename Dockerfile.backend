@@ -67,21 +67,21 @@ ENV NODE_ENV=production
 # Install dependencies (production only)
 RUN npm ci --only=production
 
-# Verify Puppeteer installation and download Chromium
-RUN npx puppeteer browsers install chrome
-
 # Copy server code
 COPY server/ ./
 
-# Create uploads directory with proper permissions
+# Create uploads directory and user with proper permissions
 RUN mkdir -p /uploads && \
     groupadd -g 1001 nodejs && \
     useradd -r -u 1001 -g nodejs backend && \
+    mkdir -p /home/backend/.cache && \
     chown -R backend:nodejs /uploads && \
-    chown -R backend:nodejs /app
+    chown -R backend:nodejs /app && \
+    chown -R backend:nodejs /home/backend
 
-# Switch to non-root user
+# Switch to backend user and install Chrome for Puppeteer
 USER backend
+RUN npx puppeteer browsers install chrome
 
 EXPOSE 5001
 
