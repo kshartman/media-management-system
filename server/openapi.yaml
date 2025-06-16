@@ -1451,6 +1451,12 @@ components:
         updatedAt:
           type: string
           format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Timestamp of the user's last successful login"
+          example: "2024-01-15T14:30:00.000Z"
 
     CreateUserRequest:
       type: object

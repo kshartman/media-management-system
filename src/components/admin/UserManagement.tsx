@@ -233,6 +233,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
                           Role
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Last Login
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -252,6 +255,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
                             }`}>
                               {user.role}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {user.lastLoginAt ? (
+                              <div>
+                                <div>{new Date(user.lastLoginAt).toLocaleDateString()}</div>
+                                <div className="text-xs text-gray-400">
+                                  {new Date(user.lastLoginAt).toLocaleTimeString()}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic">Never</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <button 
@@ -280,7 +295,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
                       ))}
                       {users.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                          <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                             No users found
                           </td>
                         </tr>

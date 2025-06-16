@@ -275,6 +275,7 @@ export interface User {
   role: 'admin' | 'user';
   createdAt?: string;
   updatedAt?: string;
+  lastLoginAt?: string;
 }
 
 export interface UserCreateInput {
