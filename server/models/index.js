@@ -128,6 +128,9 @@ const userSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Add case-insensitive index for username to ensure uniqueness regardless of case
+userSchema.index({ username: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
+
 // Initialize models
 const models = {};
 

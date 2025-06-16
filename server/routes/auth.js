@@ -79,7 +79,14 @@ async function verifyPassword(storedPassword, suppliedPassword) {
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    
+    // Allow login with either username or email (both case-insensitive)
+    const user = await User.findOne({
+      $or: [
+        { username: username },
+        { email: username.toLowerCase() }
+      ]
+    }).collation({ locale: 'en', strength: 2 });
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });

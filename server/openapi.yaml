@@ -158,7 +158,7 @@ paths:
       tags:
         - Authentication
       summary: User login
-      description: Authenticate user with username/password and receive JWT token
+      description: Authenticate user with username or email and password, receive JWT token
       requestBody:
         required: true
         content:
@@ -1116,6 +1116,7 @@ components:
       properties:
         username:
           type: string
+          description: "Username or email address"
           example: "admin"
         password:
           type: string

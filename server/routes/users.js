@@ -76,10 +76,10 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Username and email are required' });
     }
 
-    // Check if username or email already exists
+    // Check if username or email already exists (case-insensitive)
     const existingUser = await User.findOne({
-      $or: [{ username }, { email }]
-    });
+      $or: [{ username }, { email: email.toLowerCase() }]
+    }).collation({ locale: 'en', strength: 2 });
 
     if (existingUser) {
       return res.status(400).json({
@@ -152,15 +152,15 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if username or email already exists (excluding the current user)
+    // Check if username or email already exists (excluding the current user, case-insensitive)
     if (username || email) {
       const existingUser = await User.findOne({
         _id: { $ne: userId },
         $or: [
           ...(username ? [{ username }] : []),
-          ...(email ? [{ email }] : [])
+          ...(email ? [{ email: email.toLowerCase() }] : [])
         ]
-      });
+      }).collation({ locale: 'en', strength: 2 });
 
       if (existingUser) {
         return res.status(400).json({

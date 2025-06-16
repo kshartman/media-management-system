@@ -24,7 +24,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onForgotPassword 
       await login(username, password);
       onLoginSuccess();
     } catch {
-      setError('Invalid username or password');
+      setError('Invalid username/email or password');
     } finally {
       setLoading(false);
     }
@@ -49,13 +49,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onForgotPassword 
             
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-                Username
+                Username or Email
               </label>
               <input
                 id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username or email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 required
               />
