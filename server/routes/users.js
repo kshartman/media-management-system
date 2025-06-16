@@ -3,7 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const { User } = require('../models');
 const authMiddleware = require('../middleware/auth');
-const { isEmailConfigured, sendWelcomeEmail } = require('../utils/emailService');
+const { isEmailConfigured, sendWelcomeEmail, sendPasswordResetEmail } = require('../utils/emailService');
 const logger = require('../utils/logger');
 const { scrypt, randomBytes } = require('crypto');
 const { promisify } = require('util');
@@ -222,6 +222,59 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     res.status(204).end();
   } catch (error) {
     userLogger.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Send password reset link to a user (admin only)
+router.post('/:id/send-reset-link', authMiddleware, async (req, res) => {
+  try {
+    // Check if the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
+    }
+
+    // Check if email service is configured
+    if (!isEmailConfigured()) {
+      return res.status(503).json({ error: 'Password reset is not available. Email service is not configured.' });
+    }
+
+    const userId = req.params.id;
+    
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Set token and expiration (24 hours from now)
+    user.resetPasswordToken = resetTokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await user.save();
+
+    // Send reset email
+    try {
+      await sendPasswordResetEmail(user.email, resetToken, user.username);
+      userLogger.info(`Password reset link sent to user: ${user.username} (${user.email}) by admin: ${req.user.username}`);
+      res.json({ 
+        message: 'Password reset link has been sent successfully',
+        email: user.email,
+        expiresAt: user.resetPasswordExpires
+      });
+    } catch (emailError) {
+      userLogger.error('Error sending password reset email:', emailError);
+      // Clear the reset token if email failed
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+      return res.status(500).json({ error: 'Failed to send password reset email. Please try again later.' });
+    }
+  } catch (error) {
+    userLogger.error('Admin send reset link error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

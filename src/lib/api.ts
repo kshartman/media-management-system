@@ -325,3 +325,8 @@ export const updateUser = async (id: string, userData: UserUpdateInput): Promise
 export const deleteUser = async (id: string): Promise<void> => {
   return request(`/users/${id}`, { method: 'DELETE' });
 };
+
+// Send password reset link to a user (admin only)
+export const sendPasswordResetLink = async (id: string): Promise<{ message: string; email: string; expiresAt: string }> => {
+  return request(`/users/${id}/send-reset-link`, { method: 'POST' });
+};

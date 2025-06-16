@@ -474,6 +474,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/cards/{id}/generate-fallback-preview:
+    patch:
+      tags:
+        - Cards
+      summary: Generate fallback preview
+      description: Generate a fallback preview image for reel cards when automatic preview generation fails
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '200':
+          description: Fallback preview generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+        '400':
+          description: Invalid request or not a reel card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/cards/{id}/download-package:
     get:
       tags:
@@ -783,6 +831,60 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{id}/send-reset-link:
+    post:
+      tags:
+        - Users
+      summary: Send password reset link
+      description: Send a password reset link to a user (admin only, 24-hour expiration)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '200':
+          description: Password reset link sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendResetLinkResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to send email or email service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Email service not configured
           content:
             application/json:
               schema:
@@ -1390,6 +1492,23 @@ components:
           type: string
           enum: [admin, user]
           example: "admin"
+
+    SendResetLinkResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Password reset link has been sent successfully"
+        email:
+          type: string
+          format: email
+          description: Email address where the reset link was sent
+          example: "user@example.com"
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the reset link expires (24 hours from creation)
+          example: "2024-01-15T14:30:00.000Z"
 
     # Common Schemas
     MessageResponse:

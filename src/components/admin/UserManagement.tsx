@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, UserCreateInput, UserUpdateInput, getUsers, createUser, updateUser, deleteUser } from '../../lib/api';
+import { User, UserCreateInput, UserUpdateInput, getUsers, createUser, updateUser, deleteUser, sendPasswordResetLink } from '../../lib/api';
 import { useAuth } from '../../lib/authContext';
 import UserForm from './UserForm';
 
@@ -99,6 +99,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
       fetchUsers(); // Refresh the user list
     } catch {
       setError('Failed to delete user. Please try again.');
+    }
+  };
+
+  const handleSendResetLink = async (userId: string, userEmail: string) => {
+    if (!window.confirm(`Send password reset link to ${userEmail}?`)) {
+      return;
+    }
+    
+    try {
+      const response = await sendPasswordResetLink(userId);
+      const expiresAt = new Date(response.expiresAt);
+      const formattedExpiry = expiresAt.toLocaleString();
+      setSuccessMessage(`Password reset link sent to ${response.email}. Link expires at ${formattedExpiry}.`);
+    } catch (error) {
+      console.error('Failed to send reset link:', error);
+      setError('Failed to send password reset link. Please check if email service is configured.');
     }
   };
 
@@ -240,13 +256,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <button 
                               onClick={() => setUserToEdit(user)}
-                              className="text-blue-600 hover:text-blue-900 mr-4"
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                              title="Edit user"
                             >
                               Edit
                             </button>
                             <button 
+                              onClick={() => handleSendResetLink(user.id || user._id as string, user.email)}
+                              className="text-green-600 hover:text-green-900 mr-3"
+                              title="Send password reset link"
+                            >
+                              Reset
+                            </button>
+                            <button 
                               onClick={() => handleDeleteUser(user.id || user._id as string)}
                               className="text-red-600 hover:text-red-900"
+                              title="Delete user"
                             >
                               Delete
                             </button>
