@@ -116,6 +116,13 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
             </>
           )}
           
+          {/* Development-only download count overlay */}
+          {process.env.NODE_ENV === 'development' && typeof props.downloadCount === 'number' && (
+            <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded z-20">
+              {props.downloadCount}
+            </div>
+          )}
+
           {/* Drop zone indicator (only visible when dragging and admin) */}
           {isAdmin && isDragging && (
             <div className="absolute inset-0 bg-blue-100 bg-opacity-70 flex items-center justify-center z-10">

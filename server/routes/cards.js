@@ -69,17 +69,17 @@ router.get('/', async (req, res) => {
     let sortQuery = {};
     switch (sort) {
       case 'oldest':
-        sortQuery = { createdAt: 1 };
+        sortQuery = { 'fileMetadata.date': 1 };
         break;
       case 'alphabetical':
-        sortQuery = { description: 1, createdAt: -1 };
+        sortQuery = { description: 1, 'fileMetadata.date': -1 };
         break;
       case 'popularity':
-        sortQuery = { downloadCount: -1, createdAt: -1 };
+        sortQuery = { downloadCount: -1, 'fileMetadata.date': -1, description: 1 };
         break;
       case 'newest':
       default:
-        sortQuery = { createdAt: -1 };
+        sortQuery = { 'fileMetadata.date': -1 };
         break;
     }
 

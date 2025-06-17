@@ -72,6 +72,13 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 </div>
               )}
               
+              {/* Development-only download count overlay */}
+              {process.env.NODE_ENV === 'development' && typeof props.downloadCount === 'number' && (
+                <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded z-20">
+                  {props.downloadCount}
+                </div>
+              )}
+
               {/* Play button overlay */}
               <div 
                 className="absolute inset-0 flex items-center justify-center cursor-pointer"
