@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Navigation from './Navigation';
 import { useAuth } from '@/lib/authContext';
@@ -14,7 +14,9 @@ interface AppHeaderProps {
 
 export default function AppHeader({ title = "Affiliate Resources", showControls = false, controlsSlot, onLoginClick }: AppHeaderProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const { isAuthenticated, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { isAuthenticated, isAdmin, isEditor, user, logout } = useAuth();
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleLoginClick = () => {
     if (isAuthenticated) {
@@ -25,6 +27,20 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
       window.location.href = '/';
     }
   };
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <>
@@ -95,12 +111,77 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
               />
             </div>
 
-            <h1 className="text-xl font-bold text-gray-900 hidden sm:block">{title}</h1>
+            <div className="flex items-center">
+              {/* User Dropdown */}
+              {isAuthenticated && user ? (
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-white hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {/* User Avatar */}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    {/* Username */}
+                    <span className="hidden sm:block">{user.username}</span>
+                    {/* Dropdown Arrow */}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                      <div className="px-4 py-2 text-sm text-gray-900 border-b border-gray-100">
+                        <div className="font-medium">{user.username}</div>
+                        <div className="text-xs text-gray-500 capitalize">
+                          {isAdmin ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-purple-100 text-purple-800 font-medium">
+                              Admin
+                            </span>
+                          ) : isEditor ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium">
+                              Editor
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800 font-medium">
+                              User
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setShowUserMenu(false);
+                        }}
+                        className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={onLoginClick}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Login
+                </button>
+              )}
+            </div>
           </div>
           
           {/* Navigation row */}
-          <div className="mt-3 flex justify-center">
+          <div className="mt-3 flex justify-center relative">
             <Navigation />
+            {/* Page title positioned on the left, aligned with hamburger menu, hidden when space is crowded */}
+            <h1 className="absolute left-0 top-1/2 transform -translate-y-1/2 text-xl font-bold text-gray-900 hidden lg:block">{title}</h1>
           </div>
         </div>
       </header>
