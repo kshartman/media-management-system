@@ -289,7 +289,7 @@ export interface UserUpdateInput {
   username?: string;
   email?: string;
   password?: string;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'editor';
 }
 
 // Get all users (admin only)
