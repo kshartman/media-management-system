@@ -450,6 +450,7 @@ export default function ImagesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader 
+        title="Image Resources"
         showControls={true}
         onLoginClick={handleLoginClick}
         controlsSlot={
