@@ -42,6 +42,7 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
     const search = req.query.search || '';
+    const sort = req.query.sort || 'newest';
     const types = req.query.type ? (Array.isArray(req.query.type) ? req.query.type : [req.query.type]) : [];
     const tags = req.query.tag ? (Array.isArray(req.query.tag) ? req.query.tag : [req.query.tag]) : [];
 
@@ -64,9 +65,27 @@ router.get('/', async (req, res) => {
       filter.tags = { $in: tags };
     }
 
+    // Determine sort order
+    let sortQuery = {};
+    switch (sort) {
+      case 'oldest':
+        sortQuery = { createdAt: 1 };
+        break;
+      case 'alphabetical':
+        sortQuery = { description: 1, createdAt: -1 };
+        break;
+      case 'popularity':
+        sortQuery = { downloadCount: -1, createdAt: -1 };
+        break;
+      case 'newest':
+      default:
+        sortQuery = { createdAt: -1 };
+        break;
+    }
+
     // Execute the query with pagination
     const cards = await Card.find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sortQuery)
       .limit(limit)
       .skip((page - 1) * limit);
 
@@ -741,6 +760,30 @@ router.patch('/:id/social-copy', authMiddleware, async (req, res) => {
     res.json(responseCard);
   } catch (error) {
     cardLogger.error('Error updating social copy:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Track download for a card
+router.post('/:id/track-download', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find and update the card's download count
+    const updatedCard = await Card.findByIdAndUpdate(
+      id,
+      { $inc: { downloadCount: 1 } },
+      { new: true }
+    );
+
+    if (!updatedCard) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    cardLogger.info(`Download tracked for card: ${id}, new count: ${updatedCard.downloadCount}`);
+    res.json({ success: true, downloadCount: updatedCard.downloadCount });
+  } catch (error) {
+    cardLogger.error('Error tracking download:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

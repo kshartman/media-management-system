@@ -23,6 +23,7 @@ export interface BaseCardProps {
   tags: string[];
   description: string;
   fileMetadata?: FileMetadata;
+  downloadCount?: number;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRefresh?: () => void;

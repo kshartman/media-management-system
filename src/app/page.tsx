@@ -327,7 +327,8 @@ export default function Home() {
         const response = await fetchCards(1, {
           type: types,
           tags: tags,
-          search: searchTerm
+          search: searchTerm,
+          sort: currentSort
         });
         
         // Update all cards, available tags, and total count

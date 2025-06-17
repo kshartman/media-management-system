@@ -6,6 +6,7 @@ import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useAuth } from '../../lib/authContext';
 import { useCardGrid } from '../../contexts/CardGridContext';
+import { trackCardDownload } from '../../lib/api';
 
 const ImageCard: React.FC<ImageCardProps> = (props) => {
   // Don't destructure preview and download here since we need to pass them to BaseCard
@@ -134,8 +135,13 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
             target="_blank"
             rel="noopener noreferrer"
             className="absolute top-2 right-2 z-10"
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
+              try {
+                await trackCardDownload(props.id);
+              } catch (error) {
+                console.error('Failed to track download:', error);
+              }
             }}
             title={`Download ${props.fileMetadata?.downloadOriginalFileName || 'image'}`}
           >

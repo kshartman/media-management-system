@@ -64,7 +64,7 @@ export default function ImagesPage() {
 
         // Load cards and tags - default to image type but allow all
         const [cardsResponse, tagsResponse] = await Promise.all([
-          fetchCards(1, { type: ['image'], tags: [], search: '' }, 100),
+          fetchCards(1, { type: ['image'], tags: [], search: '', sort: 'newest' }, 100),
           getAllTags()
         ]);
         
@@ -89,7 +89,8 @@ export default function ImagesPage() {
               const page2Response = await fetchCards(2, { 
                 type: ['image'], 
                 tags: [], 
-                search: '' 
+                search: '',
+                sort: 'newest'
               });
               
               const combinedCards = [...cardsResponse.cards];
@@ -200,7 +201,8 @@ export default function ImagesPage() {
       const response = await fetchCards(1, {
         type: ['image'],
         tags: tags,
-        search: searchTerm
+        search: searchTerm,
+        sort: currentSort
       });
       
       setCards(response.cards);
@@ -216,7 +218,8 @@ export default function ImagesPage() {
             const page2Response = await fetchCards(2, {
               type: ['image'],
               tags: tags,
-              search: searchTerm
+              search: searchTerm,
+              sort: currentSort
             });
             
             const combinedCards = [...response.cards];
@@ -261,7 +264,8 @@ export default function ImagesPage() {
       const response = await fetchCards(1, {
         type: ['image'],
         tags: selectedTags,
-        search: search
+        search: search,
+        sort: currentSort
       });
       
       setCards(response.cards);
@@ -276,7 +280,8 @@ export default function ImagesPage() {
             const page2Response = await fetchCards(2, {
               type: ['image'],
               tags: selectedTags,
-              search: search
+              search: search,
+              sort: currentSort
             });
             
             const combinedCards = [...response.cards, ...page2Response.cards];
@@ -362,7 +367,7 @@ export default function ImagesPage() {
   const handleCardCreated = async () => {
     try {
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(1, { type: ['image'], tags: selectedTags, search: searchTerm }),
+        fetchCards(1, { type: ['image'], tags: selectedTags, search: searchTerm, sort: currentSort }),
         getAllTags()
       ]);
 
@@ -393,7 +398,8 @@ export default function ImagesPage() {
         fetchCards(1, { 
           type: ['image'], 
           tags: selectedTags, 
-          search: searchTerm 
+          search: searchTerm,
+          sort: currentSort
         }, 100),
         getAllTags()
       ]);
@@ -534,7 +540,8 @@ export default function ImagesPage() {
                 const response = await fetchCards(page, {
                   type: ['image'],
                   tags: selectedTags,
-                  search: searchTerm
+                  search: searchTerm,
+                  sort: currentSort
                 });
                 return response.cards;
               } catch (error) {

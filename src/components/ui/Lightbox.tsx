@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import { trackCardDownload } from '../../lib/api';
 
 interface LightboxProps {
   images: string[];
@@ -24,6 +25,7 @@ interface LightboxProps {
     total: number;
     type: string;
   };
+  cardId?: string;
 }
 
 const Lightbox: React.FC<LightboxProps> = ({
@@ -36,7 +38,8 @@ const Lightbox: React.FC<LightboxProps> = ({
   imageMetadata,
   onNavigateCard,
   canNavigateCard,
-  cardInfo
+  cardInfo,
+  cardId
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
@@ -332,6 +335,15 @@ const Lightbox: React.FC<LightboxProps> = ({
                         document.body.removeChild(link);
                         window.URL.revokeObjectURL(url);
                       }, 100);
+
+                      // Track the download if cardId is available
+                      if (cardId) {
+                        try {
+                          await trackCardDownload(cardId);
+                        } catch (trackError) {
+                          console.error('Failed to track download:', trackError);
+                        }
+                      }
                       
                     } catch (error) {
                       console.error('Download failed:', error);

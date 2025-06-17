@@ -36,7 +36,7 @@ export default function ReelsPage() {
 
         // Load reel cards and tags - only fetch reel type
         const [cardsResponse, tagsResponse] = await Promise.all([
-          fetchCards(1, { type: ['reel'], tags: [], search: '' }, 100),
+          fetchCards(1, { type: ['reel'], tags: [], search: '', sort: currentSort }, 100),
           getAllTags()
         ]);
         
@@ -61,7 +61,8 @@ export default function ReelsPage() {
               const page2Response = await fetchCards(2, { 
                 type: ['reel'], 
                 tags: [], 
-                search: '' 
+                search: '',
+                sort: currentSort 
               });
               
               const combinedCards = [...cardsResponse.cards];
@@ -174,7 +175,8 @@ export default function ReelsPage() {
       const response = await fetchCards(1, {
         type: ['reel'],
         tags: tags,
-        search: searchTerm
+        search: searchTerm,
+        sort: currentSort
       });
       
       setCards(response.cards);
@@ -190,7 +192,8 @@ export default function ReelsPage() {
             const page2Response = await fetchCards(2, {
               type: ['reel'],
               tags: tags,
-              search: searchTerm
+              search: searchTerm,
+              sort: currentSort
             });
             
             const combinedCards = [...response.cards];
@@ -235,7 +238,8 @@ export default function ReelsPage() {
       const response = await fetchCards(1, {
         type: ['reel'],
         tags: selectedTags,
-        search: search
+        search: search,
+        sort: currentSort
       });
       
       setCards(response.cards);
@@ -250,7 +254,8 @@ export default function ReelsPage() {
             const page2Response = await fetchCards(2, {
               type: ['reel'],
               tags: selectedTags,
-              search: search
+              search: search,
+              sort: currentSort
             });
             
             const combinedCards = [...response.cards, ...page2Response.cards];
@@ -337,7 +342,7 @@ export default function ReelsPage() {
   const handleCardCreated = async () => {
     try {
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(1, { type: ['reel'], tags: selectedTags, search: searchTerm }),
+        fetchCards(1, { type: ['reel'], tags: selectedTags, search: searchTerm, sort: currentSort }),
         getAllTags()
       ]);
 
@@ -361,7 +366,7 @@ export default function ReelsPage() {
   const handleRefreshCards = async () => {
     try {
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(1, { type: ['reel'], tags: selectedTags, search: searchTerm }),
+        fetchCards(1, { type: ['reel'], tags: selectedTags, search: searchTerm, sort: currentSort }),
         getAllTags()
       ]);
 
@@ -393,7 +398,8 @@ export default function ReelsPage() {
         fetchCards(1, { 
           type: ['reel'], 
           tags: selectedTags, 
-          search: searchTerm 
+          search: searchTerm,
+          sort: currentSort 
         }, 100),
         getAllTags()
       ]);
@@ -535,7 +541,8 @@ export default function ReelsPage() {
                 const response = await fetchCards(page, {
                   type: ['reel'],
                   tags: selectedTags,
-                  search: searchTerm
+                  search: searchTerm,
+                  sort: currentSort
                 });
                 return response.cards;
               } catch (error) {

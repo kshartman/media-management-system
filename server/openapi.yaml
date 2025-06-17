@@ -279,6 +279,13 @@ paths:
               - type: array
                 items:
                   type: string
+        - name: sort
+          in: query
+          description: Sort order for results
+          schema:
+            type: string
+            enum: [newest, oldest, alphabetical, popularity]
+            default: newest
       responses:
         '200':
           description: Cards retrieved successfully
@@ -517,6 +524,48 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Failed to generate preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cards/{id}/track-download:
+    post:
+      tags:
+        - Cards
+      summary: Track card download
+      description: Increment the download count for a card when a file is downloaded
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '200':
+          description: Download tracked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  downloadCount:
+                    type: integer
+                    description: Updated download count
+                    example: 42
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -1223,6 +1272,12 @@ components:
         updatedAt:
           type: string
           format: date-time
+        downloadCount:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of times this card has been downloaded
+          example: 42
 
     FileMetadata:
       type: object

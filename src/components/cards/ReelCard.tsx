@@ -6,6 +6,7 @@ import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useVideoPlayer } from '../../contexts/VideoPlayerContext';
 import { getProxiedImageUrl } from '../../lib/utils';
+import { trackCardDownload } from '../../lib/api';
 
 const ReelCard: React.FC<ReelCardProps> = (props) => {
   // Keep all props to pass to BaseCard
@@ -93,8 +94,13 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="absolute top-2 right-2 z-10"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
+                  try {
+                    await trackCardDownload(props.id);
+                  } catch (error) {
+                    console.error('Failed to track download:', error);
+                  }
                 }}
                 title={`Download ${props.fileMetadata?.movieOriginalFileName || 'video'}`}
               >

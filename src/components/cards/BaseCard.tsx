@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { BaseCardProps } from '../../types';
 import StandaloneSocialCopyEditor from './StandaloneSocialCopyEditor';
 import { useScroll } from '../../contexts/ScrollContext';
+import { trackCardDownload } from '../../lib/api';
 
 const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   id,
@@ -126,6 +127,13 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+
+      // Track the download
+      try {
+        await trackCardDownload(id);
+      } catch (trackError) {
+        console.error('Failed to track download:', trackError);
+      }
 
     } catch (error) {
       console.error('Error downloading ZIP file:', error);

@@ -86,6 +86,11 @@ const cardSchema = new mongoose.Schema({
       enum: ['auto-generated', 'user-uploaded', 'fallback'],
       default: 'auto-generated' // Track how the preview was created
     }
+  },
+  downloadCount: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, { timestamps: true });
 
