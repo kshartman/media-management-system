@@ -62,7 +62,7 @@ export default function PostsPage() {
 
         // Load social cards and tags - only fetch social type
         const [cardsResponse, tagsResponse] = await Promise.all([
-          fetchCards(1, { type: selectedTypes, tags: [], search: '' }, 100),
+          fetchCards(1, { type: selectedTypes, tags: [], search: '', sort: currentSort }, 100),
           getAllTags()
         ]);
         
@@ -87,7 +87,8 @@ export default function PostsPage() {
               const page2Response = await fetchCards(2, { 
                 type: selectedTypes, 
                 tags: [], 
-                search: '' 
+                search: '',
+                sort: currentSort 
               });
               
               const combinedCards = [...cardsResponse.cards];
@@ -180,9 +181,39 @@ export default function PostsPage() {
 
     // Apply sorting
     filtered.sort((a, b) => {
-      const dateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
-      const dateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
-      return sort === 'newest' ? dateB - dateA : dateA - dateB;
+      switch (sort) {
+        case 'popularity':
+          // Primary: downloadCount descending
+          const downloadA = a.downloadCount || 0;
+          const downloadB = b.downloadCount || 0;
+          if (downloadB !== downloadA) {
+            return downloadB - downloadA;
+          }
+          
+          // Secondary: date descending  
+          const dateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
+          const dateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
+          if (dateB !== dateA) {
+            return dateB - dateA;
+          }
+          
+          // Tertiary: description alphabetical
+          return a.description.localeCompare(b.description);
+          
+        case 'alphabetical':
+          return a.description.localeCompare(b.description);
+          
+        case 'oldest':
+          const oldDateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
+          const oldDateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
+          return oldDateA - oldDateB;
+          
+        case 'newest':
+        default:
+          const newDateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
+          const newDateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
+          return newDateB - newDateA;
+      }
     });
 
     return filtered;
@@ -202,7 +233,8 @@ export default function PostsPage() {
       const response = await fetchCards(1, {
         type: ['social'],
         tags: tags,
-        search: searchTerm
+        search: searchTerm,
+        sort: currentSort
       });
       
       setCards(response.cards);
@@ -218,7 +250,8 @@ export default function PostsPage() {
             const page2Response = await fetchCards(2, {
               type: ['social'],
               tags: tags,
-              search: searchTerm
+              search: searchTerm,
+              sort: currentSort
             });
             
             const combinedCards = [...response.cards];
@@ -263,7 +296,8 @@ export default function PostsPage() {
       const response = await fetchCards(1, {
         type: ['social'],
         tags: selectedTags,
-        search: search
+        search: search,
+        sort: currentSort
       });
       
       setCards(response.cards);
@@ -278,7 +312,8 @@ export default function PostsPage() {
             const page2Response = await fetchCards(2, {
               type: ['social'],
               tags: selectedTags,
-              search: search
+              search: search,
+              sort: currentSort
             });
             
             const combinedCards = [...response.cards, ...page2Response.cards];
@@ -365,7 +400,7 @@ export default function PostsPage() {
   const handleCardCreated = async () => {
     try {
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(1, { type: ['social'], tags: selectedTags, search: searchTerm }),
+        fetchCards(1, { type: ['social'], tags: selectedTags, search: searchTerm, sort: currentSort }),
         getAllTags()
       ]);
 
@@ -389,7 +424,7 @@ export default function PostsPage() {
   const handleRefreshCards = useCallback(async () => {
     try {
       const [cardsResponse, tagsResponse] = await Promise.all([
-        fetchCards(1, { type: ['social'], tags: selectedTags, search: searchTerm }),
+        fetchCards(1, { type: ['social'], tags: selectedTags, search: searchTerm, sort: currentSort }),
         getAllTags()
       ]);
 
@@ -421,7 +456,8 @@ export default function PostsPage() {
         fetchCards(1, { 
           type: ['social'], 
           tags: selectedTags, 
-          search: searchTerm 
+          search: searchTerm,
+          sort: currentSort 
         }, 100),
         getAllTags()
       ]);
@@ -564,7 +600,8 @@ export default function PostsPage() {
                 const response = await fetchCards(page, {
                   type: ['social'],
                   tags: selectedTags,
-                  search: searchTerm
+                  search: searchTerm,
+                  sort: currentSort
                 });
                 return response.cards;
               } catch (error) {

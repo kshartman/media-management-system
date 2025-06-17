@@ -6,6 +6,7 @@ import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useAuth } from '../../lib/authContext';
 import { useCardGrid } from '../../contexts/CardGridContext';
+import { trackCardDownload } from '../../lib/api';
 
 const ImageCard: React.FC<ImageCardProps> = (props) => {
   // Don't destructure preview and download here since we need to pass them to BaseCard
@@ -115,6 +116,13 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
             </>
           )}
           
+          {/* Development-only download count overlay */}
+          {process.env.NODE_ENV === 'development' && typeof props.downloadCount === 'number' && (
+            <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded z-20">
+              {props.downloadCount}
+            </div>
+          )}
+
           {/* Drop zone indicator (only visible when dragging and admin) */}
           {isAdmin && isDragging && (
             <div className="absolute inset-0 bg-blue-100 bg-opacity-70 flex items-center justify-center z-10">
@@ -134,8 +142,13 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
             target="_blank"
             rel="noopener noreferrer"
             className="absolute top-2 right-2 z-10"
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
+              try {
+                await trackCardDownload(props.id);
+              } catch (error) {
+                console.error('Failed to track download:', error);
+              }
             }}
             title={`Download ${props.fileMetadata?.downloadOriginalFileName || 'image'}`}
           >

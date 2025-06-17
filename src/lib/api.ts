@@ -7,6 +7,7 @@ export interface CardFilters {
   type?: string[];
   tags?: string[];
   search?: string;
+  sort?: string;
 }
 
 // Use the API proxy through Next.js rewrites
@@ -75,7 +76,7 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
 // API functions
 export const fetchCards = async (
   page = 1,
-  filters: CardFilters = { type: [], tags: [], search: '' },
+  filters: CardFilters = { type: [], tags: [], search: '', sort: 'newest' },
   limit = PAGE_SIZE
 ): Promise<{ cards: CardProps[]; availableTags: string[]; totalCount: number }> => {
   
@@ -85,6 +86,10 @@ export const fetchCards = async (
 
   if (filters.search) {
     queryParams.append('search', filters.search);
+  }
+
+  if (filters.sort) {
+    queryParams.append('sort', filters.sort);
   }
 
   if (filters.type && filters.type.length > 0) {
@@ -330,4 +335,9 @@ export const deleteUser = async (id: string): Promise<void> => {
 // Send password reset link to a user (admin only)
 export const sendPasswordResetLink = async (id: string): Promise<{ message: string; email: string; expiresAt: string }> => {
   return request(`/users/${id}/send-reset-link`, { method: 'POST' });
+};
+
+// Track download for a card
+export const trackCardDownload = async (cardId: string): Promise<{ success: boolean; downloadCount: number }> => {
+  return request(`/cards/${cardId}/track-download`, { method: 'POST' });
 };

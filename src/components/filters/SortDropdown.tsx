@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-export type SortOption = 'newest' | 'oldest';
+export type SortOption = 'newest' | 'alphabetical' | 'popularity' | 'oldest';
 
 interface SortDropdownProps {
   onSortChange: (sortBy: SortOption) => void;
@@ -15,6 +15,8 @@ const SortDropdown: React.FC<SortDropdownProps> = ({ onSortChange, currentSort }
   
   const sortOptions = [
     { id: 'newest', label: 'Newest' },
+    { id: 'alphabetical', label: 'Alphabetical' },
+    { id: 'popularity', label: 'Popularity' },
     { id: 'oldest', label: 'Oldest' }
   ];
 

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { SocialCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import Lightbox from '../ui/Lightbox';
+import { trackCardDownload } from '../../lib/api';
 
 const SocialCard: React.FC<SocialCardProps> = (props) => {
   // Keep all props to pass to BaseCard
@@ -108,6 +109,7 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
             names: props.fileMetadata?.imageSequenceOriginalFileNames || [],
             captions: props.fileMetadata?.imageSequenceCaptions || []
           }}
+          cardId={props.id}
         />
       )}
       <div className="relative group">
@@ -142,6 +144,13 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
             </div>
           )}
           
+          {/* Development-only download count overlay */}
+          {process.env.NODE_ENV === 'development' && typeof props.downloadCount === 'number' && (
+            <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded z-20">
+              {props.downloadCount}
+            </div>
+          )}
+
           {/* View slideshow button overlay */}
           {props.imageSequence && props.imageSequence.length > 0 && (
             <div 
@@ -199,8 +208,13 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
                 download={props.fileMetadata?.transcriptOriginalFileName || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
+                  try {
+                    await trackCardDownload(props.id);
+                  } catch (error) {
+                    console.error('Failed to track download:', error);
+                  }
                 }}
                 title={`Download ${props.fileMetadata?.transcriptOriginalFileName || 'transcript'}`}
               >
