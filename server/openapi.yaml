@@ -1499,7 +1499,7 @@ components:
           example: "admin@example.com"
         role:
           type: string
-          enum: [admin, user]
+          enum: [admin, editor]
           example: "admin"
         createdAt:
           type: string
@@ -1530,9 +1530,9 @@ components:
           example: "newuser@example.com"
         role:
           type: string
-          enum: [admin, user]
-          default: user
-          example: "user"
+          enum: [admin, editor]
+          default: editor
+          example: "editor"
 
     UpdateUserRequest:
       type: object
@@ -1552,7 +1552,7 @@ components:
           example: "newpassword123"
         role:
           type: string
-          enum: [admin, user]
+          enum: [admin, editor]
           example: "admin"
 
     SendResetLinkResponse:

@@ -57,7 +57,7 @@ const SampleCards: CardProps[] = [
 ];
 
 export default function Home() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isEditor } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -782,12 +782,13 @@ export default function Home() {
           <>
             {/* Controls row - keeps all controls on one line */}
             <div className="flex items-center gap-4">
-              {isAdmin && (
+              {isEditor && (
                 <div className="mr-2">
                   <AdminBar
                     onCardCreated={handleCardCreated}
                     availableTags={availableTags}
                     selectedCardType={selectedTypes.length === 0 ? 'all' : selectedTypes[0]}
+                    isAdmin={isAdmin}
                   />
                 </div>
               )}
@@ -879,8 +880,9 @@ export default function Home() {
               }
             }}
             isAdmin={isAdmin}
-            onEdit={isAdmin ? handleEditCard : undefined}
-            onDelete={isAdmin ? handleDeleteCard : undefined}
+            isEditor={isEditor}
+            onEdit={isEditor ? handleEditCard : undefined}
+            onDelete={isEditor ? handleDeleteCard : undefined}
             selectedTypes={selectedTypes}
             lastEditedCardId={lastEditedCardId}
           />

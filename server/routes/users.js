@@ -100,7 +100,7 @@ router.post('/', authMiddleware, async (req, res) => {
       username,
       email,
       password: hashedPassword, // Temporary password
-      role: role || 'user', // Default to 'user' role if not specified
+      role: role || 'editor', // Default to 'editor' role if not specified
       resetPasswordToken: resetTokenHash,
       resetPasswordExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     });

@@ -28,6 +28,7 @@ export interface BaseCardProps {
   onDelete?: (id: string) => void;
   onRefresh?: () => void;
   isAdmin?: boolean;
+  isEditor?: boolean;
   // Add properties needed for download all functionality
   preview?: string;
   download?: string;

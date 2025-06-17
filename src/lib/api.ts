@@ -277,7 +277,7 @@ export interface User {
   _id?: string;
   username: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'editor';
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string;
@@ -287,14 +287,14 @@ export interface UserCreateInput {
   username: string;
   email: string;
   password?: string; // Optional - users will set password via welcome email
-  role: 'admin' | 'user';
+  role: 'admin' | 'editor';
 }
 
 export interface UserUpdateInput {
   username?: string;
   email?: string;
   password?: string;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'editor';
 }
 
 // Get all users (admin only)

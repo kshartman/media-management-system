@@ -20,6 +20,7 @@ interface CardGridProps {
   onDelete?: (id: string) => void;
   onRefresh?: () => void;
   isAdmin?: boolean;
+  isEditor?: boolean;
   selectedTypes?: string[]; // Added to know whether to group by type
   lastEditedCardId?: string | null; // To track the last edited card
 }
@@ -31,6 +32,7 @@ const CardGrid: React.FC<CardGridProps> = ({
   onDelete,
   onRefresh,
   isAdmin = false,
+  isEditor = false,
   selectedTypes = [],
   lastEditedCardId = null
 }) => {
@@ -162,6 +164,7 @@ const CardGrid: React.FC<CardGridProps> = ({
           onDelete={onDelete}
           onRefresh={onRefresh}
           isAdmin={isAdmin}
+          isEditor={isEditor}
         />
       </div>
     );

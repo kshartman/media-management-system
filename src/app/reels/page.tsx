@@ -14,7 +14,7 @@ import { useAuth } from '../../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags, fetchCardById } from '../../lib/api';
 
 export default function ReelsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isEditor } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -462,12 +462,13 @@ export default function ReelsPage() {
         controlsSlot={
           <>
             <div className="flex items-center gap-4">
-              {isAdmin && (
+              {isEditor && (
                 <div className="mr-2">
                   <AdminBar
                     onCardCreated={handleCardCreated}
                     availableTags={availableTags}
                     selectedCardType="reel"
+                    isAdmin={isAdmin}
                   />
                 </div>
               )}
@@ -551,8 +552,9 @@ export default function ReelsPage() {
               }
             }}
             isAdmin={isAdmin}
-            onEdit={isAdmin ? handleEditCard : undefined}
-            onDelete={isAdmin ? handleDeleteCard : undefined}
+            isEditor={isEditor}
+            onEdit={isEditor ? handleEditCard : undefined}
+            onDelete={isEditor ? handleDeleteCard : undefined}
             onRefresh={handleRefreshCards}
             selectedTypes={selectedTypes}
             lastEditedCardId={lastEditedCardId}

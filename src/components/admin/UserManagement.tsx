@@ -200,25 +200,24 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            {/* User List */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="text-lg font-medium">Users</h4>
-                {!showCreateForm && !userToEdit && (
+            {/* User List - only show when not creating or editing */}
+            {!showCreateForm && !userToEdit && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-medium">Users</h4>
                   <button
                     onClick={() => setShowCreateForm(true)}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
                   >
                     Add New User
                   </button>
-                )}
-              </div>
-              
-              {loading ? (
-                <div className="flex justify-center p-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              ) : (
+                
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -303,8 +302,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ isOpen, onClose }) => {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
