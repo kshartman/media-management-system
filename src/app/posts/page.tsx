@@ -14,7 +14,7 @@ import { useAuth } from '../../lib/authContext';
 import { fetchCards, deleteCard, updateCard, getAllTags, fetchCardById } from '../../lib/api';
 
 export default function PostsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isEditor } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentEditCard, setCurrentEditCard] = useState<CardProps | undefined>(undefined);
@@ -484,12 +484,13 @@ export default function PostsPage() {
         controlsSlot={
           <>
             <div className="flex items-center gap-4">
-              {isAdmin && (
+              {isEditor && (
                 <div className="mr-2">
                   <AdminBar
                     onCardCreated={handleCardCreated}
                     availableTags={availableTags}
                     selectedCardType="social"
+                    isAdmin={isAdmin}
                   />
                 </div>
               )}
@@ -572,8 +573,9 @@ export default function PostsPage() {
               }
             }}
             isAdmin={isAdmin}
-            onEdit={isAdmin ? handleEditCard : undefined}
-            onDelete={isAdmin ? handleDeleteCard : undefined}
+            isEditor={isEditor}
+            onEdit={isEditor ? handleEditCard : undefined}
+            onDelete={isEditor ? handleDeleteCard : undefined}
             onRefresh={handleRefreshCards}
             selectedTypes={selectedTypes}
             lastEditedCardId={lastEditedCardId}

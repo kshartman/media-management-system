@@ -19,7 +19,7 @@ const UserForm: React.FC<UserFormProps> = ({
   const [username, setUsername] = useState(initialData?.username || '');
   const [email, setEmail] = useState(initialData?.email || '');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'user'>(initialData?.role || 'user');
+  const [role, setRole] = useState<'admin' | 'editor'>(initialData?.role as 'admin' | 'editor' || 'editor');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const isEditMode = !!initialData;
@@ -164,10 +164,10 @@ const UserForm: React.FC<UserFormProps> = ({
           <select
             id="role"
             value={role}
-            onChange={(e) => setRole(e.target.value as 'admin' | 'user')}
+            onChange={(e) => setRole(e.target.value as 'admin' | 'editor')}
             className="w-full px-3 py-2 border border-gray-300 rounded"
           >
-            <option value="user">User</option>
+            <option value="editor">Editor</option>
             <option value="admin">Admin</option>
           </select>
         </div>

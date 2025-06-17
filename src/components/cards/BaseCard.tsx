@@ -15,6 +15,7 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   onDelete,
   onRefresh,
   isAdmin = false,
+  isEditor = false,
   type: _type,
   preview: _preview,
   download: _download,
@@ -296,8 +297,8 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
                   </svg>
                 </button>
                 
-                {/* Edit button - only show for admins */}
-                {isAdmin && (
+                {/* Edit button - only show for editors */}
+                {isEditor && (
                   <button 
                     onClick={() => {
                       setShowSocialCopyModal(false);
@@ -475,8 +476,8 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
             )}
           </div>
 
-          {/* Admin controls */}
-          {isAdmin && (
+          {/* Editor controls */}
+          {isEditor && (
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => onEdit && onEdit(id)}

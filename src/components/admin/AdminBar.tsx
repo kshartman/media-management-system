@@ -9,9 +9,10 @@ interface AdminBarProps {
   onCardCreated: () => void;
   availableTags?: string[];
   selectedCardType?: string;
+  isAdmin?: boolean;
 }
 
-const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], selectedCardType = 'image' }) => {
+const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], selectedCardType = 'image', isAdmin = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   
@@ -64,16 +65,18 @@ const AdminBar: React.FC<AdminBarProps> = ({ onCardCreated, availableTags = [], 
         Card
       </button>
 
-      {/* User Management Button */}
-      <button
-        onClick={() => setIsUserManagementOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zm8 0a3 3 0 11-6 0 3 3 0 016 0zm-4.07 11c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-        </svg>
-        Users
-      </button>
+      {/* User Management Button - Only for Admins */}
+      {isAdmin && (
+        <button
+          onClick={() => setIsUserManagementOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zm8 0a3 3 0 11-6 0 3 3 0 016 0zm-4.07 11c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+          </svg>
+          Users
+        </button>
+      )}
 
       {/* Modals */}
       <CardUploadModal

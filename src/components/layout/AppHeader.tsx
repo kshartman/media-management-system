@@ -14,10 +14,10 @@ interface AppHeaderProps {
 
 export default function AppHeader({ title = "Affiliate Resources", showControls = false, controlsSlot, onLoginClick }: AppHeaderProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const { isAdmin, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   const handleLoginClick = () => {
-    if (isAdmin) {
+    if (isAuthenticated) {
       logout();
     } else if (onLoginClick) {
       onLoginClick();
@@ -60,7 +60,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
                     }}
                     className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
                   >
-                    {isAdmin ? 'Logout' : 'Admin Login'}
+                    {isAuthenticated ? 'Logout' : 'Login'}
                   </button>
                   <a
                     href="https://affiliates.shopzive.com"
