@@ -69,15 +69,29 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
                     Help
                   </a>
                   <div className="border-t border-gray-100 my-1" />
-                  <button
-                    onClick={() => {
-                      handleLoginClick();
-                      setShowMobileMenu(false);
-                    }}
-                    className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                  >
-                    {isAuthenticated ? 'Logout' : 'Login'}
-                  </button>
+                  {isAuthenticated ? (
+                    <button
+                      onClick={() => {
+                        logout();
+                        setShowMobileMenu(false);
+                      }}
+                      className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+                    >
+                      Logout
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (onLoginClick) {
+                          onLoginClick();
+                        }
+                        setShowMobileMenu(false);
+                      }}
+                      className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+                    >
+                      Login
+                    </button>
+                  )}
                   <a
                     href="https://affiliates.shopzive.com"
                     target="_blank"
@@ -112,68 +126,95 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
             </div>
 
             <div className="flex items-center">
-              {/* User Dropdown */}
-              {isAuthenticated && user ? (
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-white hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {/* User Avatar */}
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    {/* Username */}
-                    <span className="hidden sm:block">{user.username}</span>
-                    {/* Dropdown Arrow */}
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              {/* User Avatar/Login - Always show avatar, on mobile becomes dropdown */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      setShowUserMenu(!showUserMenu);
+                    } else {
+                      // On desktop, show login directly
+                      if (window.innerWidth >= 640) {
+                        if (onLoginClick) {
+                          onLoginClick();
+                        }
+                      } else {
+                        // On mobile, show dropdown with login option
+                        setShowUserMenu(!showUserMenu);
+                      }
+                    }
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-white hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {/* User Avatar */}
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
-                  </button>
+                  </div>
+                  {/* Username - only show when authenticated */}
+                  {isAuthenticated && user && (
+                    <span className="hidden sm:block">{user.username}</span>
+                  )}
+                  {/* Login text - show on mobile when not authenticated */}
+                  {!isAuthenticated && (
+                    <span className="block sm:hidden">Login</span>
+                  )}
+                  {/* Dropdown Arrow - always show */}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
 
-                  {/* Dropdown Menu */}
-                  {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
-                      <div className="px-4 py-2 text-sm text-gray-900 border-b border-gray-100">
-                        <div className="font-medium">{user.username}</div>
-                        <div className="text-xs text-gray-500 capitalize">
-                          {isAdmin ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-purple-100 text-purple-800 font-medium">
-                              Admin
-                            </span>
-                          ) : isEditor ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium">
-                              Editor
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800 font-medium">
-                              User
-                            </span>
-                          )}
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                    {isAuthenticated && user ? (
+                      <>
+                        <div className="px-4 py-2 text-sm text-gray-900 border-b border-gray-100">
+                          <div className="font-medium">{user.username}</div>
+                          <div className="text-xs text-gray-500 capitalize">
+                            {isAdmin ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-purple-100 text-purple-800 font-medium">
+                                Admin
+                              </span>
+                            ) : isEditor ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium">
+                                Editor
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800 font-medium">
+                                User
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                        <button
+                          onClick={() => {
+                            logout();
+                            setShowUserMenu(false);
+                          }}
+                          className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+                        >
+                          Logout
+                        </button>
+                      </>
+                    ) : (
                       <button
                         onClick={() => {
-                          logout();
+                          if (onLoginClick) {
+                            onLoginClick();
+                          }
                           setShowUserMenu(false);
                         }}
                         className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
                       >
-                        Logout
+                        Login
                       </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={onLoginClick}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  Login
-                </button>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
