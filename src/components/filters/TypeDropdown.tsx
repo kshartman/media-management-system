@@ -78,7 +78,7 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
       </button>
       
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10">
+        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-50">
           {typeOptions.map((option) => (
             <button
               key={option.id}

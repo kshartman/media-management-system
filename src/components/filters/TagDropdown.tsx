@@ -83,7 +83,7 @@ const TagDropdown: React.FC<TagDropdownProps> = ({ onFilterChange, selectedTags,
       </button>
       
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10">
+        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-50">
           <div className="p-2 relative">
             <input
               ref={inputRef}
