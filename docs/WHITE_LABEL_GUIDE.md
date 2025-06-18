@@ -87,6 +87,7 @@ cp /path/to/acme-favicon.ico public/
 
 ### 3. Configure Environment
 
+#### Frontend Environment
 ```bash
 # Copy the whitelabel environment template
 cp .env.example.whitelabel .env
@@ -95,17 +96,38 @@ cp .env.example.whitelabel .env
 vim .env
 ```
 
+#### Server Environment (for local development)
+```bash
+# Copy the server whitelabel template
+cp server/.env.example.whitelabel server/.env
+
+# Update with client values
+vim server/.env
+```
+
 Key environment variables:
 - `NEXT_PUBLIC_BRAND_CONFIG=acme` (matches your config filename)
 - `CLIENT_DOMAIN=media.acme.com`
 - Update email domains and CORS origins
+- Ensure `ALLOWED_ORIGINS` includes client domain for production
 
 ### 4. Build and Test
 
+#### Local Development Testing
 ```bash
-# Test locally
+# Set brand config for this session
+export NEXT_PUBLIC_BRAND_CONFIG=acme
+
+# Start frontend
 npm run dev
 
+# In another terminal, start backend (if testing locally)
+cd server
+npm start
+```
+
+#### Production Build Testing
+```bash
 # Build for production
 npm run build
 
