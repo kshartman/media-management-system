@@ -220,16 +220,33 @@ const brandConfig = {
 ## Development Reference Files
 
 ### ZIVE Production Values
-For reference, the actual ZIVE production configuration values are available in:
+For reference, the actual ZIVE configuration values are available in:
+
+**Frontend (Local Development):**
+- `.env.local.zive` - Real ZIVE frontend local development environment (not tracked by git)
+
+**Backend (Local Development):**
 - `server/.env.zive` - Real ZIVE server environment (not tracked by git)
 - `server/env.zive.gpg` - Encrypted version (tracked by git for team access)
 
-This file contains the actual production values formatted like the `.env.example` template, useful for:
+These files contain the actual configuration values formatted like the template structure, useful for:
 - Comparing client configurations against ZIVE defaults
 - Quick setup for ZIVE-compatible development
 - Reference for working configuration values
 
-**Note**: The `.env.zive` file contains sensitive data and is not committed to git. The encrypted `env.zive.gpg` version is available for team members who need access to the production configuration.
+**Note**: The `.env.*zive` files contain sensitive data and are not committed to git. The encrypted `server/env.zive.gpg` version is available for team members who need access to the production configuration.
+
+### Quick ZIVE Development Setup
+```bash
+# Frontend - copy ZIVE local development config
+cp .env.local.zive .env.local
+
+# Backend - copy ZIVE server config  
+cp server/.env.zive server/.env
+
+# Start development
+npm run dev
+```
 
 ## Troubleshooting
 
