@@ -39,6 +39,14 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
 
   const handlePlay = () => {
     playVideo(videoId);
+    // On mobile, give video element a chance to receive user gesture
+    if (isMobile) {
+      setTimeout(() => {
+        if (videoRef.current && isPlaying(videoId)) {
+          videoRef.current.play().catch(console.error);
+        }
+      }, 100);
+    }
   };
 
   return (
@@ -168,7 +176,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 ref={videoRef}
                 src={getProxiedImageUrl(props.movie)}
                 controls
-                autoPlay={!isMobile}
+                autoPlay={false}
                 playsInline={!isMobile}
                 preload="metadata"
                 muted={isMobile}
