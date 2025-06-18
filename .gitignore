@@ -37,6 +37,7 @@ yarn-error.log*
 .env.next3k
 .env.*.next3k
 .env.local.zive
+.env.docker.zive
 server/.env.zive
 
 # vercel
