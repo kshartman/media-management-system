@@ -114,7 +114,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
               )}
             </div>
 
-            <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+            <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center pointer-events-none">
               <Image
                 src="/zive-logo.png"
                 alt="ZIVE logo"
@@ -156,9 +156,9 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
                   {isAuthenticated && user && (
                     <span className="hidden sm:block">{user.username}</span>
                   )}
-                  {/* Login text - show on mobile when not authenticated */}
+                  {/* Login text - hide on small mobile screens when not authenticated */}
                   {!isAuthenticated && (
-                    <span className="block sm:hidden">Login</span>
+                    <span className="hidden min-[400px]:block sm:hidden">Login</span>
                   )}
                   {/* Dropdown Arrow - always show */}
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,7 +230,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
       {/* Controls section (for main page) */}
       {showControls && controlsSlot && (
         <div className="sticky top-[100px] z-40 bg-white border-b border-gray-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="max-w-7xl mx-auto px-4 pt-4 pb-3">
             {controlsSlot}
           </div>
         </div>

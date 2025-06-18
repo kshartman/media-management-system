@@ -21,7 +21,7 @@ const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
 
   return (
     <nav className={`${className}`}>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 ml-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
