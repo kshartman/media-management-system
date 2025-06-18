@@ -45,7 +45,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
   return (
     <>
       <header className="bg-[#d9f2fc] border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-3" style={{paddingBottom: 'calc(0.75rem - 2px)'}}>
           {/* Top row with title, logo, and menu */}
           <div className="flex justify-between items-center relative">
             <div className="relative">
@@ -229,7 +229,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
 
       {/* Controls section (for main page) */}
       {showControls && controlsSlot && (
-        <div className="sticky top-[100px] z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="z-40 bg-white border-b border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 pt-2 pb-3">
             {controlsSlot}
           </div>
