@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { HeadBucketCommand } = require('@aws-sdk/client-s3');
 const { getS3Client, isS3Configured } = require('./s3Storage');
-const { isEmailConfigured } = require('./emailService');
+const { getMailStatus } = require('./mail');
 const logger = require('./logger');
 const fs = require('fs').promises;
 const path = require('path');
@@ -110,12 +110,23 @@ class HealthChecker {
    * Check email service configuration
    */
   checkEmailService() {
-    const configured = isEmailConfigured();
-    return {
-      status: configured ? 'configured' : 'not-configured',
-      provider: configured ? 'sendgrid' : null,
-      features: configured ? ['password-reset', 'welcome-emails'] : []
-    };
+    try {
+      const mailStatus = getMailStatus();
+      return {
+        status: mailStatus.configured ? 'configured' : 'not-configured',
+        provider: mailStatus.currentDriver,
+        initialized: mailStatus.initialized,
+        availableDrivers: mailStatus.availableDrivers,
+        driverStatus: mailStatus.driverStatus,
+        features: mailStatus.configured ? ['password-reset', 'welcome-emails'] : []
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        error: error.message,
+        features: []
+      };
+    }
   }
 
   /**

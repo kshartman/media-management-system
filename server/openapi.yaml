@@ -8,7 +8,7 @@ info:
     - Card management (image, social, reel types)
     - File uploads with automatic processing
     - User authentication and management
-    - Password reset via email
+    - Password reset via email (SendGrid or Mailgun)
     - Tag management
     - Health monitoring
     - Both local and S3 storage support
@@ -18,6 +18,13 @@ info:
     
     ## File Upload
     File uploads use multipart/form-data and support up to 500MB files with automatic preview generation.
+    
+    ## Email Configuration
+    The system supports multiple email providers for sending password reset and welcome emails:
+    - SendGrid (default if both configured)
+    - Mailgun
+    
+    Configure via environment variables or force a specific driver with MAIL_DRIVER=sendgrid|mailgun
   version: 1.0.0
   contact:
     name: Media Management System
@@ -184,7 +191,7 @@ paths:
       tags:
         - Authentication
       summary: Request password reset
-      description: Send password reset email to user (requires SendGrid configuration)
+      description: Send password reset email to user (requires email service configuration - SendGrid or Mailgun)
       requestBody:
         required: true
         content:
@@ -1036,10 +1043,30 @@ components:
               properties:
                 status:
                   type: string
-                  enum: [configured, not-configured]
+                  enum: [configured, not-configured, error]
                 provider:
                   type: string
                   nullable: true
+                  description: Current mail driver (sendgrid, mailgun)
+                initialized:
+                  type: boolean
+                  description: Whether the mail service is initialized
+                availableDrivers:
+                  type: array
+                  items:
+                    type: string
+                  description: List of supported mail drivers
+                driverStatus:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      available:
+                        type: boolean
+                      required_vars:
+                        type: array
+                        items:
+                          type: string
                 features:
                   type: array
                   items:
