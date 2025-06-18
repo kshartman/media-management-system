@@ -226,7 +226,7 @@ For reference, the actual ZIVE configuration values are available in:
 - `.env.local.zive` - Real ZIVE frontend local development environment (not tracked by git)
 
 **Backend (Local Development):**
-- `server/.env.local.zive` - Real ZIVE server local development environment (not tracked by git)
+- `server/.env.zive` - Real ZIVE server environment (not tracked by git)
 - `server/env.zive.gpg` - Encrypted version (tracked by git for team access)
 
 These files contain the actual configuration values formatted like the template structure, useful for:
@@ -234,7 +234,7 @@ These files contain the actual configuration values formatted like the template 
 - Quick setup for ZIVE-compatible development
 - Reference for working configuration values
 
-**Note**: The `.env.local.zive` files contain sensitive data and are not committed to git. The encrypted `server/env.zive.gpg` version is available for team members who need access to the production configuration.
+**Note**: The reference files (`.env.local.zive` and `server/.env.zive`) contain sensitive data and are not committed to git. The encrypted `server/env.zive.gpg` version is available for team members who need access to the production configuration.
 
 ### Quick ZIVE Development Setup
 ```bash
@@ -242,7 +242,7 @@ These files contain the actual configuration values formatted like the template 
 cp .env.local.zive .env.local
 
 # Backend - copy ZIVE server config  
-cp server/.env.local.zive server/.env
+cp server/.env.zive server/.env
 
 # Start development
 npm run dev
