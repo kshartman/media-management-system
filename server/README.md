@@ -10,6 +10,8 @@ This is the backend server for the Media Management System, providing API endpoi
 - File uploads to local storage or Amazon S3
 - Tag management and filtering
 - Media metadata extraction
+- Password reset via email (SendGrid or Mailgun)
+- MongoDB database for data persistence
 
 ## Installation
 
@@ -30,20 +32,50 @@ This is the backend server for the Media Management System, providing API endpoi
 The server requires several environment variables to run properly. Create a `.env` file in the server directory with the following variables:
 
 ```env
+# Server Configuration
 PORT=3001
+NODE_ENV=development
+
+# MongoDB Configuration
+MONGODB_URI=mongodb://username:password@hostname:port/database
+MONGODB_DB_NAME=media-management
+
+# JWT Authentication
 JWT_SECRET=your-secret-jwt-key-change-in-production
+JWT_EXPIRES_IN=24h
 
 # AWS S3 Configuration (required if USE_S3_STORAGE=true)
 AWS_ACCESS_KEY_ID=your-access-key-id
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
 AWS_REGION=us-west-1
 S3_BUCKET=your-bucket-name
-
-# Set this to true to use S3, false to use local storage
+S3_BUCKET_NAME=your-bucket-name  # Alternative env var
 USE_S3_STORAGE=false
 
 # Optionally specify a custom domain for your S3 bucket (if using CloudFront or similar)
 # S3_CUSTOM_DOMAIN=cdn.yourdomain.com
+
+# Email Configuration (optional - choose SendGrid OR Mailgun)
+# SendGrid
+SENDGRID_API_KEY=your-sendgrid-api-key
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+
+# Mailgun (alternative to SendGrid)
+# MAILGUN_API_KEY=your-mailgun-api-key
+# MAILGUN_DOMAIN=yourdomain.com
+# MAILGUN_FROM_EMAIL=noreply@yourdomain.com
+
+# Force specific mail driver (optional)
+# MAIL_DRIVER=sendgrid
+
+# Frontend URL (for password reset links)
+FRONTEND_URL=http://localhost:3000
+
+# Logging Configuration
+LOG_LEVEL=debug  # debug, info, warn, error
+
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3002
 ```
 
 ## Setting Up Amazon S3 for File Storage

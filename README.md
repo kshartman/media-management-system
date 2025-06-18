@@ -12,7 +12,7 @@ A comprehensive system for browsing, categorizing, and managing digital media as
 - **Admin Features**: Upload, edit, and delete media assets
 - **Cloud Storage**: Support for Amazon S3 storage
 - **User Management**: Admin interface for managing users
-- **Password Reset**: Email-based password reset functionality via SendGrid
+- **Password Reset**: Email-based password reset functionality via SendGrid or Mailgun
 
 ## System Architecture
 
@@ -85,9 +85,20 @@ S3_CUSTOM_DOMAIN=cdn.example.com  # Optional: Set if you're using a CDN
 # Storage Configuration
 USE_S3_STORAGE=true  # Set to true for S3, false for local storage
 
-# SendGrid Configuration (for password reset emails)
+# Email Configuration (for password reset emails)
+# You can use either SendGrid OR Mailgun
+
+# SendGrid Configuration
 SENDGRID_API_KEY=your-sendgrid-api-key-here
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+
+# Mailgun Configuration (Alternative to SendGrid)
+# MAILGUN_API_KEY=your-mailgun-api-key-here
+# MAILGUN_DOMAIN=yourdomain.com
+# MAILGUN_FROM_EMAIL=noreply@yourdomain.com
+
+# Optional: Force a specific mail driver (sendgrid or mailgun)
+# MAIL_DRIVER=sendgrid
 
 # Frontend URL (for password reset links)
 FRONTEND_URL=http://localhost:3000
@@ -197,9 +208,11 @@ Ensure your bucket has this public read policy:
 
 For detailed instructions, see the [S3 IAM Setup Guide](./server/s3-iam-setup-guide.md).
 
-## SendGrid Setup (Optional)
+## Email Setup (Optional)
 
-The password reset feature requires SendGrid for sending emails:
+The password reset feature requires either SendGrid or Mailgun for sending emails. The system automatically detects which service is configured.
+
+### SendGrid Setup
 
 1. **Create a SendGrid account** at [sendgrid.com](https://sendgrid.com)
 2. **Generate an API key**:
@@ -214,7 +227,29 @@ The password reset feature requires SendGrid for sending emails:
    ```
 4. **Verify sender identity** in SendGrid (required for production)
 
-**Note**: If SendGrid is not configured, the password reset feature will be automatically disabled and users will see an appropriate error message.
+### Mailgun Setup
+
+1. **Create a Mailgun account** at [mailgun.com](https://mailgun.com)
+2. **Get your API credentials**:
+   - Go to Dashboard > API Security
+   - Copy your Private API key
+   - Note your sending domain
+3. **Configure environment variables**:
+   ```bash
+   MAILGUN_API_KEY=your-mailgun-api-key-here
+   MAILGUN_DOMAIN=yourdomain.com
+   MAILGUN_FROM_EMAIL=noreply@yourdomain.com
+   FRONTEND_URL=https://yourdomain.com
+   ```
+4. **Verify your domain** in Mailgun (required for production)
+
+### Choosing a Mail Driver
+
+- If both services are configured, SendGrid is used by default
+- To force a specific driver, set: `MAIL_DRIVER=sendgrid` or `MAIL_DRIVER=mailgun`
+- If neither service is configured, password reset features will be disabled
+
+**Note**: The system provides detailed status information about mail configuration in the health check endpoint at `/api/health`.
 
 ## Logging
 
@@ -324,7 +359,7 @@ The system supports three types of media cards:
 
 The system includes user management features:
 
-- User roles (admin, regular user)
+- User roles (admin, editor)
 - Secure authentication with JWT
 - Password hashing with scrypt
 - Admin panel for user management

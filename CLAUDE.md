@@ -121,6 +121,24 @@ src/
 - Consolidated hamburger menu logic
 - Added help link to all routes
 
+### Role System Update
+- Changed "user" role to "editor" throughout the system
+- Added isEditor computed property in AuthContext
+- Editors can create, edit, delete cards (same as old "user" role)
+- Admins have additional user management capabilities
+
+### Download Tracking Implementation
+- Added downloadCount field to Card model
+- Implemented track-download API endpoint
+- Added popularity sort option (by download count)
+- Added development-only download count overlay on cards
+
+### Mail System Abstraction
+- Abstracted email service to support multiple providers
+- Added Mailgun driver alongside existing SendGrid
+- Automatic driver detection based on configuration
+- Enhanced health check to show mail system status
+
 ## Common Issues & Solutions
 
 ### Safari Hanging

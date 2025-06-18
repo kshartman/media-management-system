@@ -38,8 +38,13 @@ This guide explains how to build and deploy the Media Management System using Do
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | your-secret |
 | `S3_BUCKET_NAME` | S3 bucket name | your-bucket |
 | `HOST_UPLOAD_PATH` | Host path for uploads | /data/uploads |
-| `SENDGRID_API_KEY` | SendGrid API key (optional) | your-sendgrid-key |
-| `SENDGRID_FROM_EMAIL` | From email address (optional) | noreply@domain.com |
+| **Email Configuration** | (optional - choose one) | |
+| `SENDGRID_API_KEY` | SendGrid API key | your-sendgrid-key |
+| `SENDGRID_FROM_EMAIL` | SendGrid from email | noreply@domain.com |
+| `MAILGUN_API_KEY` | Mailgun API key | your-mailgun-key |
+| `MAILGUN_DOMAIN` | Mailgun domain | yourdomain.com |
+| `MAILGUN_FROM_EMAIL` | Mailgun from email | noreply@domain.com |
+| `MAIL_DRIVER` | Force specific driver | sendgrid or mailgun |
 | `FRONTEND_URL` | Frontend URL for reset links (optional) | https://domain.com |
 | `LOG_LEVEL` | Logging level (optional) | warn |
 | `NODE_ENV` | Node.js environment (set automatically in Docker) | production |

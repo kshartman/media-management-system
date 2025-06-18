@@ -48,8 +48,10 @@ Configure these in your `.env` file:
 - `AWS_REGION`: AWS region (default: us-east-1)
 - `S3_BUCKET_NAME`: S3 bucket for file storage
 - `UPLOAD_PATH`: Local path for file uploads (will be mounted as volume)
-- `SENDGRID_API_KEY`: SendGrid API key for password reset emails (optional)
-- `SENDGRID_FROM_EMAIL`: Sender email for password reset emails (optional)
+- **Email Configuration** (optional - choose SendGrid OR Mailgun):
+  - SendGrid: `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`
+  - Mailgun: `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL`
+  - Force driver: `MAIL_DRIVER=sendgrid` or `MAIL_DRIVER=mailgun`
 - `FRONTEND_URL`: Frontend URL for password reset links (optional)
 - `LOG_LEVEL`: Logging level - debug, info, warn, error (defaults to warn in production)
 
