@@ -190,21 +190,19 @@ src/
 
 The S3 bucket (`zivepublic`) must have CORS configured to allow browser downloads from the lightbox. This enables the download button to fetch images and force downloads instead of opening in browser.
 
-**Required CORS Configuration:**
+**Required CORS Configuration (ChatGPT recommended):**
 ```json
 [
   {
-    "AllowedHeaders": ["*"],
-    "AllowedMethods": ["GET", "HEAD"],
     "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
     "ExposeHeaders": [
       "Content-Length",
-      "Content-Type",
-      "Content-Disposition",
-      "ETag",
-      "Last-Modified"
-    ],
-    "MaxAgeSeconds": 3600
+      "Content-Range",
+      "Accept-Ranges", 
+      "Content-Type"
+    ]
   }
 ]
 ```
@@ -229,7 +227,14 @@ The S3 bucket (`zivepublic`) must have CORS configured to allow browser download
 }
 ```
 
-**Note**: CORS is required for lightbox downloads but doesn't affect other S3 access patterns.
+**Note**: CORS is required for lightbox downloads and Safari video streaming. The `Range` header and `Content-Range`/`Accept-Ranges` expose headers are critical for Safari video playback compatibility.
+
+### S3 URL Format Fix
+**Issue**: Safari video streaming failed due to S3 URL format.
+- ❌ Global format: `https://zivepublic.s3.amazonaws.com/...` (returns 403)
+- ✅ Regional format: `https://zivepublic.s3.us-east-1.amazonaws.com/...` (works correctly)
+
+**Solution**: S3 storage configuration automatically generates regional URLs for new uploads. Database migration script available at `server/scripts/migrate-s3-urls.js` if needed for existing URLs.
 
 ## Code Patterns
 

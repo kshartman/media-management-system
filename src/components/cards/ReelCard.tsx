@@ -6,28 +6,20 @@ import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useVideoPlayer } from '../../contexts/VideoPlayerContext';
 import { getProxiedImageUrl } from '../../lib/utils';
-import { trackCardDownload } from '../../lib/api';
+import { trackCardDownload, getDownloadUrl } from '../../lib/api';
 
 const ReelCard: React.FC<ReelCardProps> = (props) => {
   // Keep all props to pass to BaseCard
   const { ...baseProps } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoId = `video-${props.id}`; // Use the card ID as the unique video ID
-  const [isMobile, setIsMobile] = useState(false);
+  
+  // Detect Safari browser
+  const isSafari = typeof window !== 'undefined' && 
+    /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   
   // Get video context
-  const { playVideo, isPlaying, registerVideoRef } = useVideoPlayer();
-  
-  // Detect mobile device
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const { playVideo, isPlaying, registerVideoRef, stopAllVideos } = useVideoPlayer();
   
   // Register video ref when it's available
   useEffect(() => {
@@ -39,13 +31,37 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
 
   const handlePlay = () => {
     playVideo(videoId);
-    // On mobile, give video element a chance to receive user gesture
-    if (isMobile) {
-      setTimeout(() => {
-        if (videoRef.current && isPlaying(videoId)) {
-          videoRef.current.play().catch(console.error);
-        }
-      }, 100);
+    // Manually trigger play on the video element
+    if (videoRef.current) {
+      videoRef.current.play().catch(err => {
+        console.log('Video play failed:', err);
+      });
+    }
+  };
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // Track the download
+      await trackCardDownload(props.id);
+      
+      // Get signed download URL
+      const response = await getDownloadUrl(
+        getProxiedImageUrl(props.movie),
+        props.fileMetadata?.movieOriginalFileName
+      );
+      
+      // Create a temporary link and trigger download
+      const link = document.createElement('a');
+      link.href = response.downloadUrl;
+      link.download = props.fileMetadata?.movieOriginalFileName || 'video.mp4';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Failed to download video:', error);
+      // Fallback to direct link
+      window.open(getProxiedImageUrl(props.movie), '_blank');
     }
   };
 
@@ -59,18 +75,84 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
       facebookCopy={props.facebookCopy}
     >
       <div className="relative group">
-        <div 
-          className="w-full aspect-[9/16] relative cursor-pointer" 
-          onClick={handlePlay}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              handlePlay();
-            }
-          }}
-          aria-label="Play video"
-        >
+        {/* Safari: Simple video element with poster */}
+        {isSafari ? (
+          <div className="w-full aspect-[9/16] relative">
+            <video
+              ref={videoRef}
+              poster={props.preview ? getProxiedImageUrl(props.preview) : undefined}
+              controls
+              preload="auto"
+              playsInline
+              width="100%"
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover"
+              style={{ aspectRatio: '9/16' }}
+              onPlay={() => {
+                // When Safari video starts playing, update context and stop other videos
+                playVideo(videoId);
+              }}
+              onPause={() => {
+                // When Safari video is paused, clear the playing state
+                if (isPlaying(videoId)) {
+                  playVideo("");
+                }
+              }}
+              onError={(e) => {
+                const videoElement = e.target as HTMLVideoElement;
+                console.error('Video error:', e.type, videoElement?.error?.code, videoElement?.error?.message);
+              }}
+            >
+              <source 
+                src={getProxiedImageUrl(props.movie)}
+                type="video/mp4"
+              />
+              <track kind="captions" srcLang="en" label="English" default />
+              {props.transcript && (
+                <track
+                  kind="captions"
+                  src={props.transcript}
+                  label="English captions"
+                  srcLang="en"
+                />
+              )}
+              Your browser does not support the video tag.
+            </video>
+            
+            {/* Download button overlay for Safari - positioned to avoid native controls */}
+            <button
+              className="absolute bottom-12 right-2 z-10"
+              onClick={handleDownload}
+              title={`Download ${props.fileMetadata?.movieOriginalFileName || 'video'}`}
+            >
+              <div className="p-1.5 rounded-full bg-white bg-opacity-90 transition-opacity duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+            </button>
+            
+            {/* Development download count for Safari - positioned to avoid native controls */}
+            {process.env.NODE_ENV === 'development' && typeof props.downloadCount === 'number' && (
+              <div className="absolute bottom-12 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded z-20">
+                {props.downloadCount}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Chrome and other browsers: Keep existing interactive behavior */
+          <div 
+            className="w-full aspect-[9/16] relative cursor-pointer" 
+            onClick={handlePlay}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handlePlay();
+              }
+            }}
+            aria-label="Play video"
+          >
           {!isPlaying(videoId) ? (
             <>
               {props.preview ? (
@@ -115,20 +197,9 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               </div>
               
               {/* Download Icon Overlay */}
-              <a
-                href={getProxiedImageUrl(props.movie)}
-                download={props.fileMetadata?.movieOriginalFileName || undefined}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
                 className="absolute top-2 right-2 z-10"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                    await trackCardDownload(props.id);
-                  } catch (error) {
-                    console.error('Failed to track download:', error);
-                  }
-                }}
+                onClick={handleDownload}
                 title={`Download ${props.fileMetadata?.movieOriginalFileName || 'video'}`}
               >
                 <div className="p-1.5 rounded-full bg-white bg-opacity-70 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
@@ -136,7 +207,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                 </div>
-              </a>
+              </button>
 
               {/* Metadata Overlay */}
               {props.fileMetadata && (
@@ -171,54 +242,59 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
               )}
             </>
           ) : (
-            <div className="w-full aspect-[9/16] relative">
+            /* Video playing state for Chrome */
+            <>
               <video
                 ref={videoRef}
-                src={getProxiedImageUrl(props.movie)}
                 controls
-                autoPlay={!isMobile}
-                playsInline={!isMobile}
-                preload="metadata"
-                muted={isMobile}
-                onEnded={() => playVideo("")} // Clear the current playing video when ended
+                autoPlay
+                crossOrigin="anonymous"
+                width="100%"
+                preload="auto"
+                muted={false}
+                playsInline
+                onEnded={() => playVideo("")}
                 onError={(e) => {
                   const videoElement = e.target as HTMLVideoElement;
                   console.error('Video error:', e.type, videoElement?.error?.code, videoElement?.error?.message);
                 }}
                 aria-label={props.description || "Video content"}
                 className="w-full h-full object-cover"
+                style={{ aspectRatio: '9/16' }}
               >
-                {/* Adding a track element for captions - transcript serves as captions */}
+                <source 
+                  src={getProxiedImageUrl(props.movie)}
+                  type="video/mp4"
+                />
                 <track kind="captions" srcLang="en" label="English" default />
-                {props.transcript ? (
+                {props.transcript && (
                   <track
                     kind="captions"
                     src={props.transcript}
                     label="English captions"
                     srcLang="en"
                   />
-                ) : (
-                  <track kind="captions" label="No captions available" />
                 )}
                 Your browser does not support the video tag.
               </video>
               
-              {/* Close button - positioned to avoid browser volume controls */}
+              {/* Close button when video is playing */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   playVideo(""); // Clear current playing video
                 }}
-                className="absolute top-2 left-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors z-20"
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors z-20"
                 aria-label="Close video"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
-            </div>
+            </>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </BaseCard>
   );

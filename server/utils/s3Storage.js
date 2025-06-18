@@ -146,6 +146,56 @@ const getSignedFileUrl = async (filename, expirationSeconds = 3600) => {
   }
 };
 
+// Generate a pre-signed URL for downloading a file with Content-Disposition header
+const getSignedDownloadUrl = async (filename, downloadFilename = null, expirationSeconds = 3600) => {
+  if (!isS3Configured || !filename) return null;
+
+  try {
+    let key;
+    
+    // Handle full S3 URLs - extract just the key part
+    if (filename.includes('amazonaws.com/')) {
+      key = filename.split('amazonaws.com/')[1];
+    }
+    // Handle custom domain URLs
+    else if (s3CustomDomain && filename.includes(s3CustomDomain)) {
+      key = filename.split(`${s3CustomDomain}/`)[1];
+    }
+    // Handle local paths that might have uploads/ prefix
+    else if (filename.includes('uploads/')) {
+      const baseName = filename.split('uploads/')[1];
+      key = `${s3FolderPath}/${baseName}`;
+    }
+    // Handle paths that already have the S3 folder prefix
+    else if (filename.startsWith(s3FolderPath + '/')) {
+      key = filename;
+    }
+    // Handle simple filenames
+    else {
+      // Remove any leading slashes for consistency
+      const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
+      // Add the S3 folder prefix if it's not already there
+      key = cleanFilename.includes(s3FolderPath) ? cleanFilename : `${s3FolderPath}/${cleanFilename}`;
+    }
+    
+    // Determine the filename for download
+    const finalFilename = downloadFilename || path.basename(key);
+    
+    // Create a GetObject command with response Content-Disposition
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${finalFilename}"`
+    });
+
+    // Generate a signed URL
+    return await getSignedUrl(s3Client, command, { expiresIn: expirationSeconds });
+  } catch (error) {
+    s3StorageLogger.error('Error generating signed download URL:', error);
+    return null;
+  }
+};
+
 // Delete a file (from S3 or local storage)
 const deleteFile = async (filename) => {
   if (!filename) return false;
@@ -383,6 +433,7 @@ module.exports = {
   getStorage,
   getFileUrl,
   getSignedFileUrl,
+  getSignedDownloadUrl,
   deleteFile,
   getFilenameFromUrl,
   isS3Configured,

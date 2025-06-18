@@ -341,3 +341,11 @@ export const sendPasswordResetLink = async (id: string): Promise<{ message: stri
 export const trackCardDownload = async (cardId: string): Promise<{ success: boolean; downloadCount: number }> => {
   return request(`/cards/${cardId}/track-download`, { method: 'POST' });
 };
+
+// Get signed download URL for a file
+export const getDownloadUrl = async (fileUrl: string, filename?: string): Promise<{ downloadUrl: string }> => {
+  return request('/files/download-url', {
+    method: 'POST',
+    body: JSON.stringify({ fileUrl, filename }),
+  });
+};
