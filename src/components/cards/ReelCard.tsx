@@ -159,7 +159,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 autoPlay
                 playsInline
                 preload="metadata"
-                muted={false}
+                muted={true}
                 onEnded={() => playVideo("")} // Clear the current playing video when ended
                 onError={(e) => {
                   const videoElement = e.target as HTMLVideoElement;
@@ -183,13 +183,13 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 Your browser does not support the video tag.
               </video>
               
-              {/* Close button */}
+              {/* Close button - positioned to avoid browser volume controls */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   playVideo(""); // Clear current playing video
                 }}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                className="absolute top-2 left-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors z-20"
                 aria-label="Close video"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
