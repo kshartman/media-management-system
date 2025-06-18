@@ -184,7 +184,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 src={getProxiedImageUrl(props.movie)}
                 controls
                 autoPlay={!isMobile}
-{...(!isMobile && { playsInline: true })}
+                playsInline={!isMobile}
                 preload="metadata"
                 muted={isMobile}
                 onEnded={() => playVideo("")} // Clear the current playing video when ended
