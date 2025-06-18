@@ -15,12 +15,14 @@ body {
   font-family: 'DM Sans', sans-serif;
 }
 
-/* Hide scrollbars while maintaining functionality */
-* {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-}
+/* Hide scrollbars on mobile while maintaining functionality */
+@media (max-width: 768px) {
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
 
-*::-webkit-scrollbar {
-  display: none; /* WebKit browsers */
+  *::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
 }
