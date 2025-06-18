@@ -176,7 +176,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 ref={videoRef}
                 src={getProxiedImageUrl(props.movie)}
                 controls
-                autoPlay={false}
+                autoPlay={!isMobile}
                 playsInline={!isMobile}
                 preload="metadata"
                 muted={isMobile}
