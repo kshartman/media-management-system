@@ -217,6 +217,19 @@ const brandConfig = {
 };
 ```
 
+## Development Reference Files
+
+### ZIVE Production Values
+For reference, the actual ZIVE production configuration values are available in:
+- `server/.env.zive` - Real ZIVE server environment (not tracked by git)
+
+This file contains the actual production values formatted like the `.env.example` template, useful for:
+- Comparing client configurations against ZIVE defaults
+- Quick setup for ZIVE-compatible development
+- Reference for working configuration values
+
+**Note**: These files contain sensitive data and are not committed to git.
+
 ## Troubleshooting
 
 ### Brand Config Not Loading
