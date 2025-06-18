@@ -225,13 +225,16 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
             <h1 className="absolute left-0 top-1/2 transform -translate-y-1/2 text-xl font-bold text-gray-900 hidden lg:block">{title}</h1>
           </div>
           
-          {/* Controls section integrated into header */}
-          {showControls && controlsSlot && (
-            <div className="mt-3 bg-white pt-3 pb-3 -mx-4 px-4">
+        </div>
+        
+        {/* Controls section integrated into header - full width */}
+        {showControls && controlsSlot && (
+          <div className="bg-white pt-3 pb-3">
+            <div className="max-w-7xl mx-auto px-4">
               {controlsSlot}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </header>
     </>
   );
