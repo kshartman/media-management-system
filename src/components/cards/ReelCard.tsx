@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
@@ -19,7 +19,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
     /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   
   // Get video context
-  const { playVideo, isPlaying, registerVideoRef, stopAllVideos } = useVideoPlayer();
+  const { playVideo, isPlaying, registerVideoRef } = useVideoPlayer();
   
   // Register video ref when it's available
   useEffect(() => {
@@ -34,7 +34,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
     // Manually trigger play on the video element
     if (videoRef.current) {
       videoRef.current.play().catch(err => {
-        console.log('Video play failed:', err);
+        console.warn('Video play failed:', err);
       });
     }
   };

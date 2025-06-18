@@ -12,7 +12,13 @@ if (configName === 'default') {
   brandConfig = defaultConfig;
 } else if (configName === 'test-client') {
   // Load test client config for demonstration
-  brandConfig = require('./brand.config.test-client').default;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    brandConfig = require('./brand.config.test-client').default;
+  } catch {
+    console.warn('Test client config not found, using default config');
+    brandConfig = defaultConfig;
+  }
 } else {
   // For other client-specific configs, fall back to default
   console.warn(`Client config '${configName}' not found, using default config`);

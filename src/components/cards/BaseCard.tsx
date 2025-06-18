@@ -15,7 +15,7 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   onEdit,
   onDelete,
   onRefresh,
-  isAdmin = false,
+  isAdmin: _isAdmin = false,
   isEditor = false,
   type: _type,
   preview: _preview,

@@ -95,7 +95,7 @@ export default function ReelsPage() {
     };
 
     loadData();
-  }, []);
+  }, [currentSort]);
   
   // Apply all filters and sorting
   const applyFiltersAndSort = (
@@ -154,7 +154,7 @@ export default function ReelsPage() {
     // Apply sorting
     filtered.sort((a, b) => {
       switch (sort) {
-        case 'popularity':
+        case 'popularity': {
           // Primary: downloadCount descending
           const downloadA = a.downloadCount || 0;
           const downloadB = b.downloadCount || 0;
@@ -171,20 +171,23 @@ export default function ReelsPage() {
           
           // Tertiary: description alphabetical
           return a.description.localeCompare(b.description);
+        }
           
         case 'alphabetical':
           return a.description.localeCompare(b.description);
           
-        case 'oldest':
+        case 'oldest': {
           const oldDateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
           const oldDateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
           return oldDateA - oldDateB;
+        }
           
         case 'newest':
-        default:
+        default: {
           const newDateA = a.fileMetadata?.date ? new Date(a.fileMetadata.date).getTime() : 0;
           const newDateB = b.fileMetadata?.date ? new Date(b.fileMetadata.date).getTime() : 0;
           return newDateB - newDateA;
+        }
       }
     });
 
