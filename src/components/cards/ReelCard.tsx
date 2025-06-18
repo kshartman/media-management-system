@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
@@ -13,9 +13,21 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
   const { ...baseProps } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoId = `video-${props.id}`; // Use the card ID as the unique video ID
+  const [isMobile, setIsMobile] = useState(false);
   
   // Get video context
   const { playVideo, isPlaying, registerVideoRef } = useVideoPlayer();
+  
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Register video ref when it's available
   useEffect(() => {
@@ -159,7 +171,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 autoPlay
                 playsInline
                 preload="metadata"
-                muted={true}
+                muted={isMobile}
                 onEnded={() => playVideo("")} // Clear the current playing video when ended
                 onError={(e) => {
                   const videoElement = e.target as HTMLVideoElement;
