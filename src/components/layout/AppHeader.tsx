@@ -224,17 +224,15 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
             {/* Page title positioned on the left, aligned with hamburger menu, hidden when space is crowded */}
             <h1 className="absolute left-0 top-1/2 transform -translate-y-1/2 text-xl font-bold text-gray-900 hidden lg:block">{title}</h1>
           </div>
+          
+          {/* Controls section integrated into header */}
+          {showControls && controlsSlot && (
+            <div className="mt-3 border-t border-gray-300 pt-3">
+              {controlsSlot}
+            </div>
+          )}
         </div>
       </header>
-
-      {/* Controls section (for main page) */}
-      {showControls && controlsSlot && (
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 pt-2 pb-3">
-            {controlsSlot}
-          </div>
-        </div>
-      )}
     </>
   );
 }

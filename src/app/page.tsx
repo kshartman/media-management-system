@@ -821,15 +821,19 @@ export default function Home() {
                   />
                 </div>
               )}
-              <TypeDropdown
-                onFilterChange={handleFilterChange}
-                selectedTypes={selectedTypes}
-              />
-              <TagDropdown
-                onFilterChange={handleFilterChange}
-                selectedTags={selectedTags}
-                availableTags={availableTags}
-              />
+              <div className="hidden sm:block">
+                <TypeDropdown
+                  onFilterChange={handleFilterChange}
+                  selectedTypes={selectedTypes}
+                />
+              </div>
+              <div className="hidden sm:block">
+                <TagDropdown
+                  onFilterChange={handleFilterChange}
+                  selectedTags={selectedTags}
+                  availableTags={availableTags}
+                />
+              </div>
               <SortDropdown
                 onSortChange={handleSortChange}
                 currentSort={currentSort}

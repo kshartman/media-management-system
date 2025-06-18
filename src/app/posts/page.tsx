@@ -530,11 +530,13 @@ export default function PostsPage() {
                   />
                 </div>
               )}
-              <TagDropdown
-                onFilterChange={handleFilterChange}
-                selectedTags={selectedTags}
-                availableTags={availableTags}
-              />
+              <div className="hidden sm:block">
+                <TagDropdown
+                  onFilterChange={handleFilterChange}
+                  selectedTags={selectedTags}
+                  availableTags={availableTags}
+                />
+              </div>
               <SortDropdown
                 onSortChange={handleSortChange}
                 currentSort={currentSort}
