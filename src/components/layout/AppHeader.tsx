@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Navigation from './Navigation';
 import { useAuth } from '@/lib/authContext';
+import { brandConfig, getThemeColor } from '@/config';
 
 interface AppHeaderProps {
   title?: string;
@@ -12,7 +13,7 @@ interface AppHeaderProps {
   onLoginClick?: () => void;
 }
 
-export default function AppHeader({ title = "Affiliate Resources", showControls = false, controlsSlot, onLoginClick }: AppHeaderProps) {
+export default function AppHeader({ title = brandConfig.appTitle, showControls = false, controlsSlot, onLoginClick }: AppHeaderProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, isAdmin, isEditor, user, logout } = useAuth();
@@ -44,7 +45,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
 
   return (
     <>
-      <header className="bg-[#d9f2fc] border-b border-gray-200 sticky top-0 z-40">
+      <header className="border-b border-gray-200 sticky top-0 z-40" style={{backgroundColor: getThemeColor('headerBackground')}}>
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-3" style={{paddingBottom: 'calc(0.75rem - 2px)'}}>
           {/* Top row with title, logo, and menu */}
           <div className="flex justify-between items-center relative">
@@ -92,32 +93,40 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
                       Login
                     </button>
                   )}
-                  <a
-                    href="https://affiliates.shopzive.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowMobileMenu(false)}
-                  >
-                    Affiliate Portal
-                  </a>
-                  <a
-                    href="https://shopzive.com/pages/zivepro-affiliate-resources"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowMobileMenu(false)}
-                  >
-                    Affiliate Training
-                  </a>
+                  {brandConfig.externalLinks && (
+                    <>
+                      {brandConfig.externalLinks.portal && (
+                        <a
+                          href={brandConfig.externalLinks.portal.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowMobileMenu(false)}
+                        >
+                          {brandConfig.externalLinks.portal.label}
+                        </a>
+                      )}
+                      {brandConfig.externalLinks.training && (
+                        <a
+                          href={brandConfig.externalLinks.training.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowMobileMenu(false)}
+                        >
+                          {brandConfig.externalLinks.training.label}
+                        </a>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
             <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center pointer-events-none">
               <Image
-                src="/zive-logo.png"
-                alt="ZIVE logo"
+                src={brandConfig.logoPath}
+                alt={`${brandConfig.companyName} logo`}
                 className="h-8 w-auto"
                 width={96}
                 height={32}

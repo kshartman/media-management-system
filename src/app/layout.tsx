@@ -1,9 +1,10 @@
 import './globals.css';
 import { Providers } from './providers';
+import { brandConfig } from '@/config';
 
 export const metadata = {
-  title: 'Affiliate Resources',
-  description: 'A system for managing and browsing digital media assets',
+  title: brandConfig.appTitle,
+  description: brandConfig.appDescription,
 };
 
 export default function RootLayout({
@@ -13,6 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href={brandConfig.faviconPath} />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
