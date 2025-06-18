@@ -222,13 +222,14 @@ const brandConfig = {
 ### ZIVE Production Values
 For reference, the actual ZIVE production configuration values are available in:
 - `server/.env.zive` - Real ZIVE server environment (not tracked by git)
+- `server/env.zive.gpg` - Encrypted version (tracked by git for team access)
 
 This file contains the actual production values formatted like the `.env.example` template, useful for:
 - Comparing client configurations against ZIVE defaults
 - Quick setup for ZIVE-compatible development
 - Reference for working configuration values
 
-**Note**: These files contain sensitive data and are not committed to git.
+**Note**: The `.env.zive` file contains sensitive data and is not committed to git. The encrypted `env.zive.gpg` version is available for team members who need access to the production configuration.
 
 ## Troubleshooting
 
