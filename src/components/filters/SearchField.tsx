@@ -58,7 +58,7 @@ const SearchField: React.FC<SearchFieldProps> = ({ onSearch, initialSearchTerm =
           value={searchTerm}
           onChange={handleSearchChange}
           placeholder="Search..."
-          className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+          className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-base"
         />
         
         {/* Clear Button (only shown when there's text) */}

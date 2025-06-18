@@ -227,7 +227,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
           
           {/* Controls section integrated into header */}
           {showControls && controlsSlot && (
-            <div className="mt-3 border-t border-gray-300 pt-3">
+            <div className="mt-3 bg-white pt-3 pb-3 -mx-4 px-4">
               {controlsSlot}
             </div>
           )}
