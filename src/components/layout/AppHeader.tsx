@@ -229,7 +229,7 @@ export default function AppHeader({ title = "Affiliate Resources", showControls 
 
       {/* Controls section (for main page) */}
       {showControls && controlsSlot && (
-        <div className="z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 pt-2 pb-3">
             {controlsSlot}
           </div>
