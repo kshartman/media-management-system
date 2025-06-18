@@ -37,8 +37,23 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
   }, [videoId, registerVideoRef]);
 
 
-  const handlePlay = () => {
-    playVideo(videoId);
+  const handlePlay = async () => {
+    if (isMobile) {
+      // On mobile, we need to manually trigger play due to autoplay restrictions
+      playVideo(videoId);
+      // Give the video element a moment to be created, then manually play
+      setTimeout(async () => {
+        if (videoRef.current) {
+          try {
+            await videoRef.current.play();
+          } catch (error) {
+            console.error('Error playing video on mobile:', error);
+          }
+        }
+      }, 100);
+    } else {
+      playVideo(videoId);
+    }
   };
 
   return (
@@ -168,7 +183,7 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
                 ref={videoRef}
                 src={getProxiedImageUrl(props.movie)}
                 controls
-                autoPlay
+                autoPlay={!isMobile}
                 playsInline
                 preload="metadata"
                 muted={isMobile}
