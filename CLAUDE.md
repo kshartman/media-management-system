@@ -133,6 +133,14 @@ src/
 - Added popularity sort option (by download count)
 - Added development-only download count overlay on cards
 
+### Video System Overhaul
+- **Browser Detection**: Safari vs Chrome rendering paths
+- **Safari**: Native video controls with positioned download button
+- **Chrome/Firefox**: Interactive preview with hover download button
+- **Mobile**: Native controls across all browsers for touch interface
+- **Downloads**: Signed URLs with Content-Disposition headers for reliable downloads
+- **Streaming**: Direct S3 URLs preserved for optimal video performance
+
 ### Mail System Abstraction
 - Abstracted email service to support multiple providers
 - Added Mailgun driver alongside existing SendGrid
@@ -186,11 +194,11 @@ src/
 
 ### AWS S3 Configuration
 
-**CORS Configuration Required for Downloads**
+**Video Streaming and Download Configuration**
 
-The S3 bucket (`zivepublic`) must have CORS configured to allow browser downloads from the lightbox. This enables the download button to fetch images and force downloads instead of opening in browser.
+The S3 bucket (`zivepublic`) supports both video streaming (direct URLs) and reliable downloads (signed URLs with Content-Disposition headers).
 
-**Required CORS Configuration (ChatGPT recommended):**
+**CORS Configuration for Video Streaming:**
 ```json
 [
   {
@@ -202,12 +210,19 @@ The S3 bucket (`zivepublic`) must have CORS configured to allow browser download
       "Content-Range",
       "Accept-Ranges", 
       "Content-Type"
-    ]
+    ],
+    "MaxAgeSeconds": 3600
   }
 ]
 ```
 
-**How to Apply:**
+**Download System:**
+- **Video streaming**: Direct S3 URLs for optimal performance
+- **Downloads**: Server-generated signed URLs with `ResponseContentDisposition: attachment`
+- **Browser compatibility**: Signed URLs bypass cross-origin download restrictions
+- **Safari/Chrome**: Browser-specific rendering with native vs interactive controls
+
+**How to Apply CORS:**
 1. AWS Console → S3 → `zivepublic` bucket
 2. Permissions tab → Cross-origin resource sharing (CORS)
 3. Edit and paste the configuration above
@@ -227,7 +242,7 @@ The S3 bucket (`zivepublic`) must have CORS configured to allow browser download
 }
 ```
 
-**Note**: CORS is required for lightbox downloads and Safari video streaming. The `Range` header and `Content-Range`/`Accept-Ranges` expose headers are critical for Safari video playback compatibility.
+**Note**: CORS enables video streaming. Downloads use signed URLs to ensure reliability across all browsers.
 
 ### S3 URL Format Fix
 **Issue**: Safari video streaming failed due to S3 URL format.
