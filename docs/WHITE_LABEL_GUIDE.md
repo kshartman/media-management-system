@@ -224,6 +224,7 @@ For reference, the actual ZIVE configuration values are available in:
 
 **Frontend (Local Development):**
 - `.env.local.zive` - Real ZIVE frontend local development environment (not tracked by git)
+- `env.local.zive.gpg` - Encrypted version (tracked by git for team access)
 
 **Backend (Local Development):**
 - `server/.env.zive` - Real ZIVE server environment (not tracked by git)
@@ -234,14 +235,30 @@ These files contain the actual configuration values formatted like the template 
 - Quick setup for ZIVE-compatible development
 - Reference for working configuration values
 
-**Note**: The reference files (`.env.local.zive` and `server/.env.zive`) contain sensitive data and are not committed to git. The encrypted `server/env.zive.gpg` version is available for team members who need access to the production configuration.
+**Note**: The reference files (`.env.local.zive` and `server/.env.zive`) contain sensitive data and are not committed to git. The encrypted versions (`env.local.zive.gpg` and `server/env.zive.gpg`) are available for team members who need access to the working configurations.
 
 ### Quick ZIVE Development Setup
+
+#### Option 1: Using existing reference files
 ```bash
 # Frontend - copy ZIVE local development config
 cp .env.local.zive .env.local
 
 # Backend - copy ZIVE server config  
+cp server/.env.zive server/.env
+
+# Start development
+npm run dev
+```
+
+#### Option 2: Decrypt from encrypted files (team setup)
+```bash
+# Decrypt encrypted configurations
+gpg --decrypt env.local.zive.gpg > .env.local.zive
+gpg --decrypt server/env.zive.gpg > server/.env.zive
+
+# Then copy to active configs
+cp .env.local.zive .env.local
 cp server/.env.zive server/.env
 
 # Start development
