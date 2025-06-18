@@ -389,4 +389,5 @@ module.exports = {
   isFileOrphaned,
   safeDeleteOrphanedFile,
   uploadLocalFileToS3,
+  getS3Client: () => s3Client,
 };
