@@ -237,6 +237,8 @@ These files contain the actual configuration values formatted like the template 
 
 **Note**: The reference files (`.env.local.zive` and `server/.env.zive`) contain sensitive data and are not committed to git. The encrypted versions (`env.local.zive.gpg` and `server/env.zive.gpg`) are available for team members who need access to the working configurations.
 
+**Docker vs Local Development**: The `.env.docker.zive` reference file contains production Docker deployment values (port 5001, external MongoDB), while `server/.env.zive` contains local development values (port 3001, direct S3 access).
+
 ### Quick ZIVE Development Setup
 
 #### Option 1: Using existing reference files
