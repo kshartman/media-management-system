@@ -246,11 +246,11 @@ async function startServer() {
     setInterval(performCleanup, 60 * 60 * 1000);
     
     app.listen(PORT, () => {
-      apiLogger.warn(`🚀 Server running on port ${PORT}`);
-      apiLogger.warn(`📁 Serving static files from: ${uploadPath}`);
-      apiLogger.warn(`🔒 CORS enabled for origins: ${CORS_ALLOWED_ORIGINS.join(', ')}`);
-      apiLogger.warn(`📧 Email service: ${isEmailConfigured() ? 'Configured' : 'Not configured'}`);
-      apiLogger.warn('✅ Media Management System API is ready');
+      apiLogger.info(`🚀 Server running on port ${PORT}`);
+      apiLogger.info(`📁 Serving static files from: ${uploadPath}`);
+      apiLogger.info(`🔒 CORS enabled for origins: ${CORS_ALLOWED_ORIGINS.join(', ')}`);
+      apiLogger.info(`📧 Email service: ${isEmailConfigured() ? 'Configured' : 'Not configured'}`);
+      apiLogger.info('✅ Media Management System API is ready');
     });
   } catch (error) {
     apiLogger.error('Failed to start server:', error);
