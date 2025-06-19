@@ -90,7 +90,7 @@ cp /path/to/acme-favicon.ico public/
 #### Frontend Environment
 ```bash
 # Copy the whitelabel environment template
-cp .env.example.whitelabel .env
+cp .env.docker.example.whitelabel .env
 
 # Update with client values
 vim .env
