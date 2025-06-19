@@ -189,7 +189,7 @@ src/
 
 ### Local Development
 - **Frontend**: Port 3000
-- **Backend**: Port 5001
+- **Backend**: Port 3001 (Note: Different from Docker which uses 5001)
 - **MongoDB**: Configured via environment variables
 
 ### AWS S3 Configuration

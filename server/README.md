@@ -32,7 +32,7 @@ This is the backend server for the Media Management System, providing API endpoi
 The server requires several environment variables to run properly. Create a `.env` file in the server directory with the following variables:
 
 ```env
-# Server Configuration
+# Server Configuration (3001 for local development, 5001 for production)
 PORT=3001
 NODE_ENV=development
 
@@ -49,8 +49,7 @@ AWS_ACCESS_KEY_ID=your-access-key-id
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
 AWS_REGION=us-west-1
 S3_BUCKET=your-bucket-name
-S3_BUCKET_NAME=your-bucket-name  # Alternative env var
-USE_S3_STORAGE=false
+USE_S3_STORAGE=true  # Set to true to enable S3 storage, false for local storage
 
 # Optionally specify a custom domain for your S3 bucket (if using CloudFront or similar)
 # S3_CUSTOM_DOMAIN=cdn.yourdomain.com

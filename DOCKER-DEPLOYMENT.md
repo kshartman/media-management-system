@@ -13,7 +13,7 @@ This guide explains how to build and deploy the Media Management System using Do
 
 1. **Configure environment variables:**
    ```bash
-   cp .env.example .env
+   cp .env.docker.example .env
    # Edit .env with your configuration
    ```
 
