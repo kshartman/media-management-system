@@ -8,6 +8,7 @@ const { getFileUrl, getSignedFileUrl, getFilenameFromUrl } = require('./s3Storag
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('./logger');
+const { getUploadPath } = require('./uploadPath');
 
 const zipSequenceLogger = logger.child({ module: 'zipSequence' });
 
@@ -25,7 +26,7 @@ async function createSequenceZip(imagePaths, originalFilenames, cardTitle) {
 
   const timestamp = Date.now();
   const zipFilename = `${timestamp}-${cardTitle || 'image-sequence'}-${uuidv4().substring(0, 8)}.zip`;
-  const zipPath = path.join(__dirname, '..', 'uploads', zipFilename);
+  const zipPath = path.join(getUploadPath(), zipFilename);
   
   zipSequenceLogger.info(`Creating ZIP archive: ${zipPath}`);
 

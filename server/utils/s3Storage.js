@@ -5,6 +5,7 @@ const path = require('path');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const logger = require('./logger');
+const { getUploadPath } = require('./uploadPath');
 require('dotenv').config();
 
 // Create a child logger for s3Storage
@@ -232,7 +233,7 @@ const deleteFile = async (filename) => {
       return true;
     } else {
       // For local storage, delete the file from disk
-      const filePath = path.join(__dirname, '..', 'uploads', path.basename(cleanFilename));
+      const filePath = path.join(getUploadPath(), path.basename(cleanFilename));
 
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);

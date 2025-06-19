@@ -6,6 +6,7 @@ const { Card } = require('../models');
 const { createCardZip } = require('../utils/zipCardFiles');
 const { getSignedFileUrl, getSignedDownloadUrl, isS3Configured } = require('../utils/s3Storage');
 const logger = require('../utils/logger');
+const { getUploadPath } = require('../utils/uploadPath');
 
 const fileLogger = logger.child({ component: 'files' });
 const s3Logger = logger.child({ component: 's3-files' });
@@ -52,7 +53,7 @@ router.get('/cards/:id/download-package', async (req, res) => {
 router.get('/download-zip/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
-    const zipPath = path.join(__dirname, '..', 'uploads', filename);
+    const zipPath = path.join(getUploadPath(), filename);
     
     // Security check: ensure filename doesn't contain path traversal
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {

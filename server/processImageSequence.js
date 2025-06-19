@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { uploadLocalFileToS3, isS3Configured } = require('./utils/s3Storage');
 const logger = require('./utils/logger');
+const { getUploadPath } = require('./utils/uploadPath');
 
 // Create child logger for this module
 const imageProcessor = logger.child({ module: 'imageProcessor' });
@@ -88,7 +89,7 @@ async function processImageSequence(req, files, date, extractMetadata, existingC
       imageProcessor.debug(`Processing image ${i}: ${file.originalname}`);
       
       // Get local path and add to uploads directory
-      const localFilePath = path.join(__dirname, 'uploads', file.filename);
+      const localFilePath = path.join(getUploadPath(), file.filename);
       let storagePath = `/uploads/${file.filename}`;
       
       // Extract metadata from the local file BEFORE S3 upload

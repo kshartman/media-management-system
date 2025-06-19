@@ -8,7 +8,9 @@ const uploadLogger = logger.child({ component: 'upload' });
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '..', 'uploads'));
+    // Use UPLOAD_PATH env var or fall back to local uploads directory
+    const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, '..', 'uploads');
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     // Create a unique filename while preserving the original extension

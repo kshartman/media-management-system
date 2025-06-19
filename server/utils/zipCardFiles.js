@@ -10,6 +10,7 @@ const { v4: uuidv4 } = require('uuid');
 const { htmlToText } = require('html-to-text');
 const puppeteer = require('puppeteer');
 const logger = require('./logger');
+const { getUploadPath } = require('./uploadPath');
 
 const zipFiles = logger.child({ component: 'zipFiles' });
 
@@ -303,7 +304,7 @@ async function createCardZip(card) {
   // Add timestamp and unique ID to ensure uniqueness
   const timestamp = Date.now();
   const zipFilename = `${timestamp}-${zipBaseName}-${uuidv4().substring(0, 8)}.zip`;
-  const zipPath = path.join(__dirname, '..', 'uploads', zipFilename);
+  const zipPath = path.join(getUploadPath(), zipFilename);
   
   zipFiles.info(`Creating ZIP archive for ${card.type} card: ${zipPath}`);
 

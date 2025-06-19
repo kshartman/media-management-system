@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { deleteFile, isFileOrphaned } = require('./s3Storage');
 const logger = require('./logger');
+const { getUploadPath } = require('./uploadPath');
 
 // Create child logger for cleanup operations
 const cleanup = logger.child({ module: 'cleanup' });
@@ -19,7 +20,7 @@ const ZIP_FILE_EXPIRY = 24 * 60 * 60 * 1000;
 async function cleanupOrphanedZipFiles() {
   try {
     cleanup.info('Running orphaned ZIP file cleanup...');
-    const uploadsDir = path.join(__dirname, '..', 'uploads');
+    const uploadsDir = getUploadPath();
     
     // Read all files in the uploads directory
     const files = fs.readdirSync(uploadsDir);

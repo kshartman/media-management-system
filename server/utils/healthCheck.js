@@ -5,6 +5,7 @@ const { getMailStatus } = require('./mail');
 const logger = require('./logger');
 const fs = require('fs').promises;
 const path = require('path');
+const { getUploadPath } = require('./uploadPath');
 
 const healthLogger = logger.child({ component: 'health' });
 
@@ -79,7 +80,7 @@ class HealthChecker {
    */
   async checkLocalStorage() {
     try {
-      const uploadsPath = path.join(__dirname, '../uploads');
+      const uploadsPath = getUploadPath();
       const start = Date.now();
       
       // Check if uploads directory exists and is writable
@@ -101,7 +102,7 @@ class HealthChecker {
       return {
         status: 'unhealthy',
         error: error.message,
-        path: path.join(__dirname, '../uploads')
+        path: getUploadPath()
       };
     }
   }
