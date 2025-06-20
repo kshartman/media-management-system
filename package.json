@@ -11,7 +11,8 @@
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --format=stylish",
     "lint:full": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --format=unix",
     "lint:fix": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --fix",
-    "lint:strict": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --max-warnings=0"
+    "lint:strict": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --max-warnings=0",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@eslint/eslintrc": "^3.3.1",
