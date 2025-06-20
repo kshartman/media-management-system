@@ -45,9 +45,19 @@ router.get('/', async (req, res) => {
     const sort = req.query.sort || 'newest';
     const types = req.query.type ? (Array.isArray(req.query.type) ? req.query.type : [req.query.type]) : [];
     const tags = req.query.tag ? (Array.isArray(req.query.tag) ? req.query.tag : [req.query.tag]) : [];
+    const includeDeleted = req.query.includeDeleted === 'true';
 
     // Build the filter query
     const filter = {};
+    
+    // Only include deleted cards if user is admin/editor and explicitly requested
+    if (includeDeleted && req.user && (req.user.role === 'admin' || req.user.role === 'editor')) {
+      // Include both deleted and non-deleted cards
+      // No deletedAt filter - will show all cards
+    } else {
+      // Default behavior: exclude soft-deleted cards
+      filter.deletedAt = null;
+    }
     
     if (search) {
       // Search in both description and tags
@@ -125,6 +135,195 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     cardLogger.error('Error fetching cards:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/cards/trash - Get deleted cards (trash view) - Admin/Editor only
+router.get('/trash', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin or editor
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'editor')) {
+      return res.status(403).json({ error: 'Access denied. Admin or editor role required.' });
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const search = req.query.search || '';
+    const sort = req.query.sort || 'newest';
+    const types = req.query.type ? (Array.isArray(req.query.type) ? req.query.type : [req.query.type]) : [];
+    const tags = req.query.tag ? (Array.isArray(req.query.tag) ? req.query.tag : [req.query.tag]) : [];
+
+    // Build filter for deleted cards only
+    const filter = {
+      deletedAt: { $ne: null } // Only show deleted cards
+    };
+    
+    if (search) {
+      filter.$or = [
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (types.length > 0) {
+      filter.type = { $in: types };
+    }
+    
+    if (tags.length > 0) {
+      filter.tags = { $in: tags };
+    }
+
+    // Sort by deletion date by default for trash
+    let sortQuery = {};
+    switch (sort) {
+      case 'oldest':
+        sortQuery = { deletedAt: 1 };
+        break;
+      case 'alphabetical':
+        sortQuery = { description: 1, deletedAt: -1 };
+        break;
+      case 'newest':
+      default:
+        sortQuery = { deletedAt: -1 };
+        break;
+    }
+
+    // Execute query with population of deletedBy user
+    const cards = await Card.find(filter)
+      .populate('deletedBy', 'username')
+      .sort(sortQuery)
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const totalCount = await Card.countDocuments(filter);
+
+    // Convert storage paths to absolute URLs
+    const baseUrl = getBaseUrl(req);
+    const cardsWithUrls = cards.map(card => {
+      const cardObj = card.toObject();
+      
+      // Convert all file paths to absolute URLs
+      if (cardObj.preview) cardObj.preview = getFileUrl(cardObj.preview, baseUrl);
+      if (cardObj.download) cardObj.download = getFileUrl(cardObj.download, baseUrl);
+      if (cardObj.movie) cardObj.movie = getFileUrl(cardObj.movie, baseUrl);
+      if (cardObj.transcript) cardObj.transcript = getFileUrl(cardObj.transcript, baseUrl);
+      if (cardObj.instagramCopy) cardObj.instagramCopy = getFileUrl(cardObj.instagramCopy, baseUrl);
+      if (cardObj.facebookCopy) cardObj.facebookCopy = getFileUrl(cardObj.facebookCopy, baseUrl);
+      if (cardObj.imageSequence && Array.isArray(cardObj.imageSequence)) {
+        cardObj.imageSequence = cardObj.imageSequence.map(img => getFileUrl(img, baseUrl));
+      }
+      
+      return cardObj;
+    });
+
+    res.json({
+      cards: cardsWithUrls,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+        hasNext: page < Math.ceil(totalCount / limit),
+        hasPrev: page > 1
+      }
+    });
+  } catch (error) {
+    cardLogger.error('Error fetching trash cards:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/cards/trash/:id/restore - Restore card from trash
+router.post('/trash/:id/restore', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin or editor
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'editor')) {
+      return res.status(403).json({ error: 'Access denied. Admin or editor role required.' });
+    }
+
+    const cardId = req.params.id;
+    cardLogger.info(`Restoring card ${cardId} from trash`);
+
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    if (!card.deletedAt) {
+      return res.status(400).json({ error: 'Card is not deleted' });
+    }
+
+    // Restore the card by clearing deletion fields
+    await Card.findByIdAndUpdate(cardId, {
+      $unset: { 
+        deletedAt: "",
+        deletedBy: ""
+      }
+    });
+
+    // Update tag counts (increase for restored card)
+    await updateTagCounts([], card.tags);
+
+    cardLogger.info(`Card restored from trash: ${cardId}`);
+    res.json({ message: 'Card restored successfully' });
+  } catch (error) {
+    cardLogger.error('Error restoring card:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/cards/trash/:id/permanent - Permanently delete card and files
+router.delete('/trash/:id/permanent', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin or editor
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'editor')) {
+      return res.status(403).json({ error: 'Access denied. Admin or editor role required.' });
+    }
+
+    const cardId = req.params.id;
+    cardLogger.info(`Permanently deleting card ${cardId}`);
+
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    if (!card.deletedAt) {
+      return res.status(400).json({ error: 'Card must be in trash before permanent deletion' });
+    }
+
+    // Delete all associated files
+    const filesToDelete = [];
+    if (card.preview) filesToDelete.push(card.preview);
+    if (card.download) filesToDelete.push(card.download);
+    if (card.movie) filesToDelete.push(card.movie);
+    if (card.transcript) filesToDelete.push(card.transcript);
+    if (card.imageSequence && Array.isArray(card.imageSequence)) {
+      filesToDelete.push(...card.imageSequence);
+    }
+
+    // Delete files that are not referenced by other cards
+    for (const filePath of filesToDelete) {
+      try {
+        const isOrphaned = await isFileOrphaned(filePath, Card);
+        if (isOrphaned) {
+          await deleteFile(filePath);
+          fileLogger.info(`Deleted orphaned file: ${filePath}`);
+        } else {
+          fileLogger.info(`File still referenced by other cards: ${filePath}`);
+        }
+      } catch (error) {
+        fileLogger.error(`Error deleting file ${filePath}:`, error);
+      }
+    }
+
+    // Permanently delete the card from database
+    await Card.findByIdAndDelete(cardId);
+    cardLogger.info(`Card permanently deleted: ${cardId}`);
+
+    res.status(204).end();
+  } catch (error) {
+    cardLogger.error('Error permanently deleting card:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -606,49 +805,33 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
   }
 });
 
-// DELETE /api/cards/:id - Delete card
+// DELETE /api/cards/:id - Soft delete card (move to trash)
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const cardId = req.params.id;
-    cardLogger.info(`Deleting card ${cardId}`);
+    const userId = req.user.id;
+    cardLogger.info(`Soft deleting card ${cardId} by user ${userId}`);
 
     const card = await Card.findById(cardId);
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    // Delete all associated files
-    const filesToDelete = [];
-    if (card.preview) filesToDelete.push(card.preview);
-    if (card.download) filesToDelete.push(card.download);
-    if (card.movie) filesToDelete.push(card.movie);
-    if (card.transcript) filesToDelete.push(card.transcript);
-    if (card.imageSequence && Array.isArray(card.imageSequence)) {
-      filesToDelete.push(...card.imageSequence);
+    // Check if already deleted
+    if (card.deletedAt) {
+      return res.status(400).json({ error: 'Card is already deleted' });
     }
 
-    // Delete files that are not referenced by other cards
-    for (const filePath of filesToDelete) {
-      try {
-        const isOrphaned = await isFileOrphaned(filePath, cardId);
-        if (isOrphaned) {
-          await deleteFile(filePath);
-          fileLogger.info(`Deleted orphaned file: ${filePath}`);
-        } else {
-          fileLogger.info(`File still referenced by other cards: ${filePath}`);
-        }
-      } catch (error) {
-        fileLogger.error(`Error deleting file ${filePath}:`, error);
-      }
-    }
+    // Soft delete: set deletedAt and deletedBy
+    await Card.findByIdAndUpdate(cardId, {
+      deletedAt: new Date(),
+      deletedBy: userId
+    });
 
-    // Update tag counts
+    // Update tag counts (decrease for deleted card)
     await updateTagCounts(card.tags, []);
 
-    // Delete the card
-    await Card.findByIdAndDelete(cardId);
-    cardLogger.info(`Card deleted successfully: ${cardId}`);
-
+    cardLogger.info(`Card moved to trash: ${cardId}`);
     res.status(204).end();
   } catch (error) {
     cardLogger.error('Error deleting card:', error);

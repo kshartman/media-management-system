@@ -17,6 +17,7 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   onRefresh,
   isAdmin: _isAdmin = false,
   isEditor = false,
+  isDeleted = false,
   type: _type,
   preview: _preview,
   download: _download,
@@ -238,7 +239,11 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
   }, [showSocialCopyModal]);
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full" data-card-id={id}>
+    <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full relative" data-card-id={id}>
+      {/* Gray overlay for deleted cards */}
+      {isDeleted && (
+        <div className="absolute inset-0 bg-gray-500 bg-opacity-20 pointer-events-none z-10" />
+      )}
       {/* Social Copy Viewer Modal */}
       {showSocialCopyModal && activeSocialCopy && (
         <div 
@@ -418,104 +423,125 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
         <div className="flex-1"></div>
       </div>
 
-      {/* Footer with action buttons only */}
+      {/* Footer with action buttons */}
       <div className="p-4 bg-gray-50 flex-shrink-0">
-
-        {/* Action buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {/* Download ZIP button */}
+        {isDeleted ? (
+          /* Trash toolbar for deleted cards */
+          <div className="flex items-center justify-center space-x-3">
             <button
-              onClick={handleDownloadAll}
-              disabled={isDownloading}
-              className={`text-sm font-medium flex items-center ${
-                isDownloading
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-blue-600 hover:text-blue-800'
-              }`}
-              title="Download all files as ZIP"
-              aria-label="Download all files as ZIP"
+              onClick={() => onEdit && onEdit(id)} // Reuse onEdit for restore action
+              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors"
+              title="Restore this item"
+              aria-label="Restore this item"
             >
-              {isDownloading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  ZIP
-                </>
-              )}
+              Restore
             </button>
-
-            {/* Social copy buttons */}
-            {localInstagramCopy && (
+            <button
+              onClick={() => onDelete && onDelete(id)} // Reuse onDelete for permanent delete action
+              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors"
+              title="Delete this item permanently"
+              aria-label="Delete this item permanently"
+            >
+              Delete Forever
+            </button>
+          </div>
+        ) : (
+          /* Normal toolbar for active cards */
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {/* Download ZIP button */}
               <button
-                onClick={() => handleOpenSocialCopy('instagram')}
-                className="text-sm font-medium text-purple-600 hover:text-purple-800 flex items-center"
-                title="View Instagram copy"
-                aria-label="View Instagram copy"
+                onClick={handleDownloadAll}
+                disabled={isDownloading}
+                className={`text-sm font-medium flex items-center ${
+                  isDownloading
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-blue-600 hover:text-blue-800'
+                }`}
+                title="Download all files as ZIP"
+                aria-label="Download all files as ZIP"
               >
-                <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                </svg>
-                IG
+                {isDownloading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    ZIP
+                  </>
+                )}
               </button>
-            )}
 
-            {localFacebookCopy && (
-              <button
-                onClick={() => handleOpenSocialCopy('facebook')}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center"
-                title="View Facebook copy"
-                aria-label="View Facebook copy"
-              >
-                <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-                FB
-              </button>
+              {/* Social copy buttons */}
+              {localInstagramCopy && (
+                <button
+                  onClick={() => handleOpenSocialCopy('instagram')}
+                  className="text-sm font-medium text-purple-600 hover:text-purple-800 flex items-center"
+                  title="View Instagram copy"
+                  aria-label="View Instagram copy"
+                >
+                  <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.40z"/>
+                  </svg>
+                  IG
+                </button>
+              )}
+
+              {localFacebookCopy && (
+                <button
+                  onClick={() => handleOpenSocialCopy('facebook')}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center"
+                  title="View Facebook copy"
+                  aria-label="View Facebook copy"
+                >
+                  <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  FB
+                </button>
+              )}
+            </div>
+
+            {/* Editor controls */}
+            {isEditor && (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => onEdit && onEdit(id)}
+                  className="text-gray-600 hover:text-gray-800"
+                  title="Edit this item"
+                  aria-label="Edit this item"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+                      if (onDelete && id) {
+                        onDelete(id);
+                      }
+                    }
+                  }}
+                  className="text-red-600 hover:text-red-800"
+                  title="Delete this item"
+                  aria-label="Delete this item"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
-
-          {/* Editor controls */}
-          {isEditor && (
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => onEdit && onEdit(id)}
-                className="text-gray-600 hover:text-gray-800"
-                title="Edit this item"
-                aria-label="Edit this item"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-                    if (onDelete && id) {
-                      onDelete(id);
-                    }
-                  }
-                }}
-                className="text-red-600 hover:text-red-800"
-                title="Delete this item"
-                aria-label="Delete this item"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

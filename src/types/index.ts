@@ -29,6 +29,7 @@ export interface BaseCardProps {
   onRefresh?: () => void;
   isAdmin?: boolean;
   isEditor?: boolean;
+  isDeleted?: boolean; // For trash functionality - shows if card is deleted
   // Add properties needed for download all functionality
   preview?: string;
   download?: string;
@@ -64,3 +65,27 @@ export interface ReelCardProps extends BaseCardProps {
 }
 
 export type CardProps = ImageCardProps | SocialCardProps | ReelCardProps;
+
+export interface Card {
+  _id: string;
+  type: "image" | "social" | "reel";
+  description: string;
+  tags: string[];
+  preview?: string;
+  download?: string;
+  movie?: string;
+  transcript?: string;
+  imageSequence?: string[];
+  instagramCopy?: string;
+  facebookCopy?: string;
+  fileMetadata?: FileMetadata;
+  downloadCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  // Trash fields (optional for backward compatibility)
+  deletedAt?: string | null;
+  deletedBy?: {
+    _id: string;
+    username: string;
+  } | null;
+}

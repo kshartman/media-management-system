@@ -72,6 +72,67 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [lastEditedCardId, setLastEditedCardId] = useState<string | null>(null);
   const [totalCardCount, setTotalCardCount] = useState<number>(0);
+  const [showDeleted, setShowDeleted] = useState(false); // Admin/editor only trash toggle
+  
+  // Helper function to process cards and add isDeleted prop
+  const processCardsWithDeletedStatus = (cards: (CardProps & { deletedAt?: string })[]): CardProps[] => {
+    return cards.map(card => ({
+      ...card,
+      isDeleted: !!card.deletedAt // Set isDeleted based on presence of deletedAt field
+    }));
+  };
+
+  // Handle restore card from trash
+  const handleRestoreCard = async (cardId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/cards/trash/${cardId}/restore`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to restore card');
+      }
+
+      // Reload cards to reflect the change
+      window.location.reload(); // Simple reload for now
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to restore card');
+    }
+  };
+
+  // Handle permanent delete card
+  const handlePermanentDeleteCard = async (cardId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this card? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/cards/trash/${cardId}/permanent`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to permanently delete card');
+      }
+
+      // Reload cards to reflect the change
+      window.location.reload(); // Simple reload for now
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to permanently delete card');
+    }
+  };
   
   // Fetch cards and tags from the API when the component mounts
   // Event handler for image drop on social cards
@@ -127,19 +188,20 @@ export default function Home() {
 
         // Load cards and tags concurrently - fetch all cards with a large limit
         const [cardsResponse, tagsResponse] = await Promise.all([
-          fetchCards(1, { type: [], tags: [], search: '' }, 100), // Use a large limit to try to get all cards at once
+          fetchCards(1, { type: [], tags: [], search: '', includeDeleted: showDeleted && (isAdmin || isEditor) }, 100), // Use a large limit to try to get all cards at once
           getAllTags()
         ]);
         
         
         // Save the total count for display
         setTotalCardCount(cardsResponse.totalCount);
-        setCards(cardsResponse.cards);
+        const processedCards = processCardsWithDeletedStatus(cardsResponse.cards);
+        setCards(processedCards);
         setAvailableTags(tagsResponse);
 
         // Filter to show all card types by default and apply sorting
         const initialFiltered = applyFiltersAndSort(
-          cardsResponse.cards,
+          processedCards,
           [],         // Empty array means all types (no type filter)
           [],         // No tags selected by default
           'newest',   // Default sort to newest
@@ -155,7 +217,8 @@ export default function Home() {
               const page2Response = await fetchCards(2, { 
                 type: [], 
                 tags: [], 
-                search: '' 
+                search: '',
+                includeDeleted: showDeleted && (isAdmin || isEditor)
               });
               
               // Combine page 1 and page 2, removing duplicates by ID
@@ -168,11 +231,12 @@ export default function Home() {
                 }
               });
               
-              setCards(combinedCards);
+              const processedCombinedCards = processCardsWithDeletedStatus(combinedCards);
+              setCards(processedCombinedCards);
               
               // Re-filter with combined cards
               const combinedFiltered = applyFiltersAndSort(
-                combinedCards,
+                processedCombinedCards,
                 [],     // Empty array means all types (no type filter)
                 [],     // No tags selected by default
                 'newest', // Default sort to newest
@@ -188,10 +252,11 @@ export default function Home() {
       } catch (error) {
         console.error('Error loading data:', error);
         // Fallback to sample cards if API fails
-        setCards(SampleCards);
+        const processedSampleCards = processCardsWithDeletedStatus(SampleCards);
+        setCards(processedSampleCards);
         // Filter to show all card types by default and apply sorting
         const initialFiltered = applyFiltersAndSort(
-          SampleCards,
+          processedSampleCards,
           [],         // Empty array means all types (no type filter)
           [],         // No tags selected by default
           'newest',   // Default sort to newest
@@ -204,7 +269,7 @@ export default function Home() {
     };
 
     loadData();
-  }, []);
+  }, [showDeleted, isAdmin, isEditor]); // Reload when trash toggle changes or auth status changes
   
   // Apply all filters and sorting
   const applyFiltersAndSort = (
@@ -360,16 +425,18 @@ export default function Home() {
           type: types,
           tags: tags,
           search: searchTerm,
-          sort: currentSort
+          sort: currentSort,
+          includeDeleted: showDeleted && (isAdmin || isEditor)
         });
         
         // Update all cards, available tags, and total count
-        setCards(response.cards);
+        const processedCards = processCardsWithDeletedStatus(response.cards);
+        setCards(processedCards);
         setTotalCardCount(response.totalCount);
         
         // Apply client-side sort only - we already have server-side filtered cards
         // Preserve the type filter from the server, but apply client-side sorting
-        const sorted = applyFiltersAndSort(response.cards, types, tags, currentSort, '');
+        const sorted = applyFiltersAndSort(processedCards, types, tags, currentSort, '');
         setFilteredCards(sorted);
         
         // Pre-load more cards immediately if we don't have all of them
@@ -380,7 +447,8 @@ export default function Home() {
               const page2Response = await fetchCards(2, {
                 type: types,
                 tags: tags,
-                search: searchTerm
+                search: searchTerm,
+                includeDeleted: showDeleted && (isAdmin || isEditor)
               });
               
               // Combine page 1 and page 2, removing duplicates by ID
@@ -393,11 +461,12 @@ export default function Home() {
                 }
               });
               
-              setCards(combinedCards);
+              const processedCombinedCards = processCardsWithDeletedStatus(combinedCards);
+              setCards(processedCombinedCards);
               
               // Re-filter with combined cards
               const combinedFiltered = applyFiltersAndSort(
-                combinedCards,
+                processedCombinedCards,
                 types,
                 tags,
                 currentSort,
@@ -427,7 +496,8 @@ export default function Home() {
               const response = await fetchCards(1, {
                 type: types,
                 tags: tags,
-                search: searchTerm
+                search: searchTerm,
+                includeDeleted: showDeleted && (isAdmin || isEditor)
               }, 24); // Double the page size for this specific case
               
               // Make sure we don't have duplicates in the response
@@ -438,11 +508,12 @@ export default function Home() {
                 }
               });
               
-              setCards(uniqueCards);
+              const processedUniqueCards = processCardsWithDeletedStatus(uniqueCards);
+              setCards(processedUniqueCards);
               
               // Re-apply client side filtering
               const newFilteredAndSorted = applyFiltersAndSort(
-                uniqueCards,
+                processedUniqueCards,
                 types,
                 tags,
                 currentSort,
@@ -483,15 +554,17 @@ export default function Home() {
       const response = await fetchCards(1, {
         type: selectedTypes,
         tags: selectedTags,
-        search: search
+        search: search,
+        includeDeleted: showDeleted && (isAdmin || isEditor)
       });
       
       // Update cards with search results and total count
-      setCards(response.cards);
+      const processedCards = processCardsWithDeletedStatus(response.cards);
+      setCards(processedCards);
       setTotalCardCount(response.totalCount);
       
       // Apply client-side sorting while preserving server-side filtering
-      const sorted = applyFiltersAndSort(response.cards, selectedTypes, selectedTags, currentSort, '');
+      const sorted = applyFiltersAndSort(processedCards, selectedTypes, selectedTags, currentSort, '');
       setFilteredCards(sorted);
       
       // If we have fewer cards than the total, try to load more immediately
@@ -501,13 +574,15 @@ export default function Home() {
             const page2Response = await fetchCards(2, {
               type: selectedTypes,
               tags: selectedTags,
-              search: search
+              search: search,
+              includeDeleted: showDeleted && (isAdmin || isEditor)
             });
             
             // Combine both pages and apply filters/sort
             const combinedCards = [...response.cards, ...page2Response.cards];
-            const newSorted = applyFiltersAndSort(combinedCards, selectedTypes, selectedTags, currentSort, '');
-            setCards(combinedCards);
+            const processedCombinedCards = processCardsWithDeletedStatus(combinedCards);
+            const newSorted = applyFiltersAndSort(processedCombinedCards, selectedTypes, selectedTags, currentSort, '');
+            setCards(processedCombinedCards);
             setFilteredCards(newSorted);
           } catch (error) {
             console.error('Error pre-loading page 2:', error);
@@ -625,18 +700,20 @@ export default function Home() {
         fetchCards(1, {
           type: selectedTypes,
           tags: selectedTags,
-          search: searchTerm
+          search: searchTerm,
+          includeDeleted: showDeleted && (isAdmin || isEditor)
         }, 100), // Use larger limit to get more cards
         getAllTags()
       ]);
 
-      setCards(cardsResponse.cards);
+      const processedCards = processCardsWithDeletedStatus(cardsResponse.cards);
+      setCards(processedCards);
       setAvailableTags(tagsResponse);
       setTotalCardCount(cardsResponse.totalCount);
 
       // Apply all current filters and sorting
       const filteredAndSorted = applyFiltersAndSort(
-        cardsResponse.cards,
+        processedCards,
         selectedTypes,
         selectedTags,
         currentSort,
@@ -651,15 +728,17 @@ export default function Home() {
             const page2Response = await fetchCards(2, {
               type: selectedTypes,
               tags: selectedTags,
-              search: searchTerm
+              search: searchTerm,
+              includeDeleted: showDeleted && (isAdmin || isEditor)
             }, 100);
             
             // Combine cards and re-sort
             const allCards = [...cardsResponse.cards, ...page2Response.cards];
-            setCards(allCards);
+            const processedAllCards = processCardsWithDeletedStatus(allCards);
+            setCards(processedAllCards);
             
             const newFilteredAndSorted = applyFiltersAndSort(
-              allCards,
+              processedAllCards,
               selectedTypes,
               selectedTags,
               currentSort,
@@ -688,7 +767,8 @@ export default function Home() {
         fetchCards(1, { 
           type: selectedTypes, 
           tags: selectedTags, 
-          search: searchTerm 
+          search: searchTerm,
+          includeDeleted: showDeleted && (isAdmin || isEditor)
         }, 100), // Use a larger limit to get all cards at once
         getAllTags()
       ]);
@@ -698,12 +778,13 @@ export default function Home() {
       setTotalCardCount(cardsResponse.totalCount);
       
       // Set all cards first
-      setCards(cardsResponse.cards);
+      const processedCards = processCardsWithDeletedStatus(cardsResponse.cards);
+      setCards(processedCards);
       setAvailableTags(tagsResponse);
 
       // Apply all current filters and sorting
       const filteredAndSorted = applyFiltersAndSort(
-        cardsResponse.cards,
+        processedCards,
         selectedTypes,
         selectedTags,
         currentSort,
@@ -720,7 +801,8 @@ export default function Home() {
           const moreCardsResponse = await fetchCards(2, {
             type: selectedTypes,
             tags: selectedTags,
-            search: searchTerm
+            search: searchTerm,
+            includeDeleted: showDeleted && (isAdmin || isEditor)
           }, 100);
           
           // Combine with existing cards (avoiding duplicates)
@@ -732,11 +814,12 @@ export default function Home() {
           });
           
           // Update the state with all cards
-          setCards(allCards);
+          const processedAllCards = processCardsWithDeletedStatus(allCards);
+          setCards(processedAllCards);
           
           // Reapply filters
           const newFilteredCards = applyFiltersAndSort(
-            allCards,
+            processedAllCards,
             selectedTypes,
             selectedTags,
             currentSort,
@@ -810,6 +893,8 @@ export default function Home() {
       <AppHeader 
         showControls={true}
         onLoginClick={handleLoginClick}
+        showDeleted={showDeleted}
+        onToggleDeleted={setShowDeleted}
         controlsSlot={
           <>
             {/* Controls row - keeps all controls on one line */}
@@ -907,9 +992,10 @@ export default function Home() {
                 const response = await fetchCards(page, {
                   type: selectedTypes,
                   tags: selectedTags,
-                  search: searchTerm
+                  search: searchTerm,
+                  includeDeleted: showDeleted && (isAdmin || isEditor)
                 });
-                return response.cards;
+                return processCardsWithDeletedStatus(response.cards);
               } catch (error) {
                 console.error('Error loading more cards:', error);
                 return [];
@@ -917,8 +1003,22 @@ export default function Home() {
             }}
             isAdmin={isAdmin}
             isEditor={isEditor}
-            onEdit={isEditor ? handleEditCard : undefined}
-            onDelete={isEditor ? handleDeleteCard : undefined}
+            onEdit={isEditor ? (cardId: string) => {
+              const card = filteredCards.find(c => c.id === cardId);
+              if (card?.isDeleted) {
+                handleRestoreCard(cardId); // Use restore for deleted cards
+              } else {
+                handleEditCard(cardId); // Use edit for normal cards
+              }
+            } : undefined}
+            onDelete={isEditor ? (cardId: string) => {
+              const card = filteredCards.find(c => c.id === cardId);
+              if (card?.isDeleted) {
+                handlePermanentDeleteCard(cardId); // Use permanent delete for deleted cards
+              } else {
+                handleDeleteCard(cardId); // Use soft delete for normal cards
+              }
+            } : undefined}
             selectedTypes={selectedTypes}
             lastEditedCardId={lastEditedCardId}
           />

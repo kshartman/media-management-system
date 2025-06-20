@@ -11,9 +11,11 @@ interface AppHeaderProps {
   showControls?: boolean;
   controlsSlot?: React.ReactNode;
   onLoginClick?: () => void;
+  showDeleted?: boolean;
+  onToggleDeleted?: (showDeleted: boolean) => void;
 }
 
-export default function AppHeader({ title = brandConfig.appTitle, showControls = false, controlsSlot, onLoginClick }: AppHeaderProps) {
+export default function AppHeader({ title = brandConfig.appTitle, showControls = false, controlsSlot, onLoginClick, showDeleted = false, onToggleDeleted }: AppHeaderProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, isAdmin, isEditor, user, logout } = useAuth();
@@ -69,6 +71,18 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
                   >
                     Help
                   </a>
+                  {/* Trash toggle for admin/editor users */}
+                  {(isAdmin || isEditor) && onToggleDeleted && (
+                    <button
+                      onClick={() => {
+                        onToggleDeleted(!showDeleted);
+                        setShowMobileMenu(false);
+                      }}
+                      className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+                    >
+                      🗑️ {showDeleted ? 'Hide Deleted' : 'Show Deleted'}
+                    </button>
+                  )}
                   <div className="border-t border-gray-100 my-1" />
                   {isAuthenticated ? (
                     <button

@@ -35,6 +35,11 @@ const brandConfig: BrandConfig = {
   
   // Domain Configuration (used in .env files)
   domain: 'resources.shopzive.com',
+  
+  // Trash Configuration
+  trash: {
+    retentionDays: 30 // Keep deleted items for 30 days before permanent deletion
+  },
 };
 
 export default brandConfig;

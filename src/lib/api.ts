@@ -8,6 +8,7 @@ export interface CardFilters {
   tags?: string[];
   search?: string;
   sort?: string;
+  includeDeleted?: boolean; // For admin/editor to show deleted cards
 }
 
 // Use the API proxy through Next.js rewrites
@@ -98,6 +99,10 @@ export const fetchCards = async (
 
   if (filters.tags && filters.tags.length > 0) {
     filters.tags.forEach(tag => queryParams.append('tag', tag));
+  }
+
+  if (filters.includeDeleted) {
+    queryParams.append('includeDeleted', 'true');
   }
   
   const queryString = queryParams.toString();

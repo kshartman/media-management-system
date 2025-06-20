@@ -7,6 +7,7 @@ const { connectToDatabase } = require('./db/connection');
 const { Card, User, Tag } = require('./models');
 const { isEmailConfigured, sendWelcomeEmail } = require('./utils/emailService');
 const { cleanupOrphanedZipFiles } = require('./utils/cleanupOrphanedFiles');
+const { startTrashCleanupScheduler } = require('./utils/trashCleanup');
 const logger = require('./utils/logger');
 const { scrypt, randomBytes } = require('crypto');
 const { promisify } = require('util');
@@ -244,6 +245,9 @@ async function startServer() {
     
     // Schedule cleanup every hour
     setInterval(performCleanup, 60 * 60 * 1000);
+    
+    // Start trash cleanup scheduler (30-day retention, check daily)
+    startTrashCleanupScheduler(30, 24);
     
     app.listen(PORT, () => {
       apiLogger.info(`🚀 Server running on port ${PORT}`);

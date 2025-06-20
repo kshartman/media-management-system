@@ -32,4 +32,9 @@ export interface BrandConfig {
   
   // Domain Configuration
   domain: string;
+  
+  // Trash Configuration
+  trash?: {
+    retentionDays: number; // Number of days to keep deleted items before permanent deletion
+  };
 }
