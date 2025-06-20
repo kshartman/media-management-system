@@ -60,10 +60,10 @@ const TagDropdown: React.FC<TagDropdownProps> = ({ onFilterChange, selectedTags,
   }, [isOpen]);
 
   return (
-    <div className="w-56 relative" ref={dropdownRef}>
+    <div className="w-32 relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 flex items-center justify-between gap-2 whitespace-nowrap"
+        className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 text-sm flex items-center justify-between gap-2 whitespace-nowrap"
       >
         <span className="truncate">Tags</span>
         <svg
@@ -83,14 +83,14 @@ const TagDropdown: React.FC<TagDropdownProps> = ({ onFilterChange, selectedTags,
       </button>
       
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-50">
+        <div className="absolute top-full left-0 mt-1 min-w-full w-max max-w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50">
           <div className="p-2 relative">
             <input
               ref={inputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search or create new tags..."
+              placeholder="Search tags..."
               className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>

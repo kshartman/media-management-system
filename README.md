@@ -10,6 +10,7 @@ A comprehensive system for browsing, categorizing, and managing digital media as
 - **Infinite Scroll**: Load more content as you scroll
 - **Access Control**: Anonymous browsing and authenticated admin features
 - **Admin Features**: Upload, edit, and delete media assets
+- **Soft Delete System**: Safe deletion with trash management and restore functionality
 - **Cloud Storage**: Support for Amazon S3 storage
 - **User Management**: Admin interface for managing users
 - **Password Reset**: Email-based password reset functionality via SendGrid or Mailgun
@@ -424,11 +425,16 @@ The system uses JWT tokens for authentication:
 
 ### Cards
 
-- `GET /api/cards` - Get all cards with optional filtering
+- `GET /api/cards` - Get all cards with optional filtering (includes `includeDeleted` parameter for admin/editor)
 - `GET /api/cards/:id` - Get a single card by ID
-- `POST /api/cards` - Create a new card (admin only)
-- `PUT /api/cards/:id` - Update a card (admin only)
-- `DELETE /api/cards/:id` - Delete a card (admin only)
+- `POST /api/cards` - Create a new card (admin/editor only)
+- `PUT /api/cards/:id` - Update a card (admin/editor only)
+- `DELETE /api/cards/:id` - Soft delete a card (admin/editor only)
+
+### Trash Management
+
+- `POST /api/cards/trash/:id/restore` - Restore a deleted card (admin/editor only)
+- `DELETE /api/cards/trash/:id/permanent` - Permanently delete a card (admin/editor only)
 
 ### Tags
 

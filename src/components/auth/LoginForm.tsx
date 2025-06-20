@@ -31,11 +31,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onForgotPassword 
   };
 
   return (
-    <div className="max-w-md mx-auto mt-8">
+    <div className="w-full">
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="bg-blue-600 mb-4 py-8 flex items-center justify-center">
           <h2 className="text-2xl font-bold text-white">
-            Admin Login
+            Login
           </h2>
         </div>
         

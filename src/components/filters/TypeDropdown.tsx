@@ -58,7 +58,7 @@ const TypeDropdown: React.FC<TypeDropdownProps> = ({ onFilterChange, selectedTyp
     <div className="w-56 relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 flex items-center justify-between gap-2"
+        className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 text-sm flex items-center justify-between gap-2"
       >
         {getCurrentSelectionLabel()}
         <svg

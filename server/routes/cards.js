@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { Card, Tag } = require('../models');
 const authMiddleware = require('../middleware/auth');
+const optionalAuthMiddleware = require('../middleware/optionalAuth');
 const { 
   handleCardUpload, 
   validateFiles, 
@@ -37,7 +38,7 @@ const cardLogger = logger.child({ component: 'cards' });
 const fileLogger = logger.child({ component: 'card-files' });
 
 // GET /api/cards - Get cards with pagination and filtering
-router.get('/', async (req, res) => {
+router.get('/', optionalAuthMiddleware, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;

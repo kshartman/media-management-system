@@ -12,6 +12,7 @@ info:
     - Tag management
     - Health monitoring
     - Both local and S3 storage support
+    - Soft delete system with trash management (admin/editor only)
     
     ## Authentication
     Most endpoints require JWT authentication via Bearer token in the Authorization header.
@@ -293,6 +294,12 @@ paths:
             type: string
             enum: [newest, oldest, alphabetical, popularity]
             default: newest
+        - name: includeDeleted
+          in: query
+          description: Include soft-deleted cards in results (admin/editor only)
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Cards retrieved successfully
@@ -412,8 +419,11 @@ paths:
     delete:
       tags:
         - Cards
-      summary: Delete card
-      description: Delete a card and all associated files
+      summary: Soft delete card
+      description: |
+        Soft delete a card (move to trash). The card will be marked as deleted but not permanently removed.
+        For already deleted cards, this will perform permanent deletion.
+        Admin/editor users can view deleted cards by using the includeDeleted parameter in GET requests.
       security:
         - bearerAuth: []
       parameters:
@@ -426,7 +436,13 @@ paths:
             pattern: '^[0-9a-fA-F]{24}$'
       responses:
         '204':
-          description: Card deleted successfully
+          description: Card moved to trash (soft deleted) or permanently deleted
+        '400':
+          description: Card is already deleted (when trying to soft delete)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Authentication required
           content:
@@ -573,6 +589,100 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Trash Management Endpoints
+  /api/cards/trash/{id}/restore:
+    post:
+      tags:
+        - Cards
+        - Trash
+      summary: Restore card from trash
+      description: Restore a soft-deleted card back to active status (admin/editor only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '204':
+          description: Card restored successfully
+        '400':
+          description: Card is not deleted or already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin or editor access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cards/trash/{id}/permanent:
+    delete:
+      tags:
+        - Cards
+        - Trash
+      summary: Permanently delete card
+      description: |
+        Permanently delete a soft-deleted card and all associated files.
+        This action cannot be undone. Only works on cards that are already soft-deleted.
+        (admin/editor only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Card ID
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{24}$'
+      responses:
+        '204':
+          description: Card permanently deleted
+        '400':
+          description: Card is not in trash or already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin or editor access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Card not found
           content:
             application/json:
               schema:
@@ -1305,6 +1415,18 @@ components:
           default: 0
           description: Number of times this card has been downloaded
           example: 42
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the card was soft deleted (null if not deleted)
+          example: "2024-01-15T14:30:00.000Z"
+        deletedBy:
+          type: string
+          pattern: '^[0-9a-fA-F]{24}$'
+          nullable: true
+          description: ID of the user who deleted the card (null if not deleted)
+          example: "507f1f77bcf86cd799439011"
 
     FileMetadata:
       type: object
@@ -1634,3 +1756,5 @@ tags:
     description: Tag management
   - name: Users
     description: User account management (admin only)
+  - name: Trash
+    description: Soft delete and trash management (admin/editor only)

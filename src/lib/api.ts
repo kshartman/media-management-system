@@ -103,11 +103,22 @@ export const fetchCards = async (
 
   if (filters.includeDeleted) {
     queryParams.append('includeDeleted', 'true');
+    // Add cache buster when including deleted cards to ensure fresh data
+    queryParams.append('_t', Date.now().toString());
   }
   
   const queryString = queryParams.toString();
 
-  const response = await request(`/cards?${queryString}`);
+  // Add cache-busting headers when including deleted cards
+  const requestOptions = filters.includeDeleted ? {
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  } : {};
+
+  const response = await request(`/cards?${queryString}`, requestOptions);
   
 
   // Map MongoDB _id to id for client-side compatibility

@@ -147,6 +147,16 @@ src/
 - Automatic driver detection based on configuration
 - Enhanced health check to show mail system status
 
+### Soft Delete System Implementation
+- Added soft delete functionality for cards (admin/editor only)
+- Cards marked as deleted rather than permanently removed
+- Trash toggle in UI to show/hide deleted cards
+- Restore functionality to bring back deleted cards
+- Permanent delete option for cards already in trash
+- Automatic cleanup after 30 days (configurable retention period)
+- Added deletedAt and deletedBy tracking fields
+- Updated API to support includeDeleted parameter for admin/editor users
+
 ## Common Issues & Solutions
 
 ### Safari Hanging
