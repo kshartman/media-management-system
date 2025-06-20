@@ -41,10 +41,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Check if user is logged in
       const token = localStorage.getItem('auth_token');
       if (token) {
-        // In a real app, you would validate the token here
-        // For now, just extract user info from JWT
         try {
+          // Decode JWT payload
           const payload = JSON.parse(atob(token.split('.')[1]));
+          
+          // Check if token has expired
+          if (payload.exp) {
+            const expirationTime = payload.exp * 1000; // Convert to milliseconds
+            const currentTime = Date.now();
+            
+            if (currentTime >= expirationTime) {
+              // Token has expired
+              localStorage.removeItem('auth_token');
+              // Don't set user if token is expired
+              setIsLoading(false);
+              return;
+            }
+          }
+          
           setUser({
             id: payload.id,
             username: payload.username,

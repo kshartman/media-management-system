@@ -39,6 +39,21 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized specifically
+      if (response.status === 401) {
+        // Clear the invalid token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+          
+          // Show user-friendly message
+          alert('Your session has expired. Please login again.');
+          
+          // Redirect to home page (which will show login)
+          window.location.href = '/';
+        }
+        throw new Error('Session expired');
+      }
+      
       console.error(`API Error: ${response.status}`, await response.text());
       throw new Error(`API Error: ${response.status}`);
     }
@@ -175,6 +190,21 @@ export const createCard = async (cardData: FormData): Promise<CardProps> => {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized specifically
+      if (response.status === 401) {
+        // Clear the invalid token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+          
+          // Show user-friendly message
+          alert('Your session has expired. Please login again.');
+          
+          // Redirect to home page (which will show login)
+          window.location.href = '/';
+        }
+        throw new Error('Session expired');
+      }
+      
       console.error(`API Error: ${response.status}`, await response.text());
       throw new Error(`API Error: ${response.status}`);
     }
@@ -213,6 +243,21 @@ export const updateCard = async (id: string, cardData: FormData): Promise<CardPr
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized specifically
+      if (response.status === 401) {
+        // Clear the invalid token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+          
+          // Show user-friendly message
+          alert('Your session has expired. Please login again.');
+          
+          // Redirect to home page (which will show login)
+          window.location.href = '/';
+        }
+        throw new Error('Session expired');
+      }
+      
       console.error(`API Error: ${response.status}`, await response.text());
       throw new Error(`API Error: ${response.status}`);
     }
