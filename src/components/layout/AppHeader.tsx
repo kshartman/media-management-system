@@ -21,6 +21,7 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, isAdmin, isEditor, user, logout } = useAuth();
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const handleLoginClick = () => {
     if (isAuthenticated) {
@@ -32,17 +33,29 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
     }
   };
 
-  // Close user menu when clicking outside
+  // Close menus when clicking outside or pressing escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
       }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setShowMobileMenu(false);
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowUserMenu(false);
+        setShowMobileMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
     };
   }, []);
 
@@ -52,7 +65,7 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-3" style={{paddingBottom: 'calc(0.75rem - 2px)'}}>
           {/* Top row with title, logo, and menu */}
           <div className="flex justify-between items-center relative">
-            <div className="relative">
+            <div className="relative" ref={mobileMenuRef}>
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="flex items-center justify-center w-10 h-10 text-gray-700 hover:text-gray-900 focus:outline-none"
