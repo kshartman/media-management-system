@@ -2,23 +2,21 @@ import type { NextConfig } from "next";
 
 // Get allowed origins from environment or use defaults
 const getAllowedOrigins = () => {
-  if (process.env.ALLOWED_ORIGINS) {
-    return process.env.ALLOWED_ORIGINS.split(',');
-  }
-  
-  // Default development origins
-  return [
+  // Default localhost variants for development
+  const defaultOrigins = [
     'http://localhost:3000',
     'http://localhost:3002', 
     'http://localhost:5000',
     'http://127.0.0.1:3000',
-    'http://lakedev:3000',
-    'http://lakedev',
-    'http://mppro4:3000',
-    'http://mppro4',
-    'http://trex:3000',
-    'http://trex',
   ];
+  
+  if (process.env.ALLOWED_ORIGINS) {
+    const envOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
+    // Merge environment origins with default localhost variants
+    return [...defaultOrigins, ...envOrigins];
+  }
+  
+  return defaultOrigins;
 };
 
 const nextConfig: NextConfig = {
