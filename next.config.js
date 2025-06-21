@@ -1,6 +1,54 @@
 /** @type {import('next').NextConfig} */
+
+// Get allowed origins from environment or use defaults
+const getAllowedOrigins = () => {
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(',');
+  }
+  
+  // Default development origins
+  return [
+    'http://localhost:3000',
+    'http://localhost:3002', 
+    'http://localhost:5000',
+    'http://127.0.0.1:3000',
+    'http://lakedev:3000',
+    'http://lakedev',
+    'http://mppro4:3000',
+    'http://mppro4',
+  ];
+};
+
 const nextConfig = {
   output: 'standalone',
+  
+  // Configure allowed origins for Next.js development server
+  ...(process.env.NODE_ENV === 'development' && {
+    experimental: {
+      // This is the key config for Next.js CORS in development
+      allowedOrigins: getAllowedOrigins(),
+    },
+  }),
+  
+  // Additional CORS headers for development
+  async headers() {
+    // Only apply in development
+    if (process.env.NODE_ENV !== 'development') {
+      return [];
+    }
+    
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*', // Allow all origins in development
+          },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
