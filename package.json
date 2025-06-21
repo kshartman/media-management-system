@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "next3k": "cp .env.local.next3k .env.local && next dev",
+    "dev": "next dev --hostname 0.0.0.0",
+    "next3k": "cp .env.local.next3k .env.local && next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --format=stylish",

@@ -16,6 +16,8 @@ const getAllowedOrigins = () => {
     'http://lakedev',
     'http://mppro4:3000',
     'http://mppro4',
+    'http://trex:3000',
+    'http://trex',
   ];
 };
 
