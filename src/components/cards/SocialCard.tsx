@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import Image from 'next/image';
 import { SocialCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import Lightbox from '../ui/Lightbox';
 import { trackCardDownload } from '../../lib/api';
 
-const SocialCard: React.FC<SocialCardProps> = (props) => {
+const SocialCard: React.FC<SocialCardProps> = memo((props) => {
   // Keep all props to pass to BaseCard
   const { ...baseProps } = props;
   
@@ -259,6 +259,8 @@ const SocialCard: React.FC<SocialCardProps> = (props) => {
       </div>
     </BaseCard>
   );
-};
+});
+
+SocialCard.displayName = 'SocialCard';
 
 export default SocialCard;

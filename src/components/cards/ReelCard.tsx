@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, memo } from 'react';
 import Image from 'next/image';
 import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
@@ -8,7 +8,7 @@ import { useVideoPlayer } from '../../contexts/VideoPlayerContext';
 import { getProxiedImageUrl } from '../../lib/utils';
 import { trackCardDownload, getDownloadUrl } from '../../lib/api';
 
-const ReelCard: React.FC<ReelCardProps> = (props) => {
+const ReelCard: React.FC<ReelCardProps> = memo((props) => {
   // Keep all props to pass to BaseCard
   const { ...baseProps } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -298,6 +298,8 @@ const ReelCard: React.FC<ReelCardProps> = (props) => {
       </div>
     </BaseCard>
   );
-};
+});
+
+ReelCard.displayName = 'ReelCard';
 
 export default ReelCard;

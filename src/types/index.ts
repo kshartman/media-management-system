@@ -89,3 +89,86 @@ export interface Card {
     username: string;
   } | null;
 }
+
+// API Response Interfaces
+export interface ApiResponse<T = unknown> {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  data?: T;
+}
+
+export interface CardsResponse extends ApiResponse<Card[]> {
+  data: Card[];
+}
+
+export interface CardResponse extends ApiResponse<Card> {
+  data: Card;
+}
+
+export interface TagsResponse extends ApiResponse<string[]> {
+  data: string[];
+}
+
+export interface User {
+  _id: string;
+  username: string;
+  email: string;
+  role: 'admin' | 'editor';
+  createdAt?: string;
+  updatedAt?: string;
+  lastLoginAt?: string | null;
+}
+
+export interface AuthResponse extends ApiResponse<{ user: User }> {
+  user: User;
+}
+
+export interface UsersResponse extends ApiResponse<User[]> {
+  data: User[];
+}
+
+export interface UserResponse extends ApiResponse<User> {
+  data: User;
+}
+
+export interface HealthResponse extends ApiResponse {
+  status: 'healthy' | 'unhealthy';
+  timestamp: string;
+  uptime: number;
+  version?: string;
+  dependencies?: {
+    database?: {
+      status: 'connected' | 'disconnected';
+      responseTime?: number;
+      connectionPool?: {
+        current: number;
+        max: number;
+        min: number;
+      };
+    };
+    storage?: {
+      status: 'configured' | 'not_configured';
+      type: 'local' | 's3';
+    };
+    email?: {
+      status: 'configured' | 'not_configured';
+      driver?: string;
+    };
+  };
+}
+
+// Error Types
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface ErrorResponse extends ApiResponse {
+  error: string;
+  details?: ValidationError[];
+  correlationId?: string;
+  timestamp?: string;
+  path?: string;
+  method?: string;
+}

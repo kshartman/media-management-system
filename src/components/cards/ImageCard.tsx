@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, memo } from 'react';
 import Image from 'next/image';
 import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
@@ -8,7 +8,7 @@ import { useAuth } from '../../lib/authContext';
 import { useCardGrid } from '../../contexts/CardGridContext';
 import { trackCardDownload } from '../../lib/api';
 
-const ImageCard: React.FC<ImageCardProps> = (props) => {
+const ImageCard: React.FC<ImageCardProps> = memo((props) => {
   // Don't destructure preview and download here since we need to pass them to BaseCard
   const { ...baseProps } = props;
   const { isAdmin } = useAuth();
@@ -190,6 +190,8 @@ const ImageCard: React.FC<ImageCardProps> = (props) => {
       </div>
     </BaseCard>
   );
-};
+});
+
+ImageCard.displayName = 'ImageCard';
 
 export default ImageCard;
