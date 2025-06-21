@@ -12,7 +12,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY next.config.js ./
 COPY next.config.ts ./
 COPY tsconfig.json ./
 COPY tailwind.config.js ./
