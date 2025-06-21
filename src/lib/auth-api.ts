@@ -4,13 +4,14 @@
 const API_URL = '/api';
 
 // Auth API functions
-export const login = async (credentials: { username: string; password: string }): Promise<{ token: string; user: { id: string; username: string; role: string } }> => {
+export const login = async (credentials: { username: string; password: string }): Promise<{ user: { id: string; username: string; role: string } }> => {
   try {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // Important: include cookies
       body: JSON.stringify(credentials),
     });
 
@@ -28,10 +29,15 @@ export const login = async (credentials: { username: string; password: string })
   }
 };
 
-export const logout = (): void => {
-  // Client-side logout (just removing the token)
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('auth_token');
+export const logout = async (): Promise<void> => {
+  try {
+    await fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include', // Important: include cookies
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Don't throw - logout should always succeed from client perspective
   }
 };
 

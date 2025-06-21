@@ -38,20 +38,33 @@ const PORT = process.env.PORT || 5001;
 // Validate JWT secret - fail startup if weak or missing
 function validateJWTSecret() {
   const secret = process.env.JWT_SECRET;
+  const isProduction = process.env.NODE_ENV === 'production';
   
   if (!secret) {
     apiLogger.error('SECURITY: JWT_SECRET environment variable is required but not set');
     process.exit(1);
   }
   
-  if (secret.length < 32) {
-    apiLogger.error('SECURITY: JWT_SECRET must be at least 32 characters long');
-    process.exit(1);
-  }
-  
-  if (secret === 'your-secret-key' || secret === 'default' || secret === 'secret') {
-    apiLogger.error('SECURITY: JWT_SECRET cannot use common/default values');
-    process.exit(1);
+  // In production, enforce strict requirements
+  if (isProduction) {
+    if (secret.length < 32) {
+      apiLogger.error('SECURITY: JWT_SECRET must be at least 32 characters long in production');
+      process.exit(1);
+    }
+    
+    if (secret === 'your-secret-key' || secret === 'default' || secret === 'secret') {
+      apiLogger.error('SECURITY: JWT_SECRET cannot use common/default values in production');
+      process.exit(1);
+    }
+  } else {
+    // In development, just warn about weak secrets but allow them
+    if (secret.length < 32) {
+      apiLogger.warn('SECURITY WARNING: JWT_SECRET is shorter than 32 characters. This is acceptable in development but should be strengthened for production.');
+    }
+    
+    if (secret === 'your-secret-key' || secret === 'default' || secret === 'secret') {
+      apiLogger.warn('SECURITY WARNING: JWT_SECRET is using a common/default value. This is acceptable in development but must be changed for production.');
+    }
   }
   
   return secret;

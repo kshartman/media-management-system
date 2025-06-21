@@ -38,60 +38,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Check if we're running in a browser environment
     if (typeof window !== 'undefined') {
-      // Check if user is logged in
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        try {
-          // Decode JWT payload
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          
-          // Check if token has expired
-          if (payload.exp) {
-            const expirationTime = payload.exp * 1000; // Convert to milliseconds
-            const currentTime = Date.now();
-            
-            if (currentTime >= expirationTime) {
-              // Token has expired
-              localStorage.removeItem('auth_token');
-              // Don't set user if token is expired
-              setIsLoading(false);
-              return;
-            }
-          }
-          
-          setUser({
-            id: payload.id,
-            username: payload.username,
-            role: payload.role,
-          });
-        } catch (error) {
-          console.error('Invalid token:', error);
-          localStorage.removeItem('auth_token');
-        }
-      }
+      // Since we're using httpOnly cookies, we can't directly access the token
+      // Instead, we'll make a request to validate the current session
+      checkAuthStatus();
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Important: include cookies
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+      } else {
+        // No valid session
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Auth status check failed:', error);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (username: string, password: string) => {
     setIsLoading(true);
     try {
-      const { token, user } = await apiLogin({ username, password });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_token', token);
-      }
+      const { user } = await apiLogin({ username, password });
       setUser(user);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    apiLogout();
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
+  const logout = async () => {
+    try {
+      await apiLogout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
     }
-    setUser(null);
   };
 
   return (

@@ -17,12 +17,8 @@ const PAGE_SIZE = 12; // Standard page size - we'll use pagination for more
 
 // Helper function for API requests
 const request = async (endpoint: string, options: RequestInit = {}) => {
-  // Get auth token if available
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
@@ -35,15 +31,13 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...config,
       mode: 'cors', // Explicitly set CORS mode
-      credentials: 'same-origin'
+      credentials: 'include' // Important: include cookies for authentication
     });
 
     if (!response.ok) {
       // Handle 401 Unauthorized specifically
       if (response.status === 401) {
-        // Clear the invalid token
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('auth_token');
           
           // Show user-friendly message
           alert('Your session has expired. Please login again.');
@@ -174,27 +168,17 @@ export const fetchCardById = async (id: string): Promise<CardProps> => {
 };
 
 export const createCard = async (cardData: FormData): Promise<CardProps> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-
-  if (!token) {
-    throw new Error('Authentication required');
-  }
-
   try {
     const response = await fetch(`${API_URL}/cards`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: cardData, // Using FormData for file uploads
+      credentials: 'include', // Include cookies for authentication
+      body: cardData, // Using FormData for file uploads (don't set Content-Type for FormData)
     });
 
     if (!response.ok) {
       // Handle 401 Unauthorized specifically
       if (response.status === 401) {
-        // Clear the invalid token
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('auth_token');
           
           // Show user-friendly message
           alert('Your session has expired. Please login again.');
@@ -227,27 +211,17 @@ export const createCard = async (cardData: FormData): Promise<CardProps> => {
 };
 
 export const updateCard = async (id: string, cardData: FormData): Promise<CardProps> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-
-  if (!token) {
-    throw new Error('Authentication required');
-  }
-
   try {
     const response = await fetch(`${API_URL}/cards/${id}`, {
       method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: cardData, // Using FormData for file uploads
+      credentials: 'include', // Include cookies for authentication
+      body: cardData, // Using FormData for file uploads (don't set Content-Type for FormData)
     });
 
     if (!response.ok) {
       // Handle 401 Unauthorized specifically
       if (response.status === 401) {
-        // Clear the invalid token
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('auth_token');
           
           // Show user-friendly message
           alert('Your session has expired. Please login again.');
