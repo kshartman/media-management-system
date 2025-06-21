@@ -22,6 +22,52 @@ const getAllowedOrigins = () => {
 const nextConfig: NextConfig = {
   output: 'standalone',
   
+  // Bundle optimization settings
+  experimental: {
+    optimizePackageImports: ['react-icons', 'lucide-react'],
+  },
+  
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Bundle optimization for production builds
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          // Admin components - only loaded when needed
+          admin: {
+            test: /[\\/]components[\\/]admin[\\/]/,
+            name: 'admin',
+            chunks: 'all',
+            priority: 20,
+          },
+          // Auth components
+          auth: {
+            test: /[\\/]components[\\/]auth[\\/]/,
+            name: 'auth', 
+            chunks: 'all',
+            priority: 15,
+          },
+          // Card components - heavily used
+          cards: {
+            test: /[\\/]components[\\/]cards[\\/]/,
+            name: 'cards',
+            chunks: 'all',
+            priority: 10,
+          },
+          // Common vendor libraries
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+            priority: 5,
+          },
+        },
+      };
+    }
+    
+    return config;
+  },
+  
   // Allow development origins for Next.js dev server
   allowedDevOrigins: getAllowedOrigins(),
   

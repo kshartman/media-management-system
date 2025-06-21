@@ -104,6 +104,20 @@ const cardSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Add performance indexes for Card model
+cardSchema.index({ type: 1 }); // Index for filtering by card type
+cardSchema.index({ tags: 1 }); // Index for tag-based filtering
+cardSchema.index({ createdAt: -1 }); // Index for date sorting (newest first)
+cardSchema.index({ 'fileMetadata.date': -1 }); // Index for custom date sorting
+cardSchema.index({ downloadCount: -1 }); // Index for popularity sorting
+cardSchema.index({ deletedAt: 1 }); // Index for soft delete filtering
+cardSchema.index({ description: 'text' }); // Text index for search functionality
+
+// Compound indexes for common query patterns
+cardSchema.index({ type: 1, deletedAt: 1 }); // Filter by type and deleted status
+cardSchema.index({ tags: 1, deletedAt: 1 }); // Filter by tags and deleted status
+cardSchema.index({ deletedAt: 1, createdAt: -1 }); // Non-deleted cards by date
+
 // User Schema
 const userSchema = new mongoose.Schema({
   username: {
