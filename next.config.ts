@@ -22,6 +22,9 @@ const getAllowedOrigins = () => {
 const nextConfig: NextConfig = {
   output: 'standalone',
   
+  // Allow development origins for Next.js dev server
+  allowedDevOrigins: getAllowedOrigins(),
+  
   // Additional CORS headers for development
   async headers() {
     // Only apply in development
