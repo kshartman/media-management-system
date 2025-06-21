@@ -251,9 +251,9 @@ router.post('/:id/send-reset-link', authMiddleware, async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
-    // Set token and expiration (24 hours from now)
+    // Set token and expiration (8 hours from now)
     user.resetPasswordToken = resetTokenHash;
-    user.resetPasswordExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    user.resetPasswordExpires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
     await user.save();
 
     // Send reset email
