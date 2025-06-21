@@ -108,7 +108,7 @@ router.post('/', authMiddleware, async (req, res) => {
     // Send welcome email with password setup link if email service is configured
     if (isEmailConfigured()) {
       try {
-        await sendWelcomeEmail(email, resetToken, username);
+        await sendWelcomeEmail(email, resetToken, username, '24');
         userLogger.info(`Welcome email sent to new user: ${username} (${email})`);
       } catch (emailError) {
         userLogger.error('Error sending welcome email:', emailError);
@@ -258,7 +258,7 @@ router.post('/:id/send-reset-link', authMiddleware, async (req, res) => {
 
     // Send reset email
     try {
-      await sendPasswordResetEmail(user.email, resetToken, user.username);
+      await sendPasswordResetEmail(user.email, resetToken, user.username, '8');
       userLogger.info(`Password reset link sent to user: ${user.username} (${user.email}) by admin: ${req.user.username}`);
       res.json({ 
         message: 'Password reset link has been sent successfully',

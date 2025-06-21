@@ -67,9 +67,10 @@ class MailService {
    * @param {string} to - Recipient email address
    * @param {string} resetToken - Password reset token
    * @param {string} username - Username
+   * @param {string} [expirationHours='24'] - Hours until token expires
    * @returns {Promise<void>}
    */
-  async sendWelcomeEmail(to, resetToken, username) {
+  async sendWelcomeEmail(to, resetToken, username, expirationHours = '24') {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
     
     const options = {
@@ -89,7 +90,7 @@ class MailService {
           </div>
           <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
           <p style="word-break: break-all;">${resetUrl}</p>
-          <p>This link will expire in 1 hour for security reasons.</p>
+          <p>This link will expire in ${expirationHours} ${expirationHours === '1' ? 'hour' : 'hours'} for security reasons.</p>
           <p>Once you've set your password, you'll be able to access the Media Management System.</p>
           <hr style="margin: 30px 0;">
           <p style="color: #666; font-size: 12px;">Media Management System</p>
@@ -106,7 +107,7 @@ class MailService {
         
         ${resetUrl}
         
-        This link will expire in 1 hour for security reasons.
+        This link will expire in ${expirationHours} ${expirationHours === '1' ? 'hour' : 'hours'} for security reasons.
         
         Once you've set your password, you'll be able to access the Media Management System.
         
@@ -123,9 +124,10 @@ class MailService {
    * @param {string} to - Recipient email address
    * @param {string} resetToken - Password reset token
    * @param {string} username - Username
+   * @param {string} [expirationHours='1'] - Hours until token expires
    * @returns {Promise<void>}
    */
-  async sendPasswordResetEmail(to, resetToken, username) {
+  async sendPasswordResetEmail(to, resetToken, username, expirationHours = '1') {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
     
     const options = {
@@ -144,7 +146,7 @@ class MailService {
           </div>
           <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
           <p style="word-break: break-all;">${resetUrl}</p>
-          <p>This link will expire in 1 hour for security reasons.</p>
+          <p>This link will expire in ${expirationHours} ${expirationHours === '1' ? 'hour' : 'hours'} for security reasons.</p>
           <p>If you didn't request this password reset, please ignore this email.</p>
           <hr style="margin: 30px 0;">
           <p style="color: #666; font-size: 12px;">Media Management System</p>
@@ -159,7 +161,7 @@ class MailService {
         
         ${resetUrl}
         
-        This link will expire in 1 hour for security reasons.
+        This link will expire in ${expirationHours} ${expirationHours === '1' ? 'hour' : 'hours'} for security reasons.
         
         If you didn't request this password reset, please ignore this email.
         

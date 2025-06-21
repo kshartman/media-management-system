@@ -19,7 +19,7 @@ module.exports = {
   
   // Convenience methods
   isEmailConfigured: () => MailService.isConfigured(),
-  sendWelcomeEmail: (to, resetToken, username) => MailService.sendWelcomeEmail(to, resetToken, username),
-  sendPasswordResetEmail: (to, resetToken, username) => MailService.sendPasswordResetEmail(to, resetToken, username),
+  sendWelcomeEmail: (to, resetToken, username, expirationHours) => MailService.sendWelcomeEmail(to, resetToken, username, expirationHours),
+  sendPasswordResetEmail: (to, resetToken, username, expirationHours) => MailService.sendPasswordResetEmail(to, resetToken, username, expirationHours),
   getMailStatus: () => MailService.getStatus()
 };

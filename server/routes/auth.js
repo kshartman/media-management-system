@@ -257,7 +257,7 @@ router.post('/forgot-password', authRateLimit, async (req, res) => {
 
     // Send reset email
     try {
-      await sendPasswordResetEmail(user.email, resetToken, user.username);
+      await sendPasswordResetEmail(user.email, resetToken, user.username, '1');
       res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
     } catch (emailError) {
       authLogger.error('Error sending password reset email:', emailError);
