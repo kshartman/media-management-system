@@ -15,6 +15,7 @@ import AppHeader from './AppHeader';
 import { CardProps } from '../../types';
 import { useAuth } from '../../lib/authContext';
 import { useCardManagement } from '../../hooks/useCardManagement';
+import { updateCard, createCard } from '../../lib/api';
 
 interface CardPageLayoutProps {
   pageTitle?: string;
@@ -237,8 +238,14 @@ export default function CardPageLayout({
             setCurrentEditCard(undefined);
           }}
           onSubmit={currentEditCard ? 
-            async (_formData: FormData) => { await handleCardUpdated(); } : 
-            async (_formData: FormData) => { await handleCardCreated(); }
+            async (formData: FormData) => { 
+              await updateCard(currentEditCard.id, formData);
+              await handleCardUpdated();
+            } : 
+            async (formData: FormData) => { 
+              await createCard(formData);
+              await handleCardCreated();
+            }
           }
           initialData={currentEditCard}
           availableTags={availableTags}
