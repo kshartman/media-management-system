@@ -436,20 +436,23 @@ const BaseCard: React.FC<React.PropsWithChildren<BaseCardProps>> = ({
             >
               Restore
             </button>
-            <button
-              onClick={() => {
-                if (window.confirm('Are you sure you want to permanently delete this item and all associated files? This action cannot be undone.')) {
-                  if (onDelete && id) {
-                    onDelete(id);
+            {/* Only admins can permanently delete */}
+            {_isAdmin && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to permanently delete this item and all associated files? This action cannot be undone.')) {
+                    if (onDelete && id) {
+                      onDelete(id);
+                    }
                   }
-                }
-              }}
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors"
-              title="Delete this item permanently"
-              aria-label="Delete this item permanently"
-            >
-              Delete Forever
-            </button>
+                }}
+                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors"
+                title="Delete this item permanently"
+                aria-label="Delete this item permanently"
+              >
+                Delete Forever
+              </button>
+            )}
           </div>
         ) : (
           /* Normal toolbar for active cards */

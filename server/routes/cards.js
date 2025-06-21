@@ -276,9 +276,9 @@ router.post('/trash/:id/restore', authMiddleware, async (req, res) => {
 // DELETE /api/cards/trash/:id/permanent - Permanently delete card and files
 router.delete('/trash/:id/permanent', authMiddleware, async (req, res) => {
   try {
-    // Check if user is admin or editor
-    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'editor')) {
-      return res.status(403).json({ error: 'Access denied. Admin or editor role required.' });
+    // Check if user is admin (permanent deletion is admin-only)
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin role required for permanent deletion.' });
     }
 
     const cardId = req.params.id;
