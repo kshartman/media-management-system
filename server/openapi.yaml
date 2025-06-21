@@ -10,9 +10,21 @@ info:
     - User authentication and management
     - Password reset via email (SendGrid or Mailgun)
     - Tag management
-    - Health monitoring
+    - Health monitoring with dependency checks
     - Both local and S3 storage support
     - Soft delete system with trash management (admin/editor only)
+    - Centralized error handling with correlation ID tracking
+    - Client-side error logging
+    - Database connection pooling with retry logic
+    - Environment validation on startup
+    
+    ## Architecture Improvements
+    - **Correlation IDs**: All responses include `X-Correlation-ID` header for request tracking
+    - **Centralized Error Handling**: Consistent error responses with correlation IDs and timestamps
+    - **Enhanced Health Checks**: Comprehensive monitoring of database, storage, email, and system resources
+    - **Database Resilience**: Connection pooling, retry logic with exponential backoff
+    - **Structured Logging**: Correlation ID tracking throughout the request lifecycle
+    - **Environment Validation**: Startup validation of all environment variables
     
     ## Authentication
     Most endpoints require JWT authentication via Bearer token in the Authorization header.
@@ -93,6 +105,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReadinessResponse'
+
+  # Client Error Logging
+  /api/client-error:
+    post:
+      tags:
+        - Debug
+      summary: Log client-side errors
+      description: |
+        Endpoint for logging client-side JavaScript errors to the server.
+        Used by React error boundaries and other client-side error handling.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientErrorRequest'
+      responses:
+        '200':
+          description: Error logged successfully
+          headers:
+            X-Correlation-ID:
+              description: Unique request correlation ID for tracking
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientErrorResponse'
+        '500':
+          description: Internal server error
+          headers:
+            X-Correlation-ID:
+              description: Unique request correlation ID for tracking
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # Debug Endpoints
   /api/debug/loglevel:
@@ -1078,6 +1131,10 @@ components:
         uptime:
           type: number
           description: Server uptime in seconds
+        correlationId:
+          type: string
+          format: uuid
+          description: Unique request correlation ID for tracking
 
     HealthResponse:
       type: object
@@ -1096,6 +1153,10 @@ components:
           type: string
         responseTime:
           type: string
+        correlationId:
+          type: string
+          format: uuid
+          description: Unique request correlation ID for tracking
         checks:
           type: object
           properties:
@@ -1117,6 +1178,19 @@ components:
                   type: number
                 dataSize:
                   type: string
+                connectionPool:
+                  type: object
+                  description: Database connection pool status
+                  properties:
+                    status:
+                      type: string
+                      enum: [connected, disconnected]
+                    poolSize:
+                      type: number
+                      description: Maximum connections in pool
+                    models:
+                      type: number
+                      description: Number of registered models
             storage:
               type: object
               properties:
@@ -1240,6 +1314,10 @@ components:
         database:
           type: string
           nullable: true
+        correlationId:
+          type: string
+          format: uuid
+          description: Unique request correlation ID for tracking
 
     # Debug Schemas
     LogLevelResponse:
@@ -1721,6 +1799,69 @@ components:
           description: When the reset link expires (24 hours from creation)
           example: "2024-01-15T14:30:00.000Z"
 
+    # Client Error Logging Schemas
+    ClientErrorRequest:
+      type: object
+      required:
+        - error
+        - userAgent
+        - url
+        - timestamp
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - name
+          properties:
+            message:
+              type: string
+              description: Error message
+              example: "Cannot read property 'id' of undefined"
+            stack:
+              type: string
+              description: JavaScript stack trace
+              example: "TypeError: Cannot read property 'id' of undefined\n    at CardForm.tsx:42:15"
+            name:
+              type: string
+              description: Error type/name
+              example: "TypeError"
+        errorInfo:
+          type: object
+          properties:
+            componentStack:
+              type: string
+              description: React component stack trace
+              example: "    in CardForm (created by CardPage)\n    in CardPage"
+        userAgent:
+          type: string
+          description: Browser user agent string
+          example: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        url:
+          type: string
+          description: URL where the error occurred
+          example: "http://localhost:3000/cards/edit/123"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred on the client
+          example: "2024-01-15T14:30:00.000Z"
+
+    ClientErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          format: uuid
+          description: Unique request correlation ID for tracking
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        message:
+          type: string
+          example: "Error logged successfully"
+
     # Common Schemas
     MessageResponse:
       type: object
@@ -1740,6 +1881,20 @@ components:
           type: string
           description: Additional error details
           example: "Username is required"
+        correlationId:
+          type: string
+          format: uuid
+          description: Unique request correlation ID for tracking
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+        path:
+          type: string
+          description: Request path where error occurred
+        method:
+          type: string
+          description: HTTP method where error occurred
 
 tags:
   - name: Health

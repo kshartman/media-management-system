@@ -1,19 +1,34 @@
 # Media Management System
 
-A comprehensive system for browsing, categorizing, and managing digital media assets like images, documents, and videos with S3 storage support.
+A comprehensive system for browsing, categorizing, and managing digital media assets like images, social posts, and video reels with advanced cloud storage and reliability features.
 
-## Key Features
+## 🚀 Key Features
 
-- **Responsive Design**: Works on mobile, tablet, and desktop devices
-- **Media Cards**: Three card types (Image, Social Post, Reel) with appropriate metadata
-- **Filtering & Search**: Filter by type, tags, and search by description
-- **Infinite Scroll**: Load more content as you scroll
-- **Access Control**: Anonymous browsing and authenticated admin features
-- **Admin Features**: Upload, edit, and delete media assets
+- **Responsive Design**: Works seamlessly on mobile, tablet, and desktop devices
+- **Media Cards**: Three card types (Image, Social Post, Reel) with rich metadata
+- **Advanced Search**: Filter by type, tags, and search by description with smart caching
+- **Infinite Scroll**: Smooth content loading as you browse
+- **Role-Based Access**: Anonymous browsing, editor privileges, and admin controls
+- **Admin Features**: Upload, edit, and delete media assets with real-time validation
 - **Soft Delete System**: Safe deletion with trash management and restore functionality
-- **Cloud Storage**: Support for Amazon S3 storage
-- **User Management**: Admin interface for managing users
-- **Password Reset**: Email-based password reset functionality via SendGrid or Mailgun
+- **Cloud Storage**: AWS S3 integration with local fallback support
+- **User Management**: Complete admin interface for user administration
+- **Email Integration**: Password reset functionality via SendGrid or Mailgun
+
+## 🏗️ Architecture Improvements (Phase 2)
+
+### Reliability & Performance
+- **Centralized Error Handling**: Structured error responses with correlation ID tracking
+- **Database Resilience**: Connection pooling (10 max connections) with exponential backoff retry
+- **Request Correlation**: UUID-based request tracing for debugging
+- **API Client Enhancement**: Automatic retry logic, request deduplication, and intelligent caching
+- **Environment Validation**: Comprehensive startup validation of all configuration
+
+### Monitoring & Debugging
+- **Health Monitoring**: Enhanced health checks with dependency status
+- **Client Error Logging**: Automatic React error boundary reporting to server
+- **Structured Logging**: Winston-based logging with correlation IDs and component isolation
+- **Real-time Metrics**: Database connection pool monitoring and system resource tracking
 
 ## System Architecture
 
@@ -106,6 +121,9 @@ FRONTEND_URL=http://localhost:3000
 
 # Logging Configuration
 LOG_LEVEL=debug  # debug, info, warn, error (defaults: debug in dev, warn in production)
+
+# Development Features
+SHOW_DOWNLOAD_COUNT=true  # Show download count overlay on cards (development only)
 ```
 
 Replace all placeholders with your actual values. The S3 configuration is only required if you're using S3 storage (`USE_S3_STORAGE=true`).
@@ -411,6 +429,12 @@ No code changes are required when switching between storage options.
 
 ## API Endpoints
 
+### Health Monitoring
+
+- `GET /health` - Simple liveness check
+- `GET /api/health` - Comprehensive health check with dependency status
+- `GET /api/health/ready` - Kubernetes-style readiness probe
+
 ### Authentication
 
 - `POST /api/auth/login` - Login with username and password
@@ -419,7 +443,7 @@ No code changes are required when switching between storage options.
 
 The system uses JWT tokens for authentication:
 1. Admin users log in via the login form
-2. JWT token is stored in localStorage
+2. JWT tokens are stored as httpOnly cookies for security
 3. Protected routes/operations check for valid token
 4. The frontend maintains auth state in the AuthContext
 
@@ -430,6 +454,7 @@ The system uses JWT tokens for authentication:
 - `POST /api/cards` - Create a new card (admin/editor only)
 - `PUT /api/cards/:id` - Update a card (admin/editor only)
 - `DELETE /api/cards/:id` - Soft delete a card (admin/editor only)
+- `POST /api/track-download` - Track download count for analytics
 
 ### Trash Management
 
@@ -447,6 +472,14 @@ The system uses JWT tokens for authentication:
 - `POST /api/users` - Create a new user
 - `PUT /api/users/:id` - Update a user
 - `DELETE /api/users/:id` - Delete a user
+
+### Error Logging
+
+- `POST /api/client-error` - Log client-side React errors for debugging
+
+### Correlation ID Tracking
+
+All API responses include the `X-Correlation-ID` header for request tracing and debugging. This UUID is automatically generated for each request and logged throughout the system for end-to-end request tracking.
 
 ## Development
 
@@ -559,7 +592,10 @@ For a complete implementation of a new media type:
 ### Connection Issues
 
 **Q: MongoDB connection fails with authentication errors**
-A: Verify your MongoDB connection string in the `.env` file. Ensure the username, password, and authSource are correct. If using Atlas, check that your IP is whitelisted.
+A: Verify your MongoDB connection string in the `.env` file. Ensure the username, password, and authSource are correct. If using Atlas, check that your IP is whitelisted. The system now includes automatic retry logic with exponential backoff for connection issues.
+
+**Q: MongoDB "bufferMaxEntries is not a supported option" error**
+A: This error has been fixed in Phase 2. The deprecated bufferMaxEntries option has been removed from the connection configuration. Update to the latest version.
 
 **Q: S3 uploads fail with "Access Denied"**
 A: Check your AWS credentials and IAM permissions. Ensure your IAM user has the correct permissions for the S3 bucket and that the bucket name is correct in your `.env` file.
@@ -573,7 +609,7 @@ A: Verify that `USE_S3_STORAGE=true` is set in your `.env` file and that all AWS
 A: Run the migration script again with `DRY_RUN = false`. Check that the database records have been updated correctly with the new S3 URLs.
 
 **Q: How can I verify if I'm using S3 storage?**
-A: Check the server logs during startup. You should see a message like "Using S3 storage: bucket yourBucketName/dams in region your-region".
+A: Check the server logs during startup. You should see a message like "Using S3 storage: bucket yourBucketName/dams in region your-region". You can also check the `/api/health` endpoint which includes storage configuration status.
 
 ### Security Considerations
 
@@ -584,7 +620,7 @@ A: For basic security, ensure your S3 bucket has the correct CORS and bucket pol
 - Implement JWT verification for file downloads
 
 **Q: How do I change the admin password?**
-A: The default admin password is set in `server/index.js`. Change it there before the first run, or use the admin interface to update it after logging in. If you forget your password, you can use the "Forgot Password" feature on the login page (requires SendGrid configuration).
+A: Admin credentials are no longer hardcoded as of Phase 1 security improvements. Use the admin interface to manage users, or use the "Forgot Password" feature on the login page (requires email configuration).
 
 ### Performance Optimization
 
@@ -595,7 +631,26 @@ A: If using S3, consider:
 - Implementing multipart uploads for large files
 
 **Q: The application loads slowly**
-A: Consider enabling caching, optimizing database queries, and using pagination for card listings.
+A: The system now includes performance optimizations:
+- Database connection pooling (10 max connections)
+- API request deduplication and caching
+- Automatic retry logic for failed requests
+- Enhanced error handling to prevent cascading failures
+
+### Debugging and Monitoring
+
+**Q: How do I track down issues with my deployment?**
+A: Use the correlation ID system:
+1. Check the `X-Correlation-ID` header in failed requests
+2. Search server logs for that correlation ID to trace the full request lifecycle
+3. Use the `/api/health` endpoint to check system status
+4. Monitor database connection pool metrics in health checks
+
+**Q: Client-side errors aren't being logged**
+A: The system automatically logs React errors to the server via the `/api/client-error` endpoint. Check your server logs for client-side error reports with correlation IDs.
+
+**Q: How do I enable debug logging?**
+A: Set `LOG_LEVEL=debug` in your `.env` file. In development, this is the default. In production, use `LOG_LEVEL=info` or `LOG_LEVEL=warn` for less verbose output.
 
 ## Future Enhancements
 

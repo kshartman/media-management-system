@@ -9,6 +9,26 @@ Media Management System - Next.js frontend with Express backend for managing dig
 - **Storage**: AWS S3 with local fallback
 - **Deployment**: Docker containers
 
+## Phase 2 Architecture Improvements
+
+### Backend Infrastructure
+- **Centralized Error Handling**: Custom middleware with structured error responses
+- **Correlation ID Tracking**: UUID-based request tracing throughout the system
+- **Database Resilience**: Connection pooling (10 max, 2 min) with exponential backoff retry
+- **Environment Validation**: Comprehensive startup validation of all environment variables
+- **Structured Logging**: Winston-based logging with correlation IDs and component-specific loggers
+
+### Frontend Enhancements
+- **Error Boundaries**: React error boundaries with fallback UI and server error logging
+- **Centralized API Client**: Retry logic, request deduplication, intelligent caching
+- **Enhanced Error Handling**: Automatic session management and user-friendly error messages
+
+### Reliability Features
+- **Request Retry Logic**: Exponential backoff with jitter for network resilience
+- **Connection Monitoring**: Real-time database connection health tracking
+- **Client Error Logging**: Automatic logging of frontend errors to backend for debugging
+- **Health Check Enhancements**: Dependency monitoring for database, storage, and email services
+
 ## Development Commands
 
 ### Local Development
@@ -102,9 +122,72 @@ src/
 │   ├── layout/            # Layout components
 │   └── ui/                # Reusable UI components
 └── lib/                   # Utilities and API functions
+    ├── api-v2.ts          # Enhanced API client with retry logic
+    ├── apiClient.ts       # Centralized HTTP client
+    └── authContext.tsx    # Authentication context
 ```
 
+## New Infrastructure Components
+
+### Server Middleware
+```
+server/middleware/
+├── correlationId.js       # UUID correlation ID middleware
+└── errorHandler.js        # Centralized error handling
+```
+
+### Server Utilities
+```
+server/utils/
+├── envValidator.js        # Environment variable validation
+├── healthCheck.js         # Enhanced health monitoring (updated)
+└── logger.js              # Structured logging (enhanced)
+```
+
+### Frontend Error Handling
+```
+src/components/
+├── ErrorBoundary.tsx      # Generic React error boundary
+└── CardErrorBoundary.tsx  # Card-specific error handling
+```
+
+## API Architecture Patterns
+
+### Centralized API Client (`src/lib/apiClient.ts`)
+- **Automatic Retry Logic**: Exponential backoff with jitter (max 5 retries)
+- **Request Deduplication**: Prevents duplicate GET requests
+- **Intelligent Caching**: 5-minute TTL for GET responses
+- **Error Handling**: Standardized error classes and correlation ID tracking
+- **Timeout Management**: 30-second default timeout with circuit breaker patterns
+
+### Enhanced API Layer (`src/lib/api-v2.ts`)
+- **Type-Safe Responses**: Full TypeScript support with proper error types
+- **Automatic Session Management**: Handles 401 responses and redirects
+- **MongoDB ID Mapping**: Automatic `_id` to `id` conversion for client compatibility
+- **Cache Invalidation**: Smart cache busting for admin operations
+
+### Error Handling Architecture
+- **Correlation IDs**: Every request/response includes unique tracking ID
+- **Structured Responses**: Consistent error format with timestamps and paths
+- **Client Error Logging**: React errors automatically logged to `/api/client-error`
+- **Custom Error Classes**: `APIError`, `ValidationError`, `AuthenticationError`, etc.
+
+### Database Architecture Improvements
+- **Connection Pooling**: 10 max connections, 2 minimum with smart scaling
+- **Retry Logic**: 5 attempts with exponential backoff for connection failures
+- **Health Monitoring**: Real-time connection status and pool metrics
+- **Graceful Degradation**: Non-retryable error detection (auth failures, etc.)
+
 ## Recent Major Changes
+
+### Phase 2 Architecture Overhaul (Latest)
+- Implemented centralized error handling middleware with correlation ID tracking
+- Added database connection pooling and retry logic with exponential backoff
+- Created React error boundaries for component-level error handling
+- Built centralized API client with request deduplication and intelligent caching
+- Enhanced health checks with dependency monitoring and connection pool status
+- Added comprehensive environment validation on server startup
+- Migrated all components from legacy `api.ts` to new `api-v2.ts` architecture
 
 ### Help System Implementation
 - Created comprehensive role-based help documentation
@@ -171,6 +254,18 @@ src/
 - **Webpack modules**: Clear `.next` cache and restart dev server
 - **Media queries**: Use standard Tailwind responsive classes
 
+### API & Network Issues
+- **Correlation ID Tracking**: All API responses include `X-Correlation-ID` header for debugging
+- **Client Errors**: Check `/api/client-error` logs for React error boundary reports
+- **Connection Pool**: Monitor database connection pool status via `/api/health`
+- **Request Retries**: Failed requests automatically retry with exponential backoff (max 5 attempts)
+
+### Debugging with Correlation IDs
+- **Server Logs**: All logs include correlation IDs for request tracing
+- **Client Errors**: Error boundaries automatically log errors with correlation IDs
+- **Health Monitoring**: Use `/api/health` to check system status and connection pool metrics
+- **Environment Issues**: Server validates all environment variables on startup
+
 ## Testing Checklist
 
 ### Before Deployment
@@ -179,13 +274,20 @@ src/
 - [ ] Admin login works on all pages
 - [ ] Download buttons visible on mobile
 - [ ] Help documentation displays correctly for all user roles
+- [ ] Error boundaries working (test with intentional React errors)
+- [ ] API client retry logic functioning
+- [ ] Environment validation passes on startup
 
 ### After Deployment
 - [ ] Frontend container healthy (port 5000)
 - [ ] Backend container healthy (port 5001)
-- [ ] All API endpoints responding
+- [ ] All API endpoints responding with correlation IDs
 - [ ] File uploads working
 - [ ] Authentication functioning
+- [ ] Database connection pool operational (`/api/health`)
+- [ ] Client error logging working (`/api/client-error`)
+- [ ] Correlation ID tracking in server logs
+- [ ] Environment validation on server startup
 
 ## Environment Details
 
