@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -33,7 +34,30 @@ const randomBytesAsync = promisify(randomBytes);
 
 // Constants
 const PORT = process.env.PORT || 5001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Validate JWT secret - fail startup if weak or missing
+function validateJWTSecret() {
+  const secret = process.env.JWT_SECRET;
+  
+  if (!secret) {
+    apiLogger.error('SECURITY: JWT_SECRET environment variable is required but not set');
+    process.exit(1);
+  }
+  
+  if (secret.length < 32) {
+    apiLogger.error('SECURITY: JWT_SECRET must be at least 32 characters long');
+    process.exit(1);
+  }
+  
+  if (secret === 'your-secret-key' || secret === 'default' || secret === 'secret') {
+    apiLogger.error('SECURITY: JWT_SECRET cannot use common/default values');
+    process.exit(1);
+  }
+  
+  return secret;
+}
+
+const JWT_SECRET = validateJWTSecret();
 const CORS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:3000',
   'http://localhost:5000',
@@ -52,7 +76,7 @@ async function hashPassword(password) {
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
-// Initialize database with sample data if empty
+// Initialize database - no automatic admin user creation
 async function seedDatabase() {
   try {
     // Check if we have any cards
@@ -64,22 +88,9 @@ async function seedDatabase() {
     dbLogger.info(`Found ${userCount} users in database`);
 
     if (userCount === 0) {
-      dbLogger.info('No users found, creating admin user...');
-      
-      // Create admin user
-      const adminUser = {
-        username: 'admin',
-        email: 'admin@example.com',
-        password: 'admin123', // This will be hashed below
-        role: 'admin'
-      };
-
-      // Hash the password
-      const hashedPassword = await hashPassword(adminUser.password);
-      adminUser.password = hashedPassword;
-
-      await User.create(adminUser);
-      dbLogger.info('Admin user created successfully');
+      dbLogger.warn('SECURITY: No users found in database');
+      dbLogger.warn('SECURITY: Use the setup endpoint POST /api/auth/setup to create the first admin user');
+      dbLogger.warn('SECURITY: This endpoint is only available when no users exist');
     }
 
     // Check and hash any existing plain text passwords
@@ -140,6 +151,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Middleware
+app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

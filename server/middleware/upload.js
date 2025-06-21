@@ -27,18 +27,84 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter to accept only certain file types
+// Enhanced file filter with strict MIME type validation
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp|svg|mp4|mov|avi|webm|pdf|txt|doc|docx|pages/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    uploadLogger.warn(`Rejected file upload: ${file.originalname} (${file.mimetype})`);
-    cb(new Error('Only image, video, and document files are allowed'));
+  // Define allowed MIME types with their corresponding extensions
+  const allowedMimeTypes = {
+    // Images
+    'image/jpeg': ['.jpg', '.jpeg'],
+    'image/png': ['.png'],
+    'image/gif': ['.gif'],
+    'image/webp': ['.webp'],
+    'image/svg+xml': ['.svg'],
+    // Videos
+    'video/mp4': ['.mp4'],
+    'video/quicktime': ['.mov'],
+    'video/x-msvideo': ['.avi'],
+    'video/webm': ['.webm'],
+    // Documents
+    'application/pdf': ['.pdf'],
+    'text/plain': ['.txt'],
+    'application/msword': ['.doc'],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    'application/vnd.apple.pages': ['.pages'],
+    // Subtitle files
+    'application/x-subrip': ['.srt']
+  };
+  
+  const fileExt = path.extname(file.originalname).toLowerCase();
+  const mimeType = file.mimetype.toLowerCase();
+  
+  // Security checks
+  if (!file.originalname || file.originalname.trim() === '') {
+    uploadLogger.warn('Rejected file upload: Empty filename');
+    return cb(new Error('Invalid filename'));
   }
+  
+  // Check for suspicious filenames
+  const suspiciousPatterns = /\.(exe|bat|cmd|scr|pif|vbs|js|jar|com|pps|php|asp|jsp|htaccess)$/i;
+  if (suspiciousPatterns.test(file.originalname)) {
+    uploadLogger.warn(`Rejected suspicious file upload: ${file.originalname}`);
+    return cb(new Error('File type not allowed for security reasons'));
+  }
+  
+  // Check if MIME type is allowed
+  if (!allowedMimeTypes[mimeType]) {
+    uploadLogger.warn(`Rejected file upload - unknown MIME type: ${file.originalname} (${mimeType})`);
+    return cb(new Error(`File type ${mimeType} is not allowed`));
+  }
+  
+  // Verify that file extension matches MIME type
+  const allowedExtensions = allowedMimeTypes[mimeType];
+  if (!allowedExtensions.includes(fileExt)) {
+    uploadLogger.warn(`Rejected file upload - MIME/extension mismatch: ${file.originalname} (${mimeType}/${fileExt})`);
+    return cb(new Error('File extension does not match file type'));
+  }
+  
+  // Additional size check per file type
+  const maxSizes = {
+    'image/jpeg': 50 * 1024 * 1024,    // 50MB for images
+    'image/png': 50 * 1024 * 1024,
+    'image/gif': 20 * 1024 * 1024,     // 20MB for GIFs
+    'image/webp': 30 * 1024 * 1024,
+    'image/svg+xml': 5 * 1024 * 1024,  // 5MB for SVG
+    'video/mp4': 500 * 1024 * 1024,    // 500MB for videos
+    'video/quicktime': 500 * 1024 * 1024,
+    'video/x-msvideo': 500 * 1024 * 1024,
+    'video/webm': 500 * 1024 * 1024,
+    'application/pdf': 25 * 1024 * 1024, // 25MB for PDFs
+    'text/plain': 10 * 1024 * 1024,     // 10MB for text files
+    'application/msword': 25 * 1024 * 1024,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 25 * 1024 * 1024,
+    'application/vnd.apple.pages': 25 * 1024 * 1024,
+    'application/x-subrip': 5 * 1024 * 1024
+  };
+  
+  // Note: We can't check file size here as it's not available yet
+  // Size validation will be done in the upload middleware
+  
+  uploadLogger.info(`Accepted file upload: ${file.originalname} (${mimeType})`);
+  cb(null, true);
 };
 
 // Create the multer upload instance

@@ -7,6 +7,8 @@ const { isEmailConfigured, sendPasswordResetEmail } = require('../utils/emailSer
 const logger = require('../utils/logger');
 const { scrypt, randomBytes } = require('crypto');
 const { promisify } = require('util');
+const { validatePasswordStrength, generateSecureToken } = require('../utils/passwordValidator');
+const { authRateLimit, strictAuthRateLimit } = require('../middleware/rateLimiter');
 
 const authLogger = logger.child({ component: 'auth' });
 
@@ -14,7 +16,7 @@ const authLogger = logger.child({ component: 'auth' });
 const scryptAsync = promisify(scrypt);
 const randomBytesAsync = promisify(randomBytes);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Helper function to check if a password is already hashed
 function isAlreadyHashed(password) {
@@ -75,8 +77,95 @@ async function verifyPassword(storedPassword, suppliedPassword) {
   }
 }
 
+// Secure setup endpoint - only available when no users exist
+router.post('/setup', strictAuthRateLimit, async (req, res) => {
+  try {
+    // Check if any users already exist
+    const userCount = await User.countDocuments();
+    if (userCount > 0) {
+      authLogger.warn('Setup attempt when users already exist', { ip: req.ip });
+      return res.status(403).json({ error: 'Setup not available. Users already exist.' });
+    }
+    
+    const { username, email, password } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+    
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Password does not meet security requirements',
+        details: passwordValidation.errors
+      });
+    }
+    
+    // Validate email format
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+    
+    // Hash the password
+    const hashedPassword = await hashPassword(password);
+    
+    // Create the admin user
+    const adminUser = await User.create({
+      username: username.trim(),
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      role: 'admin'
+    });
+    
+    authLogger.info('First admin user created successfully', { username, email });
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: adminUser._id,
+        username: adminUser.username,
+        email: adminUser.email,
+        role: adminUser.role
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    // Set secure httpOnly cookie
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only use HTTPS in production
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/'
+    });
+    
+    res.status(201).json({
+      message: 'Admin user created successfully',
+      user: {
+        id: adminUser._id,
+        username: adminUser.username,
+        email: adminUser.email,
+        role: adminUser.role,
+      },
+    });
+    
+  } catch (error) {
+    if (error.code === 11000) {
+      // Duplicate key error
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ error: `${field} already exists` });
+    }
+    
+    authLogger.error('Setup error:', error);
+    res.status(500).json({ error: 'Server error during setup' });
+  }
+});
+
 // Login endpoint
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimit, async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -113,8 +202,16 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    // Set secure httpOnly cookie
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only use HTTPS in production
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/'
+    });
+    
     res.json({
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -129,7 +226,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Password reset request endpoint
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authRateLimit, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -149,8 +246,8 @@ router.post('/forgot-password', async (req, res) => {
       return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
+    // Generate secure reset token
+    const resetToken = generateSecureToken();
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     // Set token and expiration (1 hour from now)
@@ -177,7 +274,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Password reset confirmation endpoint
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authRateLimit, async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
@@ -185,8 +282,13 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Token and new password are required' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Password does not meet security requirements',
+        details: passwordValidation.errors
+      });
     }
 
     // Hash the token to compare with stored version
@@ -216,6 +318,53 @@ router.post('/reset-password', async (req, res) => {
     authLogger.error('Reset password error:', error);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// Get current user endpoint (for session validation)
+router.get('/me', (req, res) => {
+  try {
+    // Try to get token from cookie
+    const token = req.cookies?.auth_token;
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No session found' });
+    }
+    
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    res.json({
+      user: {
+        id: decoded.id,
+        username: decoded.username,
+        email: decoded.email,
+        role: decoded.role,
+      },
+    });
+  } catch (error) {
+    // Clear invalid cookie
+    res.clearCookie('auth_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/'
+    });
+    
+    res.status(401).json({ error: 'Invalid session' });
+  }
+});
+
+// Logout endpoint
+router.post('/logout', (req, res) => {
+  // Clear the auth cookie
+  res.clearCookie('auth_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/'
+  });
+  
+  authLogger.info('User logged out', { ip: req.ip });
+  res.json({ message: 'Logged out successfully' });
 });
 
 module.exports = router;
