@@ -241,10 +241,13 @@ export default function CardPageLayout({
             async (formData: FormData) => { 
               await updateCard(currentEditCard.id, formData);
               await handleCardUpdated();
+              setShowEditModal(false);
+              setCurrentEditCard(undefined);
             } : 
             async (formData: FormData) => { 
               await createCard(formData);
               await handleCardCreated();
+              setShowEditModal(false);
             }
           }
           initialData={currentEditCard}
