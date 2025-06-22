@@ -227,7 +227,7 @@ For development teams, reference configuration files are available:
 - `env.local.reference.gpg` - Encrypted reference version (if available)
 
 **Backend (Local Development):**
-- `server/.env.example` - Example server environment
+- `server/.env.example.whitelabel` - Example server environment for white-label deployments
 - `server/env.reference.gpg` - Encrypted reference version (if available)
 
 These files contain working configuration values formatted like the template structure, useful for:
@@ -246,7 +246,7 @@ cp .env.local.example .env.local
 # Edit .env.local with your specific values
 
 # Backend - copy example config and customize
-cp server/.env.example server/.env
+cp server/.env.example.whitelabel server/.env
 # Edit server/.env with your specific values
 
 # Start development
