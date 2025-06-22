@@ -4,9 +4,26 @@
 import type { BrandConfig } from './types';
 import defaultConfig from './brand.config';
 
-// For now, always use the default config
-// Client-specific configs should be added as needed
-const brandConfig: BrandConfig = defaultConfig;
+function loadBrandConfig(): BrandConfig {
+  const configName = process.env.NEXT_PUBLIC_BRAND_CONFIG;
+  
+  if (!configName) {
+    // No specific brand config specified, use default
+    return defaultConfig;
+  }
+  
+  try {
+    // Dynamically import the specified brand config
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const specificConfig = require(`./brand.config.${configName}`).default;
+    return specificConfig;
+  } catch (error) {
+    console.warn(`Failed to load brand config '${configName}', falling back to default:`, error);
+    return defaultConfig;
+  }
+}
+
+const brandConfig: BrandConfig = loadBrandConfig();
 
 // Helper function to get theme color
 export function getThemeColor(colorKey: keyof BrandConfig['theme']): string {

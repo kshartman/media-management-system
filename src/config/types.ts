@@ -7,7 +7,7 @@ export interface BrandConfig {
   appDescription: string;
   
   // Visual Assets
-  logoPath: string;
+  logoPath: string | null; // Can be null to show company name instead
   faviconPath: string;
   
   // Theme Colors

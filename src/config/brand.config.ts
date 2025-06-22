@@ -1,40 +1,31 @@
 // Default brand configuration for the Media Management System
-// This file contains all branding elements that can be customized per client
+// This file contains generic branding elements that can be customized per client
 
 import type { BrandConfig } from './types';
 
 const brandConfig: BrandConfig = {
   // Company Information
-  companyName: 'Affiliate Resources',
-  appTitle: 'Affiliate Resources',
+  companyName: 'Media Management System',
+  appTitle: 'Media Management System',
   appDescription: 'A system for managing and browsing digital media assets',
   
   // Visual Assets
-  logoPath: '/zive-logo.png',
+  logoPath: null, // No logo by default - will show company name instead
   faviconPath: '/favicon.ico',
   
   // Theme Colors
   theme: {
-    headerBackground: '#d9f2fc', // Light blue - used in header
-    primaryColor: '#3b82f6',      // Blue - primary brand color
-    adminColor: '#9333ea',        // Purple - admin role color
-    editorColor: '#3b82f6',       // Blue - editor role color
+    headerBackground: '#f3f4f6', // Light gray - neutral header
+    primaryColor: '#6b7280',     // Gray - neutral primary color
+    adminColor: '#dc2626',       // Red - admin role color
+    editorColor: '#2563eb',      // Blue - editor role color
   },
   
   // External Links (set to null to hide menu items)
-  externalLinks: {
-    portal: {
-      label: 'Affiliate Portal',
-      url: 'https://affiliates.shopzive.com'
-    },
-    training: {
-      label: 'Affiliate Training', 
-      url: 'https://shopzive.com/pages/zivepro-affiliate-resources'
-    }
-  },
+  externalLinks: null, // No external links by default
   
   // Domain Configuration (used in .env files)
-  domain: 'resources.shopzive.com',
+  domain: 'media.example.com',
   
   // Trash Configuration
   trash: {

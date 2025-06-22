@@ -76,6 +76,7 @@ server/backend.log
 src/config/brand.config.*.ts
 !src/config/brand.config.ts
 !src/config/brand.config.example-client.ts
+!src/config/brand.config.zive.ts
 
 # Client-specific assets
 public/*-logo.png

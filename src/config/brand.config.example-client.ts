@@ -10,7 +10,8 @@ const brandConfig: BrandConfig = {
   appDescription: 'Example Corp digital asset management system',
   
   // Visual Assets (place files in public/ directory)
-  logoPath: '/example-logo.png',
+  // Set logoPath to null to show company name instead of logo
+  logoPath: '/example-logo.png', // or null for text-only
   faviconPath: '/example-favicon.ico',
   
   // Theme Colors
@@ -22,10 +23,26 @@ const brandConfig: BrandConfig = {
   },
   
   // External Links - set to null to remove external links from menu
-  externalLinks: null,
+  externalLinks: {
+    portal: {
+      label: 'Client Portal',
+      url: 'https://portal.example.com'
+    },
+    training: {
+      label: 'Training Resources',
+      url: 'https://training.example.com'
+    }
+  },
+  // Or set to null to remove external links completely:
+  // externalLinks: null,
   
   // Domain Configuration
   domain: 'media.example.com',
+  
+  // Trash Configuration
+  trash: {
+    retentionDays: 30 // Keep deleted items for 30 days before permanent deletion
+  },
 };
 
 export default brandConfig;

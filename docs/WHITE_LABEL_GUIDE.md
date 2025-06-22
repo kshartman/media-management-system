@@ -219,49 +219,49 @@ const brandConfig = {
 
 ## Development Reference Files
 
-### ZIVE Production Values
-For reference, the actual ZIVE configuration values are available in:
+### Reference Configuration Files
+For development teams, reference configuration files are available:
 
 **Frontend (Local Development):**
-- `.env.local.zive` - Real ZIVE frontend local development environment (not tracked by git)
-- `env.local.zive.gpg` - Encrypted version (tracked by git for team access)
+- `.env.local.example` - Example frontend local development environment
+- `env.local.reference.gpg` - Encrypted reference version (if available)
 
 **Backend (Local Development):**
-- `server/.env.zive` - Real ZIVE server environment (not tracked by git)
-- `server/env.zive.gpg` - Encrypted version (tracked by git for team access)
+- `server/.env.example` - Example server environment
+- `server/env.reference.gpg` - Encrypted reference version (if available)
 
-These files contain the actual configuration values formatted like the template structure, useful for:
-- Comparing client configurations against ZIVE defaults
-- Quick setup for ZIVE-compatible development
+These files contain working configuration values formatted like the template structure, useful for:
+- Quick development setup
 - Reference for working configuration values
+- Team onboarding
 
-**Note**: The reference files (`.env.local.zive` and `server/.env.zive`) contain sensitive data and are not committed to git. The encrypted versions (`env.local.zive.gpg` and `server/env.zive.gpg`) are available for team members who need access to the working configurations.
+**Note**: Reference files may contain sensitive data and are not committed to git. Encrypted versions are available for team members who need access to working configurations.
 
-**Docker vs Local Development**: The `.env.docker.zive` reference file contains production Docker deployment values (port 5001, external MongoDB), while `server/.env.zive` contains local development values (port 3001, direct S3 access).
+### Quick Development Setup
 
-### Quick ZIVE Development Setup
-
-#### Option 1: Using existing reference files
+#### Using example configuration files
 ```bash
-# Frontend - copy ZIVE local development config
-cp .env.local.zive .env.local
+# Frontend - copy example config and customize
+cp .env.local.example .env.local
+# Edit .env.local with your specific values
 
-# Backend - copy ZIVE server config  
-cp server/.env.zive server/.env
+# Backend - copy example config and customize
+cp server/.env.example server/.env
+# Edit server/.env with your specific values
 
 # Start development
 npm run dev
 ```
 
-#### Option 2: Decrypt from encrypted files (team setup)
+#### For teams with encrypted reference files
 ```bash
-# Decrypt encrypted configurations
-gpg --decrypt env.local.zive.gpg > .env.local.zive
-gpg --decrypt server/env.zive.gpg > server/.env.zive
+# Decrypt reference configurations (if available)
+gpg --decrypt env.local.reference.gpg > .env.local.reference
+gpg --decrypt server/env.reference.gpg > server/.env.reference
 
-# Then copy to active configs
-cp .env.local.zive .env.local
-cp server/.env.zive server/.env
+# Copy to active configs
+cp .env.local.reference .env.local
+cp server/.env.reference server/.env
 
 # Start development
 npm run dev

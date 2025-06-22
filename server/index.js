@@ -73,8 +73,7 @@ function validateJWTSecret() {
 const JWT_SECRET = validateJWTSecret();
 const CORS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:3000',
-  'http://localhost:5000',
-  'https://resources.shopzive.com'
+  'http://localhost:5000'
 ];
 
 // Helper function to check if a password is already hashed

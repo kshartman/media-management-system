@@ -32,6 +32,6 @@ echo "This is a sample transcript for the video." > "server/uploads/sample-reel-
 download_file "https://raw.githubusercontent.com/mozilla/pdf.js/master/web/compressed.tracemonkey-pldi-09.pdf" "server/uploads/sample-social-copy.pdf"
 
 # Download sample video file
-download_file "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4" "server/uploads/sample-reel-video.mp4"
+download_file "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4" "server/uploads/sample-reel-preview.mp4"
 
 echo "All sample files downloaded successfully!"

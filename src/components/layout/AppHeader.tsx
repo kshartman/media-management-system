@@ -162,14 +162,20 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
             </div>
 
             <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center pointer-events-none">
-              <Image
-                src={brandConfig.logoPath}
-                alt={`${brandConfig.companyName} logo`}
-                className="h-8 w-auto"
-                width={96}
-                height={32}
-                priority
-              />
+              {brandConfig.logoPath ? (
+                <Image
+                  src={brandConfig.logoPath}
+                  alt={`${brandConfig.companyName} logo`}
+                  className="h-8 w-auto"
+                  width={96}
+                  height={32}
+                  priority
+                />
+              ) : (
+                <span className="text-lg font-bold text-gray-900">
+                  {brandConfig.companyName}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center">
