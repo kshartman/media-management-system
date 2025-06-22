@@ -78,8 +78,13 @@ src/config/brand.config.*.ts
 !src/config/brand.config.example-client.ts
 !src/config/brand.config.zive.ts
 
-# Client-specific assets
-public/*-logo.png
-public/*-favicon.ico
+# Public directory - ignore everything except specific files
+public/*
 !public/zive-logo.png
+# Keep the default Next.js assets that were already tracked
+!public/file.svg
+!public/globe.svg  
+!public/next.svg
+!public/vercel.svg
+!public/window.svg
 
