@@ -14,9 +14,9 @@ info:
     - Both local and S3 storage support
     - Soft delete system with trash management (admin/editor only)
     - Centralized error handling with correlation ID tracking
-    - Client-side error logging
     - Database connection pooling with retry logic
     - Environment validation on startup
+    - Secure system initialization with setup endpoint
     
     ## Architecture Improvements
     - **Correlation IDs**: All responses include `X-Correlation-ID` header for request tracking
@@ -27,7 +27,7 @@ info:
     - **Environment Validation**: Startup validation of all environment variables
     
     ## Authentication
-    Most endpoints require JWT authentication via Bearer token in the Authorization header.
+    The API uses secure httpOnly cookies for authentication. JWT tokens are automatically managed by the browser and included in requests via cookies.
     
     ## File Upload
     File uploads use multipart/form-data and support up to 500MB files with automatic preview generation.
@@ -106,46 +106,78 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReadinessResponse'
 
-  # Client Error Logging
-  /api/client-error:
+  # Authentication Setup
+  /api/auth/setup:
     post:
       tags:
-        - Debug
-      summary: Log client-side errors
+        - Authentication
+      summary: Initial system setup
       description: |
-        Endpoint for logging client-side JavaScript errors to the server.
-        Used by React error boundaries and other client-side error handling.
+        Create the first admin user for system initialization.
+        This endpoint is only available when no users exist in the database.
+        **Security**: Strictly rate-limited and only works on fresh installations.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ClientErrorRequest'
+              $ref: '#/components/schemas/SetupRequest'
       responses:
-        '200':
-          description: Error logged successfully
-          headers:
-            X-Correlation-ID:
-              description: Unique request correlation ID for tracking
-              schema:
-                type: string
-                format: uuid
+        '201':
+          description: First admin user created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ClientErrorResponse'
-        '500':
-          description: Internal server error
-          headers:
-            X-Correlation-ID:
-              description: Unique request correlation ID for tracking
-              schema:
-                type: string
-                format: uuid
+                $ref: '#/components/schemas/SetupResponse'
+        '400':
+          description: Invalid request data or password requirements not met
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Setup not available - users already exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Validate session and return current user information
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid or missing session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Clear authentication cookie and end session
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
 
   # Debug Endpoints
   /api/debug/loglevel:
@@ -1390,10 +1422,6 @@ components:
     LoginResponse:
       type: object
       properties:
-        token:
-          type: string
-          description: JWT token for authentication
-          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         user:
           $ref: '#/components/schemas/User'
 
@@ -1420,8 +1448,42 @@ components:
         newPassword:
           type: string
           format: password
-          minLength: 6
-          example: "newpassword123"
+          minLength: 12
+          description: Must be at least 12 characters with uppercase, lowercase, numbers, and special characters
+          example: "NewPassword123!"
+
+    SetupRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Username for the first admin user
+          example: "admin"
+        email:
+          type: string
+          format: email
+          description: Email for the first admin user
+          example: "admin@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 12
+          description: Strong password with uppercase, lowercase, numbers, and special characters
+          example: "SecurePassword123!"
+
+    SetupResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Admin user created successfully"
+        user:
+          $ref: '#/components/schemas/User'
 
     # Card Schemas
     Card:
@@ -1799,68 +1861,6 @@ components:
           description: When the reset link expires (24 hours from creation)
           example: "2024-01-15T14:30:00.000Z"
 
-    # Client Error Logging Schemas
-    ClientErrorRequest:
-      type: object
-      required:
-        - error
-        - userAgent
-        - url
-        - timestamp
-      properties:
-        error:
-          type: object
-          required:
-            - message
-            - name
-          properties:
-            message:
-              type: string
-              description: Error message
-              example: "Cannot read property 'id' of undefined"
-            stack:
-              type: string
-              description: JavaScript stack trace
-              example: "TypeError: Cannot read property 'id' of undefined\n    at CardForm.tsx:42:15"
-            name:
-              type: string
-              description: Error type/name
-              example: "TypeError"
-        errorInfo:
-          type: object
-          properties:
-            componentStack:
-              type: string
-              description: React component stack trace
-              example: "    in CardForm (created by CardPage)\n    in CardPage"
-        userAgent:
-          type: string
-          description: Browser user agent string
-          example: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-        url:
-          type: string
-          description: URL where the error occurred
-          example: "http://localhost:3000/cards/edit/123"
-        timestamp:
-          type: string
-          format: date-time
-          description: When the error occurred on the client
-          example: "2024-01-15T14:30:00.000Z"
-
-    ClientErrorResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        correlationId:
-          type: string
-          format: uuid
-          description: Unique request correlation ID for tracking
-          example: "123e4567-e89b-12d3-a456-426614174000"
-        message:
-          type: string
-          example: "Error logged successfully"
 
     # Common Schemas
     MessageResponse:

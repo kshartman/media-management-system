@@ -1,5 +1,11 @@
 # Claude Code Development Notes
 
+> **📚 Documentation Overview:**
+> - **README.md**: Complete setup, configuration, and feature guide
+> - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
+> - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
+> - **CLAUDE.md** (this file): Development workflow and architecture reference
+
 ## Project Overview
 Media Management System - Next.js frontend with Express backend for managing digital media assets (images, social posts, reels).
 
@@ -288,6 +294,46 @@ src/components/
 - [ ] Client error logging working (`/api/client-error`)
 - [ ] Correlation ID tracking in server logs
 - [ ] Environment validation on server startup
+
+### Security Testing
+
+**Test JWT Secret Validation:**
+- [ ] Server fails to start with missing JWT_SECRET
+- [ ] Server fails to start with weak JWT_SECRET (< 32 chars)
+- [ ] Server starts successfully with strong JWT_SECRET
+
+**Test Setup Flow:**
+- [ ] Fresh database shows setup instructions in logs
+- [ ] Setup endpoint `/api/auth/setup` works only when no users exist
+- [ ] Setup fails with weak password (test validation)
+- [ ] Setup succeeds with strong password and creates admin user
+- [ ] Setup fails when attempted again after user exists
+
+**Test Rate Limiting:**
+```bash
+# Make multiple rapid login attempts - should get 429 responses
+for i in {1..10}; do
+  curl -X POST http://localhost:5001/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"admin","password":"wrong"}' \
+    -v
+done
+```
+
+**Test File Upload Security:**
+- [ ] Try uploading suspicious files (.exe, .php, .js) - should be blocked
+- [ ] Try uploading files with mismatched MIME types - should be rejected
+- [ ] Verify only allowed file types are accepted
+
+**Test Cookie Authentication:**
+- [ ] Login successfully creates `auth_token` cookie with httpOnly flag
+- [ ] JWT token not accessible via `document.cookie` in browser console
+- [ ] Cookies have proper security flags (httpOnly, secure in prod, sameSite)
+
+**Test Password Requirements:**
+- [ ] Passwords require minimum 12 characters
+- [ ] Passwords require uppercase, lowercase, numbers, and special characters
+- [ ] Common passwords are rejected
 
 ## Environment Details
 

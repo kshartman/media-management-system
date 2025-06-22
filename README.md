@@ -47,6 +47,12 @@ The storage system is abstracted through utility functions that handle file oper
 
 ## Getting Started
 
+> **📚 Documentation Guide:**
+> - **README.md** (this file): Complete setup and feature guide
+> - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
+> - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
+> - **CLAUDE.md**: Development workflow and architecture reference
+
 ### Prerequisites
 
 - Node.js (v14 or later)
@@ -75,6 +81,9 @@ The storage system is abstracted through utility functions that handle file oper
 ### Configuration
 
 #### Environment Setup
+
+> **💡 For white-label/client-specific deployments, see [WHITE_LABEL_GUIDE.md](./WHITE_LABEL_GUIDE.md)**  
+> **🐳 For production Docker deployment, see [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md)**
 
 Create a complete `.env` file in the `/server` directory with all necessary configuration:
 
@@ -612,6 +621,27 @@ A: Run the migration script again with `DRY_RUN = false`. Check that the databas
 A: Check the server logs during startup. You should see a message like "Using S3 storage: bucket yourBucketName/dams in region your-region". You can also check the `/api/health` endpoint which includes storage configuration status.
 
 ### Security Considerations
+
+#### Initial System Setup
+
+**First-time deployment requires secure setup:**
+
+1. **Strong JWT Secret Required**: Set a secure JWT_SECRET (min 32 characters):
+   ```bash
+   # Generate a secure JWT secret
+   echo "JWT_SECRET=$(openssl rand -base64 48)" >> server/.env
+   ```
+
+2. **Create First Admin User**: No default admin user exists. Use the setup endpoint:
+   ```bash
+   curl -X POST http://localhost:5001/api/auth/setup \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","email":"admin@example.com","password":"SecurePassword123!"}'
+   ```
+
+3. **Password Requirements**: Passwords must be at least 12 characters with uppercase, lowercase, numbers, and special characters.
+
+4. **Rate Limiting**: Auth endpoints are rate-limited (5 attempts per 15 minutes) to prevent brute force attacks.
 
 **Q: How can I secure access to my media files?**
 A: For basic security, ensure your S3 bucket has the correct CORS and bucket policies. For more advanced security, you can:

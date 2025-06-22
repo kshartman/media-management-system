@@ -1,5 +1,10 @@
 # White Label Configuration Guide
 
+> **📚 Related Documentation:**
+> - **README.md**: Complete setup and configuration guide
+> - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
+> - **CLAUDE.md**: Development workflow and troubleshooting
+
 This guide explains how to customize the Media Management System for different clients using the brand configuration system.
 
 ## Quick Start
@@ -90,7 +95,7 @@ cp /path/to/acme-favicon.ico public/
 #### Frontend Environment
 ```bash
 # Copy the whitelabel environment template
-cp .env.docker.example.whitelabel .env
+cp .env.example.whitelabel .env
 
 # Update with client values
 vim .env
@@ -222,13 +227,12 @@ const brandConfig = {
 ### Reference Configuration Files
 For development teams, reference configuration files are available:
 
-**Frontend (Local Development):**
+**Frontend:**
+- `.env.example.whitelabel` - Example frontend environment for white-label deployments
 - `.env.local.whitelabel` - Example frontend local development environment
-- `env.local.reference.gpg` - Encrypted reference version (if available)
 
 **Backend (Local Development):**
 - `server/.env.example.whitelabel` - Example server environment for white-label deployments
-- `server/env.reference.gpg` - Encrypted reference version (if available)
 
 These files contain working configuration values formatted like the template structure, useful for:
 - Quick development setup
@@ -239,13 +243,13 @@ These files contain working configuration values formatted like the template str
 
 ### Quick Development Setup
 
-#### Using example configuration files
+#### For local development
 ```bash
-# Frontend - copy example config and customize
+# Frontend - copy local development template
 cp .env.local.whitelabel .env.local
 # Edit .env.local with your specific values
 
-# Backend - copy example config and customize
+# Backend - copy server template  
 cp server/.env.example.whitelabel server/.env
 # Edit server/.env with your specific values
 
@@ -253,18 +257,15 @@ cp server/.env.example.whitelabel server/.env
 npm run dev
 ```
 
-#### For teams with encrypted reference files
+#### For production deployment
 ```bash
-# Decrypt reference configurations (if available)
-gpg --decrypt env.local.reference.gpg > .env.local.reference
-gpg --decrypt server/env.reference.gpg > server/.env.reference
+# Frontend - copy production template
+cp .env.example.whitelabel .env
+# Edit .env with production values
 
-# Copy to active configs
-cp .env.local.reference .env.local
-cp server/.env.reference server/.env
-
-# Start development
-npm run dev
+# Build and deploy
+npm run build
+docker compose up --build -d
 ```
 
 ## Troubleshooting

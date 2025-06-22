@@ -1,5 +1,10 @@
 # Docker Deployment Guide
 
+> **📚 Related Documentation:**
+> - **README.md**: Complete setup and configuration guide
+> - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
+> - **CLAUDE.md**: Development workflow and troubleshooting
+
 ## Overview
 This guide explains how to build and deploy the Media Management System using Docker containers behind an nginx proxy with HTTPS.
 
@@ -13,7 +18,7 @@ This guide explains how to build and deploy the Media Management System using Do
 
 1. **Configure environment variables:**
    ```bash
-   cp .env.docker.example.whitelabel .env
+   cp .env.example.whitelabel .env
    # Edit .env with your configuration
    ```
 
@@ -28,26 +33,28 @@ This guide explains how to build and deploy the Media Management System using Do
 
 ## Environment Variables
 
+> **📋 For complete environment variable documentation, see [README.md](./README.md#environment-setup)**
+
+Key production environment variables:
+
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DOMAIN` | Your domain name | resources.shopzive.com |
-| `NEXT_PUBLIC_API_URL` | Public API URL | https://resources.shopzive.com/api |
+| `DOMAIN` | Your domain name | resources.example.com |
+| `NEXT_PUBLIC_API_URL` | Public API URL | https://resources.example.com/api |
+| `NEXT_PUBLIC_BRAND_CONFIG` | Brand configuration name | client-name |
 | `MONGODB_URI` | MongoDB connection string | mongodb://user:pass@host:port/db |
-| `JWT_SECRET` | Secret for JWT tokens | random-secret-string |
-| `AWS_ACCESS_KEY_ID` | AWS access key for S3 | your-key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | your-secret |
-| `S3_BUCKET_NAME` | S3 bucket name | your-bucket |
+| `JWT_SECRET` | Secret for JWT tokens | [32+ character random string] |
+| `AWS_ACCESS_KEY_ID` | AWS access key for S3 | your-aws-key |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | your-aws-secret |
+| `S3_BUCKET` | S3 bucket name | your-bucket |
+| `USE_S3_STORAGE` | Enable S3 storage | true |
 | `HOST_UPLOAD_PATH` | Host path for uploads | /data/uploads |
-| **Email Configuration** | (optional - choose one) | |
-| `SENDGRID_API_KEY` | SendGrid API key | your-sendgrid-key |
-| `SENDGRID_FROM_EMAIL` | SendGrid from email | noreply@domain.com |
-| `MAILGUN_API_KEY` | Mailgun API key | your-mailgun-key |
-| `MAILGUN_DOMAIN` | Mailgun domain | yourdomain.com |
-| `MAILGUN_FROM_EMAIL` | Mailgun from email | noreply@domain.com |
-| `MAIL_DRIVER` | Force specific driver | sendgrid or mailgun |
-| `FRONTEND_URL` | Frontend URL for reset links (optional) | https://domain.com |
-| `LOG_LEVEL` | Logging level (optional) | warn |
-| `NODE_ENV` | Node.js environment (set automatically in Docker) | production |
+| `ALLOWED_ORIGINS` | CORS allowed origins | https://domain.com,http://localhost:3000 |
+| `LOG_LEVEL` | Logging level | warn |
+
+**Email Configuration** (optional - choose SendGrid OR Mailgun):
+- `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`
+- `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL`
 
 ## Deployment Steps
 
@@ -87,7 +94,8 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=us-east-1
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_BUCKET=${S3_BUCKET}
+      - USE_S3_STORAGE=true
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
       - FRONTEND_URL=${FRONTEND_URL}
