@@ -6,6 +6,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://resources.shopzive.com/api}
         NEXT_PUBLIC_DOMAIN: ${DOMAIN:-resources.shopzive.com}
+        NEXT_PUBLIC_BRAND_CONFIG: ${NEXT_PUBLIC_BRAND_CONFIG:-}
     image: media-management-frontend:latest
     container_name: media-frontend
     restart: unless-stopped

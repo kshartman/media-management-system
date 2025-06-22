@@ -27,6 +27,7 @@ COPY public ./public
 # Build arguments for environment variables
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_DOMAIN
+ARG NEXT_PUBLIC_BRAND_CONFIG
 
 # Set production environment for build
 ENV NODE_ENV=production
