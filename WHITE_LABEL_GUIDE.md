@@ -112,7 +112,7 @@ vim server/.env
 
 Key environment variables:
 - `NEXT_PUBLIC_BRAND_CONFIG=acme` (matches your config filename)
-- `CLIENT_DOMAIN=media.acme.com`
+- `CLIENT_DOMAIN=media.acme.com` (used for variable substitution in Docker env)
 - Update email domains and CORS origins
 - Ensure `ALLOWED_ORIGINS` includes client domain for production
 
