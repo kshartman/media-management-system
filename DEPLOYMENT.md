@@ -17,7 +17,7 @@ This guide explains how to build and deploy the Media Management System using Do
 1. Clone the repository and navigate to the project directory
 2. Copy and configure environment variables:
    ```bash
-   cp .env.docker.example .env
+   cp .env.docker.example.whitelabel .env
    # Edit .env with your configuration
    ```
 

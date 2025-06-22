@@ -223,7 +223,7 @@ const brandConfig = {
 For development teams, reference configuration files are available:
 
 **Frontend (Local Development):**
-- `.env.local.example` - Example frontend local development environment
+- `.env.local.whitelabel` - Example frontend local development environment
 - `env.local.reference.gpg` - Encrypted reference version (if available)
 
 **Backend (Local Development):**
@@ -242,7 +242,7 @@ These files contain working configuration values formatted like the template str
 #### Using example configuration files
 ```bash
 # Frontend - copy example config and customize
-cp .env.local.example .env.local
+cp .env.local.whitelabel .env.local
 # Edit .env.local with your specific values
 
 # Backend - copy example config and customize
