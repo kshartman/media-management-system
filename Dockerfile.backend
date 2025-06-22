@@ -74,14 +74,17 @@ COPY server/ ./
 RUN mkdir -p /uploads && \
     groupadd -g 1001 nodejs && \
     useradd -r -u 1001 -g nodejs backend && \
-    mkdir -p /home/backend/.cache && \
+    mkdir -p /home/backend/.cache/puppeteer && \
     chown -R backend:nodejs /uploads && \
     chown -R backend:nodejs /app && \
     chown -R backend:nodejs /home/backend
 
-# Switch to backend user and install Chrome for Puppeteer
+# Install Chrome for Puppeteer before switching user
+RUN npx puppeteer browsers install chrome && \
+    chown -R backend:nodejs /root/.cache/puppeteer 2>/dev/null || true
+
+# Switch to backend user
 USER backend
-RUN npx puppeteer browsers install chrome
 
 EXPOSE 5001
 
