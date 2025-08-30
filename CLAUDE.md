@@ -186,6 +186,19 @@ src/components/
 
 ## Recent Major Changes
 
+### Version 0.2.0 - Security Updates (Latest)
+- Updated Next.js from 15.3.2 to 15.5.2 to fix moderate security vulnerabilities
+  - Fixed cache poisoning vulnerability
+  - Fixed content injection for Image Optimization
+  - Fixed SSRF via improper middleware redirect
+  - Fixed cache key confusion for image optimization
+- Updated form-data from 4.0.1 to 4.0.4 in backend to fix critical vulnerability
+- Added frontend health check endpoint at `/api/health`
+- Added health check to Docker configuration for frontend container
+- Fixed TypeScript compatibility issues with Next.js 15.5.2
+
+## Previous Major Changes
+
 ### Phase 2 Architecture Overhaul (Latest)
 - Implemented centralized error handling middleware with correlation ID tracking
 - Added database connection pooling and retry logic with exponential backoff

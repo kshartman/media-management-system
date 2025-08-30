@@ -40,6 +40,9 @@ FROM node:22.16-slim AS runner
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy only necessary files for production
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -56,5 +59,11 @@ RUN groupadd -g 1001 nodejs && \
 USER nextjs
 
 EXPOSE 3000
+
+# Add health check
+# Checks every 30 seconds, times out after 5 seconds, starts checking after 60 seconds
+# Retries 3 times before marking as unhealthy
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
 
 CMD ["node", "server.js"]
