@@ -51,6 +51,7 @@ The storage system is abstracted through utility functions that handle file oper
 > - **README.md** (this file): Complete setup and feature guide
 > - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
+> - **BRAND_OVERLAY_GUIDE.md**: Private brand repository pattern for managing client-specific configurations
 > - **CLAUDE.md**: Development workflow and architecture reference
 
 ### Prerequisites

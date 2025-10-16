@@ -10,8 +10,8 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::zivepublic",
-        "arn:aws:s3:::zivepublic/dams/*"
+        "arn:aws:s3:::YOUR-BUCKET-NAME",
+        "arn:aws:s3:::YOUR-BUCKET-NAME/dams/*"
       ]
     }
   ]

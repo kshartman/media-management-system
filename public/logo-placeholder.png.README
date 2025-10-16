@@ -1,0 +1,24 @@
+# Logo Placeholder
+
+This directory should contain your company logo as `logo-placeholder.png`.
+
+## Logo Requirements:
+- **Format**: PNG with transparent background recommended
+- **Dimensions**: Height of 32px, width flexible (will scale proportionally)
+- **Location**: `/public/logo-placeholder.png`
+
+## For Brand Overlay Setup:
+If using the brand overlay pattern, your logo will be symlinked from your brand folder:
+```bash
+ln -sf ../your-brand/assets/your-logo.png public/logo-placeholder.png
+```
+
+## Creating a Quick Placeholder:
+You can create a simple text-based PNG logo using ImageMagick:
+```bash
+convert -size 200x32 -background none -fill "#3b82f6" \
+  -font Arial -pointsize 24 -gravity center \
+  label:"Your Company" public/logo-placeholder.png
+```
+
+Or use any image editing software to create a 200x32px PNG with your company name.
