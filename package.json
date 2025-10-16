@@ -26,7 +26,7 @@
     "@tiptap/extension-ordered-list": "^2.12.0",
     "@tiptap/extension-paragraph": "^2.12.0",
     "@tiptap/extension-strike": "^2.12.0",
-    "@tiptap/extension-text-style": "^2.12.0",
+    "@tiptap/extension-text-style": "^3.7.2",
     "@tiptap/extension-underline": "^2.12.0",
     "@tiptap/pm": "^2.12.0",
     "@tiptap/react": "^2.12.0",
