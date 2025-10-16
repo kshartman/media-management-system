@@ -1,0 +1,26 @@
+# ACME Brand Logo Placeholder
+
+Place your company logo in this directory.
+
+## Required File:
+- **Filename**: Any PNG file (e.g., acme-logo.png)
+- **Format**: PNG with transparent background recommended
+- **Dimensions**: Height of 32px, width flexible (will scale proportionally)
+
+## During Deployment:
+The deploy.sh script will create a symlink from your logo to:
+`public/logo-placeholder.png`
+
+## Example:
+If your logo is named `acme-logo.png`, update the deploy.sh script:
+```bash
+ln -sf ../acme-brand/assets/acme-logo.png ../public/logo-placeholder.png
+```
+
+## Quick Placeholder Creation:
+You can create a simple text-based logo with ImageMagick:
+```bash
+convert -size 200x32 -background none -fill "#0066cc" \
+  -font Arial -pointsize 24 -gravity center \
+  label:"ACME" assets/acme-logo.png
+```

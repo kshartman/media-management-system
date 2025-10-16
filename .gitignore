@@ -79,6 +79,7 @@ src/config/brand.config.*.ts
 
 # Brand overlay folders (private repos for client-specific configurations)
 *-brand/
+!acme-brand/  # Keep the example brand folder for reference
 
 # Public directory - ignore everything except specific files
 public/*
