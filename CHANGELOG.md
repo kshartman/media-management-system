@@ -7,18 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Fixed 4 HIGH severity multer vulnerabilities:
+  - CVE-2025-47944: DoS via unhandled exception from malformed multipart requests
+  - CVE-2025-47935: DoS via memory leaks from unclosed streams
+  - CVE-2025-48997: DoS from maliciously crafted upload requests
+  - CVE-2025-7338: DoS via malformed upload request handling
+- Upgraded multer from 1.4.5-lts.1 to 2.0.2 (no breaking changes)
+- npm audit: 0 vulnerabilities in frontend and backend
+
 ### Added
 - MIT License for open source distribution
 - Comprehensive DEPLOYMENT_OPTIONS.md covering Docker, Vercel + PaaS, and VPS deployment strategies
 - Brand overlay system for white-label deployments with separate private repositories
 - ACME brand example implementation for reference
 - Brand-specific development notes guidance in CLAUDE.md
+- Dependabot configuration for automated dependency security updates
+- Parameterized remote deployment script (zive-brand/deploy-remote.sh) with branch selection
 
 ### Changed
 - Compressed sample-reel-preview.mp4 from 70MB to 2.5MB (30 seconds, 540x960 resolution)
 - Removed all client-specific references from public documentation
 - Updated documentation structure with clearer deployment options
 - Added license field to package.json files
+
+### Removed
+- Unused multer-s3 dependency and imports (system uses direct AWS SDK integration)
 
 ## [0.2.0] - 2024-10-16
 

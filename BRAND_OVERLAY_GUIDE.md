@@ -266,6 +266,33 @@ In your GitHub Actions / GitLab CI:
     cd client-brand && ./deploy.sh
 ```
 
+### Remote Deployment Script
+
+For brands that include a `deploy-remote.sh` script (like the zive-brand example), you can deploy to a remote server with optional branch selection:
+
+```bash
+# Deploy main branch (default)
+cd your-client-brand
+./deploy-remote.sh
+
+# Deploy specific branch
+./deploy-remote.sh feature/new-feature
+
+# Deploy security fix branch
+./deploy-remote.sh fix/multer-security-vulnerabilities
+```
+
+The remote deployment script:
+1. Pulls latest code from specified branch (defaults to `main`)
+2. Links brand configuration files
+3. Rebuilds and restarts Docker containers
+4. Verifies deployment status
+
+This is useful for:
+- Testing feature branches in production
+- Deploying security fixes quickly
+- Managing multiple deployment environments
+
 ## Troubleshooting
 
 ### Brand not loading

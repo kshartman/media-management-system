@@ -416,17 +416,19 @@ The system supports two storage options with a unified API for file operations:
 2. **S3 Storage**:
    - Files are stored in an Amazon S3 bucket in the `dams/` folder
    - Uses AWS SDK v3 for S3 operations
-   - Uses `multer-s3` for direct-to-S3 uploads
+   - Files saved locally first using multer disk storage, then manually uploaded to S3
    - URLs are S3 URLs or custom domain URLs if configured
-   - Supports pre-signed URLs for private content
+   - Supports pre-signed URLs for private content and reliable downloads
    - Recommended for production and larger deployments
 
 #### Implementation Details
 
 The storage abstraction is implemented in `server/utils/s3Storage.js` and provides:
 
-- **getStorage()**: Returns the appropriate multer storage engine
+- **getStorage()**: Returns multer disk storage engine (always saves locally first)
+- **uploadLocalFileToS3()**: Manually uploads files to S3 after local save
 - **getFileUrl()**: Converts local paths or S3 keys to appropriate URLs
+- **getSignedDownloadUrl()**: Generates pre-signed URLs with Content-Disposition for reliable downloads
 - **deleteFile()**: Handles file deletion from either storage system
 - **getSignedFileUrl()**: Generates temporary authenticated S3 URLs
 
