@@ -245,8 +245,6 @@ Ensure your bucket has this public read policy:
 3. Get the Access Key ID and Secret Access Key
 4. Add these credentials to your `.env` file
 
-For detailed instructions, see the [S3 IAM Setup Guide](./server/s3-iam-setup-guide.md).
-
 ## Email Setup (Optional)
 
 The password reset feature requires either SendGrid or Mailgun for sending emails. The system automatically detects which service is configured.

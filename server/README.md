@@ -4,6 +4,7 @@ This is the backend server for the Media Management System, providing API endpoi
 
 ## Features
 
+### Core Functionality
 - RESTful API for CRUD operations on media cards
 - User authentication with JWT tokens
 - User management (admin-only)
@@ -12,6 +13,15 @@ This is the backend server for the Media Management System, providing API endpoi
 - Media metadata extraction
 - Password reset via email (SendGrid or Mailgun)
 - MongoDB database for data persistence
+- Soft delete system with trash management
+
+### Phase 2 Architecture Improvements
+- Centralized error handling with structured responses
+- Database connection pooling with exponential backoff retry
+- UUID-based correlation ID tracking for debugging
+- Structured Winston logging with component isolation
+- Enhanced health monitoring with dependency checks
+- Environment validation on startup
 
 ## Installation
 
@@ -185,17 +195,32 @@ If you want to use CloudFront to serve your S3 files:
 
 ## API Endpoints
 
+### Health & Monitoring
+
+- `GET /health` - Simple liveness check
+- `GET /api/health` - Comprehensive health check with dependency status
+- `GET /api/health/ready` - Kubernetes-style readiness probe
+
 ### Authentication
 
-- `POST /api/auth/login` - Login with username and password
+- `POST /api/auth/setup` - Create first admin user (only works on fresh database)
+- `POST /api/auth/login` - Login with username or email (case-insensitive)
+- `POST /api/auth/forgot-password` - Request password reset email
+- `POST /api/auth/reset-password` - Reset password with token
 
 ### Cards
 
-- `GET /api/cards` - Get all cards with optional filtering
+- `GET /api/cards` - Get all cards with optional filtering (supports `includeDeleted` for admin/editor)
 - `GET /api/cards/:id` - Get a single card by ID
-- `POST /api/cards` - Create a new card (admin only)
-- `PUT /api/cards/:id` - Update a card (admin only)
-- `DELETE /api/cards/:id` - Delete a card (admin only)
+- `POST /api/cards` - Create a new card (editor/admin only)
+- `PUT /api/cards/:id` - Update a card (editor/admin only)
+- `DELETE /api/cards/:id` - Soft delete a card (editor/admin only)
+- `POST /api/track-download` - Track download count for analytics
+
+### Trash Management
+
+- `POST /api/cards/trash/:id/restore` - Restore a deleted card (editor/admin only)
+- `DELETE /api/cards/trash/:id/permanent` - Permanently delete a card (admin only)
 
 ### Tags
 
@@ -209,12 +234,35 @@ If you want to use CloudFront to serve your S3 files:
 - `PUT /api/users/:id` - Update a user
 - `DELETE /api/users/:id` - Delete a user
 
-## Default Admin User
+### Error Logging
 
-The system creates a default admin user on first run:
+- `POST /api/client-error` - Log client-side React errors for debugging
 
-- Username: `admin`
-- Email: `owner@shopzive.com`
-- Password: `HealthyGuts4Me!`
+## Initial System Setup
 
-Change this password immediately after first login.
+**No default admin user exists.** On first deployment, create an admin user using the setup endpoint:
+
+```bash
+curl -X POST http://localhost:3001/api/auth/setup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username":"admin",
+    "email":"admin@example.com",
+    "password":"YourSecurePassword123!"
+  }'
+```
+
+**Password Requirements:**
+- Minimum 12 characters
+- Must include uppercase, lowercase, numbers, and special characters
+- Common passwords are rejected
+
+**JWT Secret Requirement:**
+- Set a strong JWT_SECRET (minimum 32 characters)
+- Generate with: `openssl rand -base64 48`
+
+**Security Features:**
+- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
+- JWT tokens stored in httpOnly cookies
+- Password hashing with scrypt
+- Correlation ID tracking for all requests
