@@ -30,7 +30,6 @@
     "mongodb": "^6.16.0",
     "mongoose": "^8.14.2",
     "multer": "^2.0.2",
-    "node-fetch": "^3.3.2",
     "puppeteer": "^24.10.0",
     "sharp": "^0.34.1",
     "uuid": "^9.0.0",

@@ -94,8 +94,7 @@ class MailgunDriver extends MailInterface {
     const url = `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`;
 
     try {
-      const fetch = (await import('node-fetch')).default;
-      
+      // Using native fetch (Node.js 18+)
       const response = await fetch(url, {
         method: 'POST',
         headers: {
