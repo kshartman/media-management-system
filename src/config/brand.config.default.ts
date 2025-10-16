@@ -21,10 +21,9 @@ const brandConfig: BrandConfig = {
     editorColor: '#3b82f6',       // Blue
   },
 
-  // External Links (set to null to hide menu items)
+  // External Links (omit to hide menu items)
   externalLinks: {
-    portal: null,     // No portal link in generic version
-    training: null,   // No training link in generic version
+    // No external links in generic version
   },
 
   // Domain Configuration (used in .env files)
