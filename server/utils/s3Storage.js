@@ -3,7 +3,6 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const multerS3 = require('multer-s3');
 const logger = require('./logger');
 const { getUploadPath } = require('./uploadPath');
 require('dotenv').config();
