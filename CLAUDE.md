@@ -2,9 +2,47 @@
 
 > **📚 Documentation Overview:**
 > - **README.md**: Complete setup, configuration, and feature guide
+> - **DEPLOYMENT_OPTIONS.md**: Deployment strategies (Docker, Vercel, VPS)
 > - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
+> - **BRAND_OVERLAY_GUIDE.md**: Private brand repository pattern
 > - **CLAUDE.md** (this file): Development workflow and architecture reference
+
+## ⚠️ Important: Brand-Specific Information
+
+**This file contains GENERIC information only.** All examples use placeholders like:
+- Domain: `media.example.com`
+- S3 Bucket: `your-bucket-name`
+- Server paths: generic examples
+
+### Working on a Specific Brand Deployment?
+
+**YOU MUST read the brand's private development notes first:**
+
+```
+<brand-name>-brand/DEVELOPMENT_NOTES.md
+```
+
+Each brand folder contains:
+- **DEVELOPMENT_NOTES.md**: Brand-specific configuration, domains, S3 buckets, deployment commands
+- **deploy.sh**: Brand-specific deployment script
+- **env/**: Encrypted environment files with real credentials
+- **config/**: Brand configuration files
+
+**Example:**
+- For Zive deployment → Read `zive-brand/DEVELOPMENT_NOTES.md`
+- For ACME deployment → Read `acme-brand/DEVELOPMENT_NOTES.md`
+
+Without reading the brand-specific notes, you will not have:
+- Actual domain names
+- Real S3 bucket names
+- SSH connection details
+- Deployment server paths
+- Client-specific configuration
+
+**This file + Brand's DEVELOPMENT_NOTES.md = Complete picture**
+
+---
 
 ## Project Overview
 Media Management System - Next.js frontend with Express backend for managing digital media assets (images, social posts, reels).
@@ -12,8 +50,10 @@ Media Management System - Next.js frontend with Express backend for managing dig
 ## Key Architecture
 - **Frontend**: Next.js 15 with TypeScript, Tailwind CSS
 - **Backend**: Express.js with MongoDB, JWT auth
-- **Storage**: AWS S3 with local fallback
-- **Deployment**: Docker containers
+- **Storage**: AWS S3 with local fallback (configurable)
+- **Email**: SendGrid or Mailgun (configurable)
+- **Database**: MongoDB only (no alternatives currently supported)
+- **Deployment**: Multiple options - Docker, Vercel + PaaS, VPS, etc.
 
 ## Phase 2 Architecture Improvements
 
@@ -367,7 +407,7 @@ done
 
 **Video Streaming and Download Configuration**
 
-The S3 bucket (`zivepublic`) supports both video streaming (direct URLs) and reliable downloads (signed URLs with Content-Disposition headers).
+The S3 bucket supports both video streaming (direct URLs) and reliable downloads (signed URLs with Content-Disposition headers).
 
 **CORS Configuration for Video Streaming:**
 ```json
@@ -379,7 +419,7 @@ The S3 bucket (`zivepublic`) supports both video streaming (direct URLs) and rel
     "ExposeHeaders": [
       "Content-Length",
       "Content-Range",
-      "Accept-Ranges", 
+      "Accept-Ranges",
       "Content-Type"
     ],
     "MaxAgeSeconds": 3600
@@ -394,11 +434,11 @@ The S3 bucket (`zivepublic`) supports both video streaming (direct URLs) and rel
 - **Safari/Chrome**: Browser-specific rendering with native vs interactive controls
 
 **How to Apply CORS:**
-1. AWS Console → S3 → `zivepublic` bucket
+1. AWS Console → S3 → your bucket
 2. Permissions tab → Cross-origin resource sharing (CORS)
 3. Edit and paste the configuration above
 
-**Existing Bucket Policy** (preserve this):
+**Example Bucket Policy** (adjust for your bucket name):
 ```json
 {
   "Version": "2012-10-17",
@@ -407,7 +447,7 @@ The S3 bucket (`zivepublic`) supports both video streaming (direct URLs) and rel
       "Effect": "Allow",
       "Principal": "*",
       "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::zivepublic/*"
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
     }
   ]
 }
@@ -415,10 +455,10 @@ The S3 bucket (`zivepublic`) supports both video streaming (direct URLs) and rel
 
 **Note**: CORS enables video streaming. Downloads use signed URLs to ensure reliability across all browsers.
 
-### S3 URL Format Fix
-**Issue**: Safari video streaming failed due to S3 URL format.
-- ❌ Global format: `https://zivepublic.s3.amazonaws.com/...` (returns 403)
-- ✅ Regional format: `https://zivepublic.s3.us-east-1.amazonaws.com/...` (works correctly)
+### S3 URL Format Best Practice
+**Important**: Always use regional S3 URLs for better reliability.
+- ❌ Global format: `https://bucket.s3.amazonaws.com/...` (may cause 403 errors)
+- ✅ Regional format: `https://bucket.s3.region.amazonaws.com/...` (recommended)
 
 **Solution**: S3 storage configuration automatically generates regional URLs for new uploads. Database migration script available at `server/scripts/migrate-s3-urls.js` if needed for existing URLs.
 

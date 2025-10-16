@@ -1,6 +1,7 @@
 # Docker Deployment Guide
 
 > **📚 Related Documentation:**
+> - **DEPLOYMENT_OPTIONS.md**: Compare Docker vs Vercel vs VPS deployment strategies
 > - **README.md**: Complete setup and configuration guide
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
 > - **CLAUDE.md**: Development workflow and troubleshooting
@@ -8,10 +9,13 @@
 ## Overview
 This guide explains how to build and deploy the Media Management System using Docker containers behind an nginx proxy with HTTPS.
 
+> **💡 Not sure if Docker is right for you?**
+> See [DEPLOYMENT_OPTIONS.md](./DEPLOYMENT_OPTIONS.md) for alternative deployment strategies including Vercel, Railway, Render, and traditional VPS setups.
+
 ## Prerequisites
 - Docker and Docker Compose installed on build machine
 - External MongoDB instance
-- Domain name (e.g., resources.shopzive.com) with SSL certificates
+- Domain name (e.g., media.example.com) with SSL certificates
 - Persistent storage location for uploads
 
 ## Building Images
@@ -114,7 +118,7 @@ Example nginx configuration:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name resources.shopzive.com;
+    server_name media.example.com;
 
     ssl_certificate /etc/ssl/certs/your-cert.pem;
     ssl_certificate_key /etc/ssl/private/your-key.pem;
@@ -143,7 +147,7 @@ server {
 # Redirect HTTP to HTTPS
 server {
     listen 80;
-    server_name resources.shopzive.com;
+    server_name media.example.com;
     return 301 https://$server_name$request_uri;
 }
 ```

@@ -49,17 +49,27 @@ The storage system is abstracted through utility functions that handle file oper
 
 > **📚 Documentation Guide:**
 > - **README.md** (this file): Complete setup and feature guide
+> - **DEPLOYMENT_OPTIONS.md**: Comprehensive deployment strategy comparison (Docker, Vercel, VPS)
 > - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
 > - **BRAND_OVERLAY_GUIDE.md**: Private brand repository pattern for managing client-specific configurations
 > - **CLAUDE.md**: Development workflow and architecture reference
 
+### Deployment Options
+
+> **🚀 Choosing Your Deployment Strategy?**
+> See [DEPLOYMENT_OPTIONS.md](./DEPLOYMENT_OPTIONS.md) for a comprehensive comparison of:
+> - Docker Compose (current approach)
+> - Vercel + Backend PaaS (Railway, Render, Fly.io)
+> - Traditional VPS with PM2
+> - Future unified Next.js architecture
+
 ### Prerequisites
 
 - Node.js (v14 or later)
 - npm or yarn
-- MongoDB database
-- AWS account with S3 access (for cloud storage)
+- MongoDB database (MongoDB Atlas recommended for production)
+- AWS account with S3 access (recommended for production storage)
 
 ### Installation
 
@@ -393,12 +403,7 @@ The system includes user management features:
 - Password hashing with scrypt
 - Admin panel for user management
 
-The default admin credentials are:
-- Username: `admin`
-- Email: `owner@shopzive.com`
-- Password: `HealthyGuts4Me!`
-
-Change these credentials after the first login.
+**Initial Setup**: The system does not include any default users. On first deployment, you must create an admin user using the setup endpoint (see Security Considerations section for details).
 
 ### File Storage Options
 
@@ -700,3 +705,16 @@ The Media Management System can be further improved with the following features:
 - **Workflow Automation**: Create approval processes and publishing schedules
 
 Contributions to these features are welcome. Please follow the development guidelines outlined in this document.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The MIT License is a permissive open-source license that allows you to:
+- ✅ Use the software commercially
+- ✅ Modify the software
+- ✅ Distribute the software
+- ✅ Use the software privately
+- ✅ Sublicense the software
+
+The only requirement is that you include the original copyright and license notice in any copy of the software.
