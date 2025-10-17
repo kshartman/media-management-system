@@ -19,12 +19,10 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # Keep major updates separate for careful review
+    # Ignore ALL major version updates (breaking changes)
+    # Review and upgrade major versions manually when needed
     ignore:
-      # Ignore major version updates for stable dependencies
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
   # Backend (Express server) dependencies
@@ -43,14 +41,10 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # Keep major updates separate for careful review
+    # Ignore ALL major version updates (breaking changes)
+    # Review and upgrade major versions manually when needed
     ignore:
-      # Ignore major version updates that might break compatibility
-      - dependency-name: "express"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "mongodb"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "mongoose"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
   # GitHub Actions (if you add any workflows later)
