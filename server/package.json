@@ -11,11 +11,11 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.806.0",
-    "@aws-sdk/s3-request-presigner": "^3.806.0",
+    "@aws-sdk/client-s3": "^3.911.0",
+    "@aws-sdk/s3-request-presigner": "^3.911.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
-    "@sendgrid/mail": "^8.1.5",
+    "@sendgrid/mail": "^8.1.6",
     "axios": "^1.9.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -27,13 +27,13 @@
     "image-size": "^2.0.2",
     "jsonwebtoken": "^9.0.0",
     "jszip": "^3.10.1",
-    "mongodb": "^6.16.0",
-    "mongoose": "^8.14.2",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.19.1",
     "multer": "^2.0.2",
-    "puppeteer": "^24.10.0",
-    "sharp": "^0.34.1",
+    "puppeteer": "^24.25.0",
+    "sharp": "^0.34.4",
     "uuid": "^9.0.0",
-    "winston": "^3.17.0"
+    "winston": "^3.18.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
