@@ -67,9 +67,10 @@ You can either:
 ```bash
 cat > deploy.sh << 'EOF'
 #!/bin/bash
-# Link brand assets
-ln -sf ../your-client-brand/assets/your-logo.png ../public/logo-placeholder.png
-ln -sf ../your-client-brand/config/brand.config.yourclient.ts ../src/config/brand.config.ts
+# Copy brand assets (IMPORTANT: use cp, not ln -sf)
+# Docker builds don't follow symlinks outside the build context
+cp ../your-client-brand/assets/your-logo.png ../public/logo-placeholder.png
+cp ../your-client-brand/config/brand.config.yourclient.ts ../src/config/brand.config.ts
 
 # Decrypt environment files (if using GPG)
 gpg -d env/env.production.gpg > ../.env
@@ -77,6 +78,15 @@ EOF
 
 chmod +x deploy.sh
 ```
+
+**⚠️ IMPORTANT: Use `cp` not `ln -sf`**
+
+Docker builds **do not follow symlinks** outside the build context. If you use `ln -sf` (symlinks), you'll get `MODULE_NOT_FOUND` errors during Docker build:
+```
+Failed to load brand config 'yourclient', falling back to default: Error: Cannot find module './brand.config.yourclient'
+```
+
+Always use `cp` to copy files, not `ln -sf` to create symlinks.
 
 ### 5. Commit to Private Repo
 
@@ -295,13 +305,18 @@ This is useful for:
 
 ## Troubleshooting
 
-### Brand not loading
+### Brand not loading / MODULE_NOT_FOUND errors
+- **Docker builds:** Ensure you're using `cp` to copy files, not `ln -sf` for symlinks
+  - Symlinks outside the build context cause "Cannot find module" errors
+  - Update your deploy script to use `cp` instead of `ln -sf`
 - Check `NEXT_PUBLIC_BRAND_CONFIG` environment variable
-- Verify brand config file exists and is properly linked
+- Verify brand config file exists and is properly copied (not symlinked)
 - Check browser console for errors
 
 ### Logo not appearing
-- Verify symlink: `ls -la public/logo-placeholder.png`
+- **Docker builds:** Use `cp` to copy logo, not `ln -sf` for symlinks
+- Verify file exists: `ls -la public/logo-placeholder.png`
+- If it's a symlink: `rm public/logo-placeholder.png && cp your-brand/assets/logo.png public/logo-placeholder.png`
 - Check logo file exists in brand repo
 - Clear Next.js cache: `rm -rf .next`
 

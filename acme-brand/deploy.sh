@@ -3,6 +3,9 @@
 # ACME Brand Deployment Script (EXAMPLE)
 # This is a reference implementation - customize for your needs
 #
+# IMPORTANT: Uses cp instead of symlinks because Docker builds don't follow
+# symlinks outside the build context. Symlinks will cause "module not found" errors.
+#
 
 set -e  # Exit on error
 
@@ -18,8 +21,8 @@ echo "Script directory: $SCRIPT_DIR"
 echo "Project root: $PROJECT_ROOT"
 echo ""
 
-# Function to create symlink with confirmation
-create_link() {
+# Function to copy file with confirmation
+copy_file() {
     local source=$1
     local target=$2
 
@@ -29,21 +32,21 @@ create_link() {
         rm -f "$target"
     fi
 
-    # Create symlink
-    echo "Linking: $(basename $target)"
-    ln -sf "$source" "$target"
+    # Copy file (NOT symlink - Docker builds don't follow external symlinks)
+    echo "Copying: $(basename $target)"
+    cp "$source" "$target"
 }
 
-# Link brand configuration
-echo "Step 1: Linking brand configuration..."
-create_link "$SCRIPT_DIR/config/brand.config.acme.ts" "$PROJECT_ROOT/src/config/brand.config.ts"
+# Copy brand configuration
+echo "Step 1: Copying brand configuration..."
+copy_file "$SCRIPT_DIR/config/brand.config.acme.ts" "$PROJECT_ROOT/src/config/brand.config.ts"
 echo ""
 
-# Link logo (you'll need to add your actual logo file)
-echo "Step 2: Linking logo..."
+# Copy logo (you'll need to add your actual logo file)
+echo "Step 2: Copying logo..."
 if [ -f "$SCRIPT_DIR/assets/acme-logo.png" ]; then
-    create_link "$SCRIPT_DIR/assets/acme-logo.png" "$PROJECT_ROOT/public/logo-placeholder.png"
-    echo "Logo linked successfully"
+    copy_file "$SCRIPT_DIR/assets/acme-logo.png" "$PROJECT_ROOT/public/logo-placeholder.png"
+    echo "Logo copied successfully"
 else
     echo "⚠️  WARNING: No logo found at assets/acme-logo.png"
     echo "   Add your logo file and run this script again"
