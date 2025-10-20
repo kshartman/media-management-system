@@ -4,6 +4,7 @@ README*
 DEPLOYMENT*
 DEBUG*
 docs/
+*.zip
 
 # Development files
 .env.local*
