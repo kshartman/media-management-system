@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+const  S3_BUCKET_HOSTNAME = process.env.S3_BUCKET_HOSTNAME;
 
 // Get allowed origins from environment or use defaults
 const getAllowedOrigins = () => {
@@ -119,7 +120,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'zivepublic.s3.us-east-1.amazonaws.com',
+        hostname: `${S3_BUCKET_HOSTNAME}`,
       },
       {
         protocol: 'https',
