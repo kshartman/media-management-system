@@ -8,13 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **CRITICAL**: Patched React Server Components vulnerability (CVE-2025-55182, CVE-2025-66478)
+  - Updated Next.js from 15.5.6 to 15.5.7
+  - Updated React from 19.2.0 to 19.2.1
+  - Updated React-DOM from 19.2.0 to 19.2.1
 - Fixed 4 HIGH severity multer vulnerabilities:
   - CVE-2025-47944: DoS via unhandled exception from malformed multipart requests
   - CVE-2025-47935: DoS via memory leaks from unclosed streams
   - CVE-2025-48997: DoS from maliciously crafted upload requests
   - CVE-2025-7338: DoS via malformed upload request handling
 - Upgraded multer from 1.4.5-lts.1 to 2.0.2 (no breaking changes)
+- Fixed additional vulnerabilities: glob (high), js-yaml (moderate), jws (high)
 - npm audit: 0 vulnerabilities in frontend and backend
+
+### Changed
+- Updated browserslist database (caniuse-lite) to latest version for current browser compatibility data
 
 ### Added
 - MIT License for open source distribution
