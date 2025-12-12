@@ -8,10 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
-- **CRITICAL**: Patched React Server Components vulnerability (CVE-2025-55182, CVE-2025-66478)
+- Fixed 4 HIGH severity multer vulnerabilities:
+
+## [0.2.2] - 2025-12-12
+
+### Security
+- **CRITICAL**: Complete fix for React Server Components vulnerabilities
+  - CVE-2025-55184 (CVSS 7.5): DoS via infinite loop in Server Functions
+  - CVE-2025-67779 (CVSS 7.5): Incomplete fix for CVE-2025-55184
+  - CVE-2025-55183 (CVSS 5.3): Source code leak in Server Functions
+  - Updated Next.js from 15.5.7 to 15.5.9
+  - Updated React from 19.2.1 to 19.2.3
+  - Updated React-DOM from 19.2.1 to 19.2.3
+
+## [0.2.1] - 2025-12-12
+
+### Security
+- **CRITICAL**: Patched React Server Components RCE vulnerability (CVE-2025-55182, CVE-2025-66478)
   - Updated Next.js from 15.5.6 to 15.5.7
   - Updated React from 19.2.0 to 19.2.1
   - Updated React-DOM from 19.2.0 to 19.2.1
+- Fixed additional vulnerabilities: glob (high), js-yaml (moderate), jws (high)
+- npm audit: 0 vulnerabilities in frontend and backend
+
+### Changed
+- Updated browserslist database (caniuse-lite) to latest version
+
+## [0.2.0+1] - Unreleased Changes Before 0.2.1
+
+### Security
 - Fixed 4 HIGH severity multer vulnerabilities:
   - CVE-2025-47944: DoS via unhandled exception from malformed multipart requests
   - CVE-2025-47935: DoS via memory leaks from unclosed streams

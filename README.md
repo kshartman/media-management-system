@@ -1,6 +1,30 @@
 # Media Management System
 
+[![GitHub release](https://img.shields.io/github/v/release/kshartman/media-management-system)](https://github.com/kshartman/media-management-system/releases/latest)
+[![Security Status](https://img.shields.io/badge/security-patched-brightgreen)](https://github.com/kshartman/media-management-system/releases/tag/v0.2.2)
+
 A comprehensive system for browsing, categorizing, and managing digital media assets like images, social posts, and video reels with advanced cloud storage and reliability features.
+
+## ⚠️ Security Notice
+
+**All users should update to v0.2.2 immediately** to address critical React Server Components vulnerabilities:
+
+| CVE | Severity | Description |
+|-----|----------|-------------|
+| CVE-2025-55182 | **CRITICAL (10.0)** | Remote Code Execution in React Server Components |
+| CVE-2025-66478 | **CRITICAL (10.0)** | RCE in Next.js Server Components |
+| CVE-2025-55184 | HIGH (7.5) | Denial of Service via infinite loop |
+| CVE-2025-67779 | HIGH (7.5) | Incomplete fix for CVE-2025-55184 |
+| CVE-2025-55183 | MEDIUM (5.3) | Source code leak in Server Functions |
+
+**Minimum safe versions:** Next.js 15.5.9, React 19.2.3
+
+```bash
+# Upgrade immediately
+npm install next@15.5.9 react@19.2.3 react-dom@19.2.3
+```
+
+See [CHANGELOG.md](./CHANGELOG.md) for full details.
 
 ## 🚀 Key Features
 

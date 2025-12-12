@@ -1,6 +1,6 @@
 {
   "name": "media-management-system",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -33,9 +33,9 @@
     "@tiptap/starter-kit": "^2.26.3",
     "date-fns": "^4.1.0",
     "lodash": "^4.17.21",
-    "next": "^15.5.7",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "next": "^15.5.9",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/line-clamp": "^0.4.4",
