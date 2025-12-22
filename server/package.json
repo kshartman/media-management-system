@@ -11,8 +11,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.946.0",
-    "@aws-sdk/s3-request-presigner": "^3.946.0",
+    "@aws-sdk/client-s3": "^3.956.0",
+    "@aws-sdk/s3-request-presigner": "^3.956.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "@sendgrid/mail": "^8.1.6",
@@ -28,9 +28,9 @@
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "mongodb": "^6.21.0",
-    "mongoose": "^8.20.2",
+    "mongoose": "^8.20.4",
     "multer": "^2.0.2",
-    "puppeteer": "^24.32.1",
+    "puppeteer": "^24.34.0",
     "sharp": "^0.34.5",
     "uuid": "^9.0.0",
     "winston": "^3.19.0"
