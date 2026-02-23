@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### TODO
 - Frontend `minimatch` ReDoS (13 high via eslint chain) — requires breaking eslint downgrade, deferred until eslint ecosystem catches up
+- VPS: configure ESM Pro patching and unattended-upgrades for automatic security updates
+- VPS: set up log rotation, Docker image pruning, and disk space monitoring to prevent filling the drive
+- VPS: set up CloudWatch alarms (instance down, CPU, disk) and external uptime monitor
+
+## [0.2.6] - 2026-02-23
+
+### Changed
+- Self-host Google Fonts via `next/font/google` — eliminates 750ms render-blocking external request; font is downloaded at build time and served from the same origin
+- Removed `@import` and `font-family` declarations from `globals.css`; font applied via `className` on `<html>` element
+
+### Added
+- Open Graph metadata (`og:title`, `og:description`, `og:image`) in root layout, driven by `brandConfig` — link previews in Slack, Outlook, etc. now show correct brand title, description, and logo
+- Dismissible tag chips in filter bar — click a selected tag to remove it
+- Generic defaults in `docker-compose.yml` (localhost instead of brand-specific domain)
+
+### Verified (no code change)
+- Logo `<Image>` already has `priority` prop (AppHeader.tsx line 173)
+- `editorColor` brand config field is defined but unused — role badges use hardcoded Tailwind classes
 
 ## [0.2.5] - 2026-02-23
 
@@ -263,7 +281,8 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 
 ## Version History Summary
 
-- **Unreleased**: Replace axios with native fetch, eslint minimatch fix
+- **Unreleased**: eslint minimatch fix, VPS hardening
+- **0.2.6** (2026-02-23): Self-host fonts via next/font, Open Graph metadata
 - **0.2.4** (2026-02-23): Security patch — backend qs/express/fast-xml-parser/axios, frontend next/lodash/ajv/markdown-it
 - **0.2.3** (2026-02-23): Auto-adaptive header theming with WCAG luminance detection
 - **0.2.2** (2025-12-12): Critical React Server Components security patches

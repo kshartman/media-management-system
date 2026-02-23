@@ -186,6 +186,24 @@ export default function CardPageLayout({
                       availableTags={availableTags}
                     />
                   </div>
+
+                  {/* Selected tag chips */}
+                  {selectedTags.length > 0 && (
+                    <div className="hidden sm:flex items-center gap-1 flex-wrap">
+                      {selectedTags.map(tag => (
+                        <button
+                          key={tag}
+                          onClick={() => handleFilterChange({ tags: selectedTags.filter(t => t !== tag) })}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full hover:bg-blue-200"
+                        >
+                          {tag}
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   
                   <SortDropdown
                     currentSort={currentSort}

@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://resources.shopzive.com/api}
-        NEXT_PUBLIC_DOMAIN: ${DOMAIN:-resources.shopzive.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://localhost/api}
+        NEXT_PUBLIC_DOMAIN: ${DOMAIN:-localhost}
         NEXT_PUBLIC_BRAND_CONFIG: ${NEXT_PUBLIC_BRAND_CONFIG:-}
     image: media-management-frontend:latest
     container_name: media-frontend
@@ -55,7 +55,7 @@ services:
       - USE_S3_STORAGE=${USE_S3_STORAGE}
       - S3_CUSTOM_DOMAIN=${S3_CUSTOM_DOMAIN:-}
       - UPLOAD_PATH=/uploads
-      - DOMAIN=${DOMAIN:-resources.shopzive.com}
+      - DOMAIN=${DOMAIN:-localhost}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
