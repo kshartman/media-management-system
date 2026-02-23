@@ -223,7 +223,12 @@ src/components/
 
 ## Recent Major Changes
 
-### Version 0.2.4 - Security Patches (Latest)
+### Version 0.2.5 - Bug Fixes (Latest)
+- Fixed health check double-prefix (`/api/api/health` 404s) — frontend health route now uses `BACKEND_URL` for direct container-to-container checks
+- Fixed Mailgun driver: `form-data` 4.0.4+ requires `form.getBuffer()` with native `fetch`
+- Replaced `axios` with native `fetch` in all backend utilities; removed `axios` dependency
+
+### Version 0.2.4 - Security Patches
 - Backend: `qs`/`express` arrayLimit DoS, `fast-xml-parser` 3 DoS/bypass issues, `axios` `__proto__` DoS
 - Frontend: `next` 15.5.9→15.5.12 (2 DoS advisories), `lodash` prototype pollution, `ajv` ReDoS, `markdown-it` ReDoS
 - Backend: 0 vulnerabilities. Frontend: 13 remaining (dev-only eslint/minimatch)

@@ -8,8 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### TODO
-- Replace `axios` with native `fetch` in `server/utils/zipCardFiles.js`, `cardHelpers.js`, `zipSequence.js` — only used for simple GET→buffer/stream downloads, axios is unnecessary overhead
 - Frontend `minimatch` ReDoS (13 high via eslint chain) — requires breaking eslint downgrade, deferred until eslint ecosystem catches up
+
+## [0.2.5] - 2026-02-23
+
+### Fixed
+- Health check double-prefix bug: frontend health route used `NEXT_PUBLIC_API_URL` (which includes `/api`) to call backend, producing `/api/api/health` 404s; now uses `BACKEND_URL` and `/health` endpoint for direct container-to-container checks
+- Mailgun driver: `form-data` 4.0.4+ incompatible with native `fetch` when passed directly as body; use `form.getBuffer()` instead
+- Upload filter: `.srt` and `.pages` files rejected because browsers send them as `application/octet-stream`; filter now remaps known extensions to correct MIME types
+
+### Changed
+- Replaced `axios` with native `fetch` in `cardHelpers.js`, `zipCardFiles.js`, `zipSequence.js` — stream downloads use `Readable.fromWeb()`, buffer downloads use `response.arrayBuffer()`
+- Removed `axios` dependency from backend `package.json`
 
 ## [0.2.4] - 2026-02-23
 

@@ -51,23 +51,36 @@ const fileFilter = (req, file, cb) => {
     // Subtitle files
     'application/x-subrip': ['.srt']
   };
-  
+
+  // Extensions that browsers commonly send as application/octet-stream
+  const octetStreamAllowed = ['.srt', '.pages'];
+
   const fileExt = path.extname(file.originalname).toLowerCase();
-  const mimeType = file.mimetype.toLowerCase();
-  
+  let mimeType = file.mimetype.toLowerCase();
+
   // Security checks
   if (!file.originalname || file.originalname.trim() === '') {
     uploadLogger.warn('Rejected file upload: Empty filename');
     return cb(new Error('Invalid filename'));
   }
-  
+
   // Check for suspicious filenames
   const suspiciousPatterns = /\.(exe|bat|cmd|scr|pif|vbs|js|jar|com|pps|php|asp|jsp|htaccess)$/i;
   if (suspiciousPatterns.test(file.originalname)) {
     uploadLogger.warn(`Rejected suspicious file upload: ${file.originalname}`);
     return cb(new Error('File type not allowed for security reasons'));
   }
-  
+
+  // Remap application/octet-stream to the correct MIME type based on extension
+  if (mimeType === 'application/octet-stream' && octetStreamAllowed.includes(fileExt)) {
+    const remappedMime = Object.entries(allowedMimeTypes)
+      .find(([, exts]) => exts.includes(fileExt));
+    if (remappedMime) {
+      mimeType = remappedMime[0];
+      uploadLogger.info(`Remapped MIME type for ${file.originalname}: application/octet-stream → ${mimeType}`);
+    }
+  }
+
   // Check if MIME type is allowed
   if (!allowedMimeTypes[mimeType]) {
     uploadLogger.warn(`Rejected file upload - unknown MIME type: ${file.originalname} (${mimeType})`);

@@ -5,7 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
 const { getFileUrl, getSignedFileUrl, getFilenameFromUrl } = require('./s3Storage');
-const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { htmlToText } = require('html-to-text');
 const puppeteer = require('puppeteer');
@@ -244,14 +243,14 @@ async function addFileToZip(zip, filePath, filename) {
       const fileUrl = await getSignedFileUrl(filePath);
       
       // Download the file to a buffer
-      const response = await axios({
-        method: 'GET',
-        url: fileUrl,
-        responseType: 'arraybuffer'
-      });
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} downloading ${filename}`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
 
       // Add the buffer to the zip with the original filename
-      zip.file(filename, response.data);
+      zip.file(filename, buffer);
       zipFiles.info(`Added file from S3 to ZIP: ${filename}`);
     } else {
       // It's a local file path

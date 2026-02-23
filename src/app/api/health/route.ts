@@ -61,12 +61,14 @@ export async function GET() {
 
   // Check backend connectivity
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://backend:5001';
+    // Use BACKEND_URL for direct container-to-container health check
+    // (not NEXT_PUBLIC_API_URL which may include /api path prefix)
+    const backendUrl = process.env.BACKEND_URL || 'http://backend:5001';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-    
+
     const backendStart = Date.now();
-    const response = await fetch(`${backendUrl}/api/health`, {
+    const response = await fetch(`${backendUrl}/health`, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Frontend-HealthCheck/1.0'

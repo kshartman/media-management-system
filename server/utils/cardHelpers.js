@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
+const { Readable } = require('stream');
 const { getFileUrl, getStorage, uploadLocalFileToS3, isS3Configured } = require('./s3Storage');
 const { getVideoMetadata, extractVideoFrame } = require('./videoUtils');
 const { generateAndUploadPreview } = require('../generatePreview');
@@ -123,41 +123,42 @@ const processFileAndGetPath = async (localFilePath, fieldName) => {
 };
 
 // Download file from URL to local path
-const downloadFile = (url, destPath) => {
+const downloadFile = async (url, destPath) => {
+  fileLogger.info(`Downloading file from ${url} to ${destPath}`);
+
+  // Validate URL
+  if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+    fileLogger.error(`Invalid URL format: ${url}`);
+    throw new Error(`Invalid URL format: ${url}`);
+  }
+
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(30000) // 30 second timeout
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} downloading ${url}`);
+  }
+
+  const writer = fs.createWriteStream(destPath);
+  const nodeStream = Readable.fromWeb(response.body);
+
   return new Promise((resolve, reject) => {
-    fileLogger.info(`Downloading file from ${url} to ${destPath}`);
-    
-    // Validate URL
-    if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-      fileLogger.error(`Invalid URL format: ${url}`);
-      return reject(new Error(`Invalid URL format: ${url}`));
-    }
-    
-    const writer = fs.createWriteStream(destPath);
-    
-    axios({
-      method: 'get',
-      url: url,
-      responseType: 'stream',
-      timeout: 30000, // 30 second timeout
-      maxContentLength: 500 * 1024 * 1024, // 500MB max
-    })
-    .then(response => {
-      response.data.pipe(writer);
-      
-      writer.on('finish', () => {
-        fileLogger.info(`Successfully downloaded file to ${destPath}`);
-        resolve(true);
-      });
-      
-      writer.on('error', (err) => {
-        fileLogger.error(`Error writing file ${destPath}:`, err);
-        reject(err);
-      });
-    })
-    .catch(error => {
-      fileLogger.error(`Error downloading file from ${url}:`, error);
-      reject(error);
+    nodeStream.pipe(writer);
+
+    writer.on('finish', () => {
+      fileLogger.info(`Successfully downloaded file to ${destPath}`);
+      resolve(true);
+    });
+
+    writer.on('error', (err) => {
+      fileLogger.error(`Error writing file ${destPath}:`, err);
+      reject(err);
+    });
+
+    nodeStream.on('error', (err) => {
+      fileLogger.error(`Error downloading file from ${url}:`, err);
+      reject(err);
     });
   });
 };
