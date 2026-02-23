@@ -16,6 +16,17 @@ export interface BrandConfig {
     primaryColor: string;
     adminColor: string;
     editorColor: string;
+    headerColors?: {
+      text?: string;
+      textMuted?: string;
+      border?: string;
+      navActiveText?: string;
+      navActiveBg?: string;
+      navActiveBorder?: string;
+      navInactiveText?: string;
+      navHoverText?: string;
+      navHoverBg?: string;
+    };
   };
   
   // External Links (optional)

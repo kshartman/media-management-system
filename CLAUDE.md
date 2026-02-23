@@ -226,7 +226,32 @@ src/components/
 
 ## Recent Major Changes
 
-### Version 0.2.0 - Security Updates (Latest)
+### Version 0.2.3 - Auto-Adaptive Header Theming (Latest)
+- Added WCAG luminance-based auto-detection of light vs dark header backgrounds
+- Header text, icons, nav tabs, and borders now auto-adapt to any `headerBackground` color
+- New optional `headerColors` sub-object in `BrandConfig.theme` for per-brand overrides
+- Dark headers (e.g. Super Patch `#A10000`) get white/rgba-white text automatically
+- Light headers (e.g. default, Zive, Vinia) compute to equivalent Tailwind gray values — no visual change
+- Nav tab hover states driven by CSS custom properties for compatibility with inline styles
+- **Files changed**: `types.ts`, `config/index.ts`, `AppHeader.tsx`, `Navigation.tsx`, `globals.css`
+- **No brand config files changed** — all existing brands auto-compute correct values
+
+**Maintaining exact previous behavior:**
+If a brand needs pixel-identical colors to the pre-0.2.3 hardcoded values, add explicit `headerColors` overrides in the brand config's `theme` object. The auto-computed light-header defaults match Tailwind gray-900/700/600/200 values, but two elements shifted slightly:
+- Avatar icon: was `text-gray-600` (`#4b5563`), now inherits `textMuted` (`#374151` / gray-700)
+- Hamburger button: lost CSS hover darkening (gray-700 → gray-900) since inline styles override Tailwind hover classes
+
+To restore exact old behavior for any brand, add to its config:
+```typescript
+theme: {
+  // ... existing colors ...
+  headerColors: {
+    textMuted: '#4b5563', // restore gray-600 for icons
+  },
+}
+```
+
+### Version 0.2.0 - Security Updates
 - Updated Next.js from 15.3.2 to 15.5.2 to fix moderate security vulnerabilities
   - Fixed cache poisoning vulnerability
   - Fixed content injection for Image Optimization

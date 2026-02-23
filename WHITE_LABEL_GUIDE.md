@@ -200,6 +200,35 @@ theme: {
 },
 ```
 
+### Auto-Adaptive Header Text (v0.2.3+)
+
+Header text, icon, and nav tab colors are **automatically computed** from `headerBackground` using WCAG luminance detection:
+- **Light backgrounds** (e.g. `#f3f4f6`) → dark gray text (equivalent to Tailwind gray-900/700/600)
+- **Dark backgrounds** (e.g. `#A10000`) → white/light text with rgba transparency
+
+No configuration is needed — it just works. To override the auto-computed colors, add an optional `headerColors` object:
+
+```javascript
+theme: {
+  headerBackground: '#A10000',
+  primaryColor: '#000000',
+  adminColor: '#101010',
+  editorColor: '#F7F7F7',
+  // Optional — all keys are optional, auto-computed if omitted
+  headerColors: {
+    text: '#ffffff',              // Primary text (title, company name)
+    textMuted: 'rgba(255,255,255,0.85)', // Icons, secondary elements
+    border: 'rgba(255,255,255,0.2)',     // Header bottom border
+    navActiveText: '#ffffff',
+    navActiveBg: 'rgba(255,255,255,0.18)',
+    navActiveBorder: 'rgba(255,255,255,0.5)',
+    navInactiveText: 'rgba(255,255,255,0.7)',
+    navHoverText: '#ffffff',
+    navHoverBg: 'rgba(255,255,255,0.1)',
+  },
+},
+```
+
 ### Minimal Branding
 
 For a generic deployment:

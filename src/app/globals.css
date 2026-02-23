@@ -15,6 +15,12 @@ body {
   font-family: 'DM Sans', sans-serif;
 }
 
+/* Nav tab hover states driven by CSS custom properties */
+[data-nav-tab]:not([data-active]):hover {
+  color: var(--nav-hover-text) !important;
+  background-color: var(--nav-hover-bg) !important;
+}
+
 /* Hide scrollbars on mobile while maintaining functionality */
 @media (max-width: 768px) {
   * {

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Navigation from './Navigation';
 import { useAuth } from '@/lib/authContext';
-import { brandConfig, getThemeColor } from '@/config';
+import { brandConfig, getThemeColor, getHeaderColor } from '@/config';
 
 interface AppHeaderProps {
   title?: string;
@@ -61,14 +61,15 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
 
   return (
     <>
-      <header className="border-b border-gray-200 sticky top-0 z-40" style={{backgroundColor: getThemeColor('headerBackground')}}>
+      <header className="border-b sticky top-0 z-40" style={{backgroundColor: getThemeColor('headerBackground'), borderColor: getHeaderColor('border')}}>
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-3" style={{paddingBottom: 'calc(0.75rem - 2px)'}}>
           {/* Top row with title, logo, and menu */}
           <div className="flex justify-between items-center relative">
             <div className="relative" ref={mobileMenuRef}>
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="flex items-center justify-center w-10 h-10 text-gray-700 hover:text-gray-900 focus:outline-none"
+                className="flex items-center justify-center w-10 h-10 focus:outline-none"
+                style={{color: getHeaderColor('textMuted')}}
                 aria-label="Menu"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,7 +173,7 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
                   priority
                 />
               ) : (
-                <span className="text-lg font-bold text-gray-900">
+                <span className="text-lg font-bold" style={{color: getHeaderColor('text')}}>
                   {brandConfig.companyName}
                 </span>
               )}
@@ -197,11 +198,12 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
                       }
                     }
                   }}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-white hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-white hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{color: getHeaderColor('textMuted')}}
                 >
                   {/* User Avatar */}
                   <div className="w-8 h-8 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -275,7 +277,7 @@ export default function AppHeader({ title = brandConfig.appTitle, showControls =
           <div className="mt-3 flex justify-center relative">
             <Navigation />
             {/* Page title positioned on the left, aligned with hamburger menu, hidden when space is crowded */}
-            <h1 className="absolute left-0 top-1/2 transform -translate-y-1/2 text-xl font-bold text-gray-900 hidden lg:block">{title}</h1>
+            <h1 className="absolute left-0 top-1/2 transform -translate-y-1/2 text-xl font-bold hidden lg:block" style={{color: getHeaderColor('text')}}>{title}</h1>
           </div>
           
         </div>

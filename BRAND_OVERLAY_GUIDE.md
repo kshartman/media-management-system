@@ -140,6 +140,8 @@ const brandConfig: BrandConfig = {
     primaryColor: '#007bff',
     adminColor: '#6f42c1',
     editorColor: '#007bff',
+    // Optional: override auto-computed header text colors (see WHITE_LABEL_GUIDE.md)
+    // headerColors: { text: '#ffffff', textMuted: 'rgba(255,255,255,0.85)', ... },
   },
 
   externalLinks: {

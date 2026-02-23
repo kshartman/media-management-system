@@ -8,7 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- TODO: Backend `qs`/`express` — arrayLimit bypass allows DoS via memory exhaustion (HIGH, internet-facing)
+- TODO: Backend `fast-xml-parser` — 3 DoS/bypass issues cascading through `@aws-sdk/*` (CRITICAL, low practical risk — requires attacker-controlled S3 responses)
+- TODO: Backend `axios` — DoS via `__proto__` in mergeConfig (HIGH, low practical risk — no user input flows into config)
+- TODO: Frontend `next` — 2 new DoS advisories: Image Optimizer remotePatterns, RSC deserialization (HIGH)
 - Fixed 4 HIGH severity multer vulnerabilities:
+
+### Changed
+- TODO: Replace `axios` with native `fetch` in `server/utils/zipCardFiles.js`, `cardHelpers.js`, `zipSequence.js` — only used for simple GET→buffer/stream downloads, axios is unnecessary overhead
+
+## [0.2.3] - 2026-02-23
+
+### Added
+- Auto-adaptive header theming based on WCAG luminance detection
+- New optional `headerColors` sub-object in `BrandConfig.theme` for per-brand color overrides
+- `getHeaderColor()` export for accessing computed header colors
+- CSS custom property driven nav tab hover states for inline-style compatibility
+
+### Changed
+- Header text, icons, nav tabs, and border colors are now auto-computed from `headerBackground`
+- Dark headers (e.g. `#A10000`) automatically get white/light text
+- Light headers (e.g. `#f3f4f6`, `#d9f2fc`) compute to equivalent Tailwind gray values — no visual change
+- No existing brand config files were modified; all brands auto-compute correct values
+
+### Migration notes
+Two minor cosmetic shifts on light-background headers vs pre-0.2.3 hardcoded Tailwind classes:
+- Avatar icon: was `text-gray-600` (`#4b5563`), now inherits `textMuted` (`#374151` / gray-700)
+- Hamburger hover: lost CSS hover darkening since inline styles override Tailwind hover classes
+
+To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }` to the brand's `theme` object.
 
 ## [0.2.2] - 2025-12-12
 
@@ -219,5 +247,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Version History Summary
 
 - **Unreleased**: Open source preparation, deployment documentation, brand overlay cleanup
+- **0.2.3** (2026-02-23): Auto-adaptive header theming with WCAG luminance detection
+- **0.2.2** (2025-12-12): Critical React Server Components security patches
+- **0.2.1** (2025-12-12): React Server Components RCE patch, additional vulnerability fixes
 - **0.2.0** (2024-10-16): Security updates, Phase 2 architecture improvements, white-labeling, feature additions
 - **0.1.0** (2024-06-07): Initial release with core media management functionality
