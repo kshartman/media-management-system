@@ -101,7 +101,7 @@ class MailgunDriver extends MailInterface {
           'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
           ...form.getHeaders()
         },
-        body: form
+        body: form.getBuffer()
       });
 
       if (!response.ok) {
