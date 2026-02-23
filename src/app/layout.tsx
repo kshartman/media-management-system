@@ -16,7 +16,7 @@ export const metadata = {
   openGraph: {
     title: brandConfig.appTitle,
     description: brandConfig.appDescription,
-    ...(brandConfig.logoPath ? { images: [brandConfig.logoPath] } : {}),
+    ...(brandConfig.ogImage ? { images: [brandConfig.ogImage] } : {}),
   },
 };
 

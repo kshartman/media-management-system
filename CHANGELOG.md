@@ -13,13 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - VPS: set up log rotation, Docker image pruning, and disk space monitoring to prevent filling the drive
 - VPS: set up CloudWatch alarms (instance down, CPU, disk) and external uptime monitor
 
+## [0.2.8] - 2026-02-23
+
+### Fixed
+- OG image: use dedicated `ogImage` brand config field instead of `logoPath` — transparent logos rendered as blank previews in Slack/WhatsApp/Outlook
+- Zive favicon: added branded `zive-favicon.ico` (was using generic Next.js default)
+
+### Added
+- `ogImage` field in `BrandConfig` for social share images (1200x630 recommended)
+- OG share images for Super Patch and Zive brands
+- Zive favicon to deploy script asset pipeline
+
+### Changed
+- Tag filter: replaced dismissible pill chips with toggle checkmarks inside the dropdown — click any tag to select/deselect, "Clear all" link when any are selected, button shows count `Tags (3)`
+
 ## [0.2.7] - 2026-02-23
 
 ### Fixed
 - OG image URLs now resolve correctly — added `metadataBase` from `NEXT_PUBLIC_API_URL` so `og:image` renders as a full production URL instead of `http://localhost:3000`
-
-### Changed
-- Tag filter: replaced dismissible pill chips with toggle checkmarks inside the dropdown — click any tag to select/deselect, "Clear all" link when any are selected, button shows count `Tags (3)`
 
 ## [0.2.6] - 2026-02-23
 
@@ -289,7 +300,8 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 ## Version History Summary
 
 - **Unreleased**: eslint minimatch fix, VPS hardening
-- **0.2.7** (2026-02-23): Fix OG metadataBase, tag filter toggle checkmarks
+- **0.2.8** (2026-02-23): OG share images, Zive favicon, tag filter checkmarks
+- **0.2.7** (2026-02-23): Fix OG metadataBase
 - **0.2.6** (2026-02-23): Self-host fonts via next/font, Open Graph metadata
 - **0.2.4** (2026-02-23): Security patch — backend qs/express/fast-xml-parser/axios, frontend next/lodash/ajv/markdown-it
 - **0.2.3** (2026-02-23): Auto-adaptive header theming with WCAG luminance detection

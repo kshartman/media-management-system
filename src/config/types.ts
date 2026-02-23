@@ -9,6 +9,7 @@ export interface BrandConfig {
   // Visual Assets
   logoPath: string | null; // Can be null to show company name instead
   faviconPath: string;
+  ogImage?: string | null; // Social share image (1200x630 recommended), omit for no og:image
   
   // Theme Colors
   theme: {
