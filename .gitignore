@@ -82,6 +82,9 @@ src/config/brand.config.*.ts
 *-brand/
 !acme-brand/  # Keep the example brand folder for reference
 
+# Brand deployment script (references private brand configs)
+deploy.sh
+
 # Public directory - ignore everything except specific files
 public/*
 # Keep the default Next.js assets that were already tracked

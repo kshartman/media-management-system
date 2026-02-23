@@ -103,21 +103,18 @@ git add .
 # Commit with detailed message
 git commit -m "descriptive message"
 
-# Push to master
-git push origin master
+# Push to main
+git push origin main
 ```
 
-### Docker Deployment to Dev Server
+### Brand Deployment
 ```bash
-# SSH connection works with: ssh dev
-# Project location: ~/projects/media-management-system
-
-# Full deployment sequence:
-ssh dev "cd ~/projects/media-management-system && git pull origin master"
-ssh dev "cd ~/projects/media-management-system && docker compose down"
-ssh dev "cd ~/projects/media-management-system && docker compose up --build -d"
-ssh dev "cd ~/projects/media-management-system && docker compose ps"
+# Deploy a specific brand (handles brand setup, build, and deploy)
+./deploy.sh zive        # Zive: sets up brand, scp to dev server, build + restart
+./deploy.sh superpatch  # Super Patch: sets up brand, local build, ECR push, VPS pull
 ```
+
+⚠️ **Always use `deploy.sh` or manually set up the brand before building.** The build directory is shared — leftover config from another brand will deploy the wrong brand. See `<brand>-brand/DEVELOPMENT_NOTES.md` for manual steps.
 
 ## Component Architecture
 
@@ -226,7 +223,14 @@ src/components/
 
 ## Recent Major Changes
 
-### Version 0.2.3 - Auto-Adaptive Header Theming (Latest)
+### Version 0.2.4 - Security Patches (Latest)
+- Backend: `qs`/`express` arrayLimit DoS, `fast-xml-parser` 3 DoS/bypass issues, `axios` `__proto__` DoS
+- Frontend: `next` 15.5.9→15.5.12 (2 DoS advisories), `lodash` prototype pollution, `ajv` ReDoS, `markdown-it` ReDoS
+- Backend: 0 vulnerabilities. Frontend: 13 remaining (dev-only eslint/minimatch)
+- Added `deploy.sh` brand deployment script, fixed brand setup procedures
+- See CHANGELOG.md for full CVE/GHSA details
+
+### Version 0.2.3 - Auto-Adaptive Header Theming
 - Added WCAG luminance-based auto-detection of light vs dark header backgrounds
 - Header text, icons, nav tabs, and borders now auto-adapt to any `headerBackground` color
 - New optional `headerColors` sub-object in `BrandConfig.theme` for per-brand overrides

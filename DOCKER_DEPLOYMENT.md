@@ -20,6 +20,8 @@ This guide explains how to build and deploy the Media Management System using Do
 
 ## Building Images
 
+> **⚠️ White-label deployments:** If you manage multiple brands from the same codebase, always set up the correct brand's `.env` and config files **before** building. The `.env` value `NEXT_PUBLIC_BRAND_CONFIG` controls which brand gets baked into the image. See `<brand>-brand/DEVELOPMENT_NOTES.md` for brand-specific setup, or use `./deploy.sh <brand>` to automate the entire process.
+
 1. **Configure environment variables:**
    ```bash
    cp .env.example.whitelabel .env
