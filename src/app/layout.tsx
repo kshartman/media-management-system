@@ -10,6 +10,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:3000'),
   title: brandConfig.appTitle,
   description: brandConfig.appDescription,
   openGraph: {

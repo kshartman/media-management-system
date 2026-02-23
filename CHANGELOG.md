@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - VPS: set up log rotation, Docker image pruning, and disk space monitoring to prevent filling the drive
 - VPS: set up CloudWatch alarms (instance down, CPU, disk) and external uptime monitor
 
+## [0.2.7] - 2026-02-23
+
+### Fixed
+- OG image URLs now resolve correctly — added `metadataBase` from `NEXT_PUBLIC_API_URL` so `og:image` renders as a full production URL instead of `http://localhost:3000`
+
+### Changed
+- Tag filter: replaced dismissible pill chips with toggle checkmarks inside the dropdown — click any tag to select/deselect, "Clear all" link when any are selected, button shows count `Tags (3)`
+
 ## [0.2.6] - 2026-02-23
 
 ### Changed
@@ -21,7 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Open Graph metadata (`og:title`, `og:description`, `og:image`) in root layout, driven by `brandConfig` — link previews in Slack, Outlook, etc. now show correct brand title, description, and logo
-- Dismissible tag chips in filter bar — click a selected tag to remove it
 - Generic defaults in `docker-compose.yml` (localhost instead of brand-specific domain)
 
 ### Verified (no code change)
@@ -282,6 +289,7 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 ## Version History Summary
 
 - **Unreleased**: eslint minimatch fix, VPS hardening
+- **0.2.7** (2026-02-23): Fix OG metadataBase, tag filter toggle checkmarks
 - **0.2.6** (2026-02-23): Self-host fonts via next/font, Open Graph metadata
 - **0.2.4** (2026-02-23): Security patch — backend qs/express/fast-xml-parser/axios, frontend next/lodash/ajv/markdown-it
 - **0.2.3** (2026-02-23): Auto-adaptive header theming with WCAG luminance detection
