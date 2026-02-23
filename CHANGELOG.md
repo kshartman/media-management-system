@@ -7,15 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security
-- TODO: Backend `qs`/`express` — arrayLimit bypass allows DoS via memory exhaustion (HIGH, internet-facing)
-- TODO: Backend `fast-xml-parser` — 3 DoS/bypass issues cascading through `@aws-sdk/*` (CRITICAL, low practical risk — requires attacker-controlled S3 responses)
-- TODO: Backend `axios` — DoS via `__proto__` in mergeConfig (HIGH, low practical risk — no user input flows into config)
-- TODO: Frontend `next` — 2 new DoS advisories: Image Optimizer remotePatterns, RSC deserialization (HIGH)
-- Fixed 4 HIGH severity multer vulnerabilities:
+### TODO
+- Replace `axios` with native `fetch` in `server/utils/zipCardFiles.js`, `cardHelpers.js`, `zipSequence.js` — only used for simple GET→buffer/stream downloads, axios is unnecessary overhead
+- Frontend `minimatch` ReDoS (13 high via eslint chain) — requires breaking eslint downgrade, deferred until eslint ecosystem catches up
 
-### Changed
-- TODO: Replace `axios` with native `fetch` in `server/utils/zipCardFiles.js`, `cardHelpers.js`, `zipSequence.js` — only used for simple GET→buffer/stream downloads, axios is unnecessary overhead
+## [0.2.4] - 2026-02-23
+
+### Security
+- **Backend** `qs` 6.13→6.14.2 / `express` 4.21→4.22.1: Fixed arrayLimit bypass allowing DoS via memory exhaustion (HIGH, GHSA-6rw7-vpxm-498p, GHSA-w7fw-mjwx-w883)
+- **Backend** `fast-xml-parser` 4.x→5.3.6: Fixed 3 DoS/bypass issues — RangeError numeric entities (GHSA-37qj-frw5-hhjh), entity expansion DoS (GHSA-jmr7-xgp7-cmfj), entity encoding bypass (GHSA-m7jm-9gc2-mpf2) — cascading through `@aws-sdk/xml-builder`→`@aws-sdk/core`→`@aws-sdk/client-s3`
+- **Backend** `axios` 1.7→1.13.5: Fixed DoS via `__proto__` key in mergeConfig (HIGH, GHSA-43fc-jf86-j433)
+- **Frontend** `next` 15.5.9→15.5.12: Fixed Image Optimizer remotePatterns DoS (GHSA-9g9p-9gw9-jx7f), RSC deserialization DoS (GHSA-h25m-26qc-wcjf)
+- **Frontend** `lodash` 4.17.21→4.17.23: Fixed prototype pollution in `_.unset`/`_.omit` (GHSA-xxjr-mmjv-4gpg)
+- **Frontend** `ajv` 6.12→6.14.0: Fixed ReDoS with `$data` option (GHSA-2g4f-4pwh-qvx6)
+- **Frontend** `markdown-it` 14.1.0→14.1.1: Fixed ReDoS (GHSA-38c4-r59v-3vqw)
+- **Backend** `minimatch` patched via nodemon update; **Frontend** minimatch via eslint chain deferred (dev-only, requires breaking change)
+- npm audit: backend 0 vulnerabilities, frontend 13 remaining (all dev-only eslint/minimatch)
 
 ## [0.2.3] - 2026-02-23
 
@@ -246,7 +253,8 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 
 ## Version History Summary
 
-- **Unreleased**: Open source preparation, deployment documentation, brand overlay cleanup
+- **Unreleased**: Replace axios with native fetch, eslint minimatch fix
+- **0.2.4** (2026-02-23): Security patch — backend qs/express/fast-xml-parser/axios, frontend next/lodash/ajv/markdown-it
 - **0.2.3** (2026-02-23): Auto-adaptive header theming with WCAG luminance detection
 - **0.2.2** (2025-12-12): Critical React Server Components security patches
 - **0.2.1** (2025-12-12): React Server Components RCE patch, additional vulnerability fixes
