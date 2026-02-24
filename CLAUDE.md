@@ -30,8 +30,8 @@ Each brand folder contains:
 - **config/**: Brand configuration files
 
 **Example:**
-- For Zive deployment → Read `zive-brand/DEVELOPMENT_NOTES.md`
 - For ACME deployment → Read `acme-brand/DEVELOPMENT_NOTES.md`
+- For WidgetCo deployment → Read `widgetco-brand/DEVELOPMENT_NOTES.md`
 
 Without reading the brand-specific notes, you will not have:
 - Actual domain names
@@ -110,8 +110,9 @@ git push origin main
 ### Brand Deployment
 ```bash
 # Deploy a specific brand (handles brand setup, build, and deploy)
-./deploy.sh zive        # Zive: sets up brand, scp to dev server, build + restart
-./deploy.sh superpatch  # Super Patch: sets up brand, local build, ECR push, VPS pull
+./deploy.sh <brand-name>
+# Each brand's deploy script handles its own workflow (local build + push,
+# scp to server, ECR, etc.) — see <brand>-brand/DEVELOPMENT_NOTES.md
 ```
 
 ⚠️ **Always use `deploy.sh` or manually set up the brand before building.** The build directory is shared — leftover config from another brand will deploy the wrong brand. See `<brand>-brand/DEVELOPMENT_NOTES.md` for manual steps.
@@ -240,7 +241,7 @@ src/components/
 - Header text, icons, nav tabs, and borders now auto-adapt to any `headerBackground` color
 - New optional `headerColors` sub-object in `BrandConfig.theme` for per-brand overrides
 - Dark headers (e.g. Super Patch `#A10000`) get white/rgba-white text automatically
-- Light headers (e.g. default, Zive, Vinia) compute to equivalent Tailwind gray values — no visual change
+- Light headers compute to equivalent Tailwind gray values — no visual change
 - Nav tab hover states driven by CSS custom properties for compatibility with inline styles
 - **Files changed**: `types.ts`, `config/index.ts`, `AppHeader.tsx`, `Navigation.tsx`, `globals.css`
 - **No brand config files changed** — all existing brands auto-compute correct values

@@ -1,12 +1,23 @@
 #!/bin/bash
 
-# Script to get current log level from resources.shopzive.com
-# Usage: ./get-loglevel.sh
+# Script to get current log level from the backend debug API
+# Usage: ./get-loglevel.sh [url]
+# Examples:
+#   ./get-loglevel.sh                              # uses $DOMAIN or localhost
+#   ./get-loglevel.sh https://media.example.com    # explicit URL
 
-# API endpoint
-API_URL="https://resources.shopzive.com/api/debug/loglevel"
+# Determine base URL
+if [ -n "$1" ]; then
+  BASE_URL="$1"
+elif [ -n "$DOMAIN" ]; then
+  BASE_URL="https://$DOMAIN"
+else
+  BASE_URL="http://localhost:5001"
+fi
 
-echo "Getting current log level..."
+API_URL="$BASE_URL/api/debug/loglevel"
+
+echo "Getting current log level from $API_URL ..."
 
 # Make the API call
 response=$(curl -s "$API_URL")
@@ -21,11 +32,11 @@ fi
 if echo "$response" | grep -q '"success":true'; then
   current_level=$(echo "$response" | jq -r '.logLevel' 2>/dev/null)
   valid_levels=$(echo "$response" | jq -r '.validLevels | join(", ")' 2>/dev/null)
-  
-  echo "📊 Current log level: $current_level"
-  echo "🔧 Valid levels: $valid_levels"
+
+  echo "Current log level: $current_level"
+  echo "Valid levels: $valid_levels"
 else
-  echo "❌ Failed to get log level"
+  echo "Failed to get log level"
   echo "$response"
   exit 1
 fi

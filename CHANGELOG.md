@@ -11,28 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frontend `minimatch` ReDoS (13 high via eslint chain) — requires breaking eslint downgrade, deferred until eslint ecosystem catches up
 - VPS: set up external uptime monitor (e.g. UptimeRobot or similar)
 
+## [1.0.0] - 2026-02-24
+
 ### Added
-- CloudWatch agent on Super Patch VPS publishing `disk_used_percent` every 5 minutes
-- Three CloudWatch alarms (status-check, CPU >90%, disk >85%) alerting `tech@superpatch.com` via SNS
+- CloudWatch agent publishing `disk_used_percent` every 5 minutes
+- Three CloudWatch alarms (status-check, CPU >90%, disk >85%) alerting via SNS
 - Weekly Docker image prune cron (Sunday 3 AM UTC, images older than 7 days)
-- IAM policy `CloudWatchAgentMetrics` for `superpatch-s3-app` user
+- IAM policy `CloudWatchAgentMetrics` for S3 app user
 - Automated OS patching: `unattended-upgrades` with `noble-security` + `noble-updates`, `needrestart` auto mode
 - Sunday 4 AM UTC auto-reboot maintenance window (with SNS pre-reboot notification)
 - Daily patch activity SNS notification (7 AM UTC)
 - Weekly review SNS report: held-back packages, Docker CE updates, dist-upgrade availability (Monday 9 AM UTC)
 - Docker CE blacklisted from auto-upgrade — flagged in weekly review for manual update
-- VPS setup scripts: `superpatch-brand/scripts/setup-monitoring.sh`, `setup-patching.sh`
+- VPS monitoring and patching setup scripts (see brand overlay DEVELOPMENT_NOTES.md)
+
+### Changed
+- Removed all client-specific domains, email addresses, and infrastructure details from public codebase
+- Parameterized hardcoded S3 bucket references in server code (`files.js`, `migrateS3Urls.js`, `migrate-s3-urls.js`, `update-metadata.js`)
+- Genericized nginx configs, shell scripts, OpenAPI spec, and documentation to use `media.example.com` placeholders
+- `deploy.sh` now auto-discovers brands instead of hardcoding names
+- `get-loglevel.sh` / `set-loglevel.sh` parameterized with `$DOMAIN` env var or CLI argument
+
+### Removed
+- One-off data repair scripts (`fix-broken-card.js`, `fix-cards.js`, `fix-missing-video-file.js`)
 
 ## [0.2.8] - 2026-02-23
 
 ### Fixed
 - OG image: use dedicated `ogImage` brand config field instead of `logoPath` — transparent logos rendered as blank previews in Slack/WhatsApp/Outlook
-- Zive favicon: added branded `zive-favicon.ico` (was using generic Next.js default)
+- Brand favicon support (was using generic Next.js default)
 
 ### Added
 - `ogImage` field in `BrandConfig` for social share images (1200x630 recommended)
-- OG share images for Super Patch and Zive brands
-- Zive favicon to deploy script asset pipeline
+- OG share images and favicons for brand deployments
+- Brand favicon to deploy script asset pipeline
 
 ### Changed
 - Tag filter: replaced dismissible pill chips with toggle checkmarks inside the dropdown — click any tag to select/deselect, "Clear all" link when any are selected, button shows count `Tags (3)`
@@ -147,7 +159,7 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 - ACME brand example implementation for reference
 - Brand-specific development notes guidance in CLAUDE.md
 - Dependabot configuration for automated dependency security updates
-- Parameterized remote deployment script (zive-brand/deploy-remote.sh) with branch selection
+- Parameterized remote deployment script with branch selection
 
 ### Changed
 - Compressed sample-reel-preview.mp4 from 70MB to 2.5MB (30 seconds, 540x960 resolution)
@@ -309,8 +321,8 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 
 ## Version History Summary
 
-- **Unreleased**: CloudWatch alarms + disk monitoring, Docker pruning, eslint minimatch fix
-- **0.2.8** (2026-02-23): OG share images, Zive favicon, tag filter checkmarks
+- **1.0.0** (2026-02-24): VPS hardening, sanitize client-specific references, parameterize S3 code
+- **0.2.8** (2026-02-23): OG share images, brand favicons, tag filter checkmarks
 - **0.2.7** (2026-02-23): Fix OG metadataBase
 - **0.2.6** (2026-02-23): Self-host fonts via next/font, Open Graph metadata
 - **0.2.4** (2026-02-23): Security patch — backend qs/express/fast-xml-parser/axios, frontend next/lodash/ajv/markdown-it

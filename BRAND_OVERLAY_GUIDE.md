@@ -20,7 +20,7 @@ media-management-system/       (public GitHub repo)
 │   └── brand.config.example-client.ts  (template)
 ├── public/
 │   └── logo-placeholder.png.README  (logo instructions)
-└── zive-brand/                (PRIVATE - gitignored)
+└── acme-brand/               (PRIVATE - gitignored)
     ├── .git/                  (separate git repo)
     ├── assets/                (logos, images)
     ├── config/                (brand configuration)
@@ -221,8 +221,8 @@ You can manage multiple brands:
 
 ```
 media-management-system/
-├── zive-brand/        (private repo 1)
-├── acme-brand/        (private repo 2)
+├── acme-brand/        (private repo 1)
+├── widgetco-brand/    (private repo 2)
 └── xyz-brand/         (private repo 3)
 ```
 
@@ -280,7 +280,7 @@ In your GitHub Actions / GitLab CI:
 
 ### Remote Deployment Script
 
-For brands that include a `deploy-remote.sh` script (like the zive-brand example), you can deploy to a remote server with optional branch selection:
+For brands that include a `deploy-remote.sh` script, you can deploy to a remote server with optional branch selection:
 
 ```bash
 # Deploy main branch (default)
@@ -327,15 +327,13 @@ This is useful for:
 - Restart development server after changes
 - Verify GPG decryption succeeded (check file size > 0)
 
-## Example: Zive Brand
+## Example Brand
 
-This repository includes a `zive-brand/` folder as a reference implementation. Review its structure and deployment script for a complete example.
-
-**Note:** The `zive-brand/` folder is gitignored in the main repository and maintained as a separate private repository.
+Each brand folder (e.g. `acme-brand/`) is gitignored in the main repository and maintained as a separate private repository. Review any brand's structure and deployment script for a complete example.
 
 ## Support
 
 For questions about the brand overlay system, see:
 - `WHITE_LABEL_GUIDE.md` - White labeling documentation
-- `zive-brand/README.md` - Example brand implementation
+- `<brand>-brand/README.md` - Brand implementation docs
 - `CLAUDE.md` - Development and deployment notes

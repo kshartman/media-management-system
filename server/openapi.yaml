@@ -47,8 +47,8 @@ info:
 servers:
   - url: http://localhost:5001
     description: Development server
-  - url: https://resources.shopzive.com
-    description: Production server
+  - url: https://media.example.com
+    description: Production server (replace with your domain)
 
 paths:
   # Health Check Endpoints
@@ -215,7 +215,7 @@ paths:
         
         **Example usage:**
         ```bash
-        curl -X POST https://resources.shopzive.com/api/debug/loglevel \
+        curl -X POST https://media.example.com/api/debug/loglevel \
           -H "Content-Type: application/json" \
           -d '{"logLevel": "debug"}'
         ```

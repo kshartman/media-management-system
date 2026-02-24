@@ -178,8 +178,8 @@ router.get('/proxy/:filename', async (req, res) => {
       return res.status(400).json({ error: 'Invalid filename' });
     }
     
-    // Construct S3 URL - get from environment or use default bucket
-    const s3BucketUrl = process.env.S3_BUCKET_URL || 'https://zivepublic.s3.amazonaws.com';
+    // Construct S3 URL from bucket name and region (consistent with s3Storage.js)
+    const s3BucketUrl = process.env.S3_BUCKET_URL || `https://${process.env.S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com`;
     const s3Url = `${s3BucketUrl}/${filename}`;
     
     fileLogger.info(`Proxying request for ${filename} from ${s3Url}`, { hasRange: !!range });

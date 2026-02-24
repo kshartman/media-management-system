@@ -63,8 +63,7 @@ function guessDimensionsFromUrl(url) {
 // Check if URL is an S3 URL
 function isS3Url(url) {
   return url && (
-    url.includes('amazonaws.com') || 
-    url.includes('zivepublic.s3') || 
+    url.includes('amazonaws.com') ||
     url.startsWith('https://s3.')
   );
 }

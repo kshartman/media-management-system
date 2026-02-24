@@ -13,7 +13,7 @@ Both tiers are production-ready and currently deployed together via Docker Compo
 
 ### How It Works Today
 
-The system is deployed for a single client (Zive) on a VPS running Docker. The two containers — frontend and backend — sit behind an nginx reverse proxy that handles SSL termination. Media files are stored in AWS S3. User and content data lives in a MongoDB Atlas database. The application is configured for Zive branding (logo, colors, domain, external links) via environment variables and a brand configuration file.
+The system is deployed on a VPS running Docker. The two containers — frontend and backend — sit behind an nginx reverse proxy that handles SSL termination. Media files are stored in AWS S3. User and content data lives in a MongoDB Atlas database. The application is configured for each client's branding (logo, colors, domain, external links) via environment variables and a brand configuration file.
 
 ```
 Internet → nginx (SSL) → Frontend container (port 5000)

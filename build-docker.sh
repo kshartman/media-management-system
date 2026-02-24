@@ -44,7 +44,7 @@ echo "  docker push your-registry/media-management-backend:latest"
 echo "  docker push your-registry/media-management-frontend:latest"
 
 echo -e "\n${YELLOW}For deployment, ensure you:${NC}"
-echo "  1. Set up nginx with HTTPS certificates for domain: ${DOMAIN:-resources.shopzive.com}"
+echo "  1. Set up nginx with HTTPS certificates for domain: ${DOMAIN:-media.example.com}"
 echo "  2. Configure environment variables in your deployment environment"
 echo "  3. Mount a persistent volume for uploads at the path specified in UPLOAD_PATH"
 echo "  4. Ensure MongoDB is accessible from your deployment environment"

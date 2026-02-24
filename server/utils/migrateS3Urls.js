@@ -5,12 +5,21 @@ const logger = require('./logger');
 // Create child logger for migration
 const migrationLogger = logger.child({ component: 'migration' });
 
+// Derive bucket name from environment (same as s3Storage.js)
+const bucketName = process.env.S3_BUCKET;
+const awsRegion = process.env.AWS_REGION || 'us-east-1';
+
 /**
  * Migrates S3 URLs from global format to regional format
- * Changes: https://zivepublic.s3.amazonaws.com/...
- * To: https://zivepublic.s3.us-east-1.amazonaws.com/...
+ * Changes: https://<bucket>.s3.amazonaws.com/...
+ * To: https://<bucket>.s3.<region>.amazonaws.com/...
+ *
+ * Requires S3_BUCKET and AWS_REGION environment variables.
  */
 async function migrateS3Urls() {
+  if (!bucketName) {
+    throw new Error('S3_BUCKET environment variable is required for migration');
+  }
   try {
     migrationLogger.info('Starting S3 URL migration...');
     
@@ -111,8 +120,9 @@ function needsUrlUpdate(url) {
   if (!url || typeof url !== 'string') return false;
   
   // Check if it's the old global format that needs updating
-  return url.includes('zivepublic.s3.amazonaws.com') && 
-         !url.includes('zivepublic.s3.us-east-1.amazonaws.com');
+  const globalPattern = `${bucketName}.s3.amazonaws.com`;
+  const regionalPattern = `${bucketName}.s3.${awsRegion}.amazonaws.com`;
+  return url.includes(globalPattern) && !url.includes(regionalPattern);
 }
 
 /**
@@ -123,8 +133,8 @@ function updateUrl(url) {
   
   // Replace global S3 domain with regional domain
   return url.replace(
-    'zivepublic.s3.amazonaws.com',
-    'zivepublic.s3.us-east-1.amazonaws.com'
+    `${bucketName}.s3.amazonaws.com`,
+    `${bucketName}.s3.${awsRegion}.amazonaws.com`
   );
 }
 
@@ -135,14 +145,16 @@ async function verifyMigration() {
   try {
     migrationLogger.info('Verifying migration...');
     
-    // Search for any remaining old format URLs
+    // Search for any remaining old format URLs (dynamic regex from bucket name)
+    const escapedBucket = bucketName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const oldUrlRegex = new RegExp(`${escapedBucket}\\.s3\\.amazonaws\\.com`);
     const cardsWithOldUrls = await Card.find({
       $or: [
-        { preview: { $regex: /zivepublic\.s3\.amazonaws\.com/, $not: /us-east-1/ } },
-        { download: { $regex: /zivepublic\.s3\.amazonaws\.com/, $not: /us-east-1/ } },
-        { movie: { $regex: /zivepublic\.s3\.amazonaws\.com/, $not: /us-east-1/ } },
-        { transcript: { $regex: /zivepublic\.s3\.amazonaws\.com/, $not: /us-east-1/ } },
-        { imageSequence: { $elemMatch: { $regex: /zivepublic\.s3\.amazonaws\.com/, $not: /us-east-1/ } } }
+        { preview: { $regex: oldUrlRegex, $not: /us-east-1/ } },
+        { download: { $regex: oldUrlRegex, $not: /us-east-1/ } },
+        { movie: { $regex: oldUrlRegex, $not: /us-east-1/ } },
+        { transcript: { $regex: oldUrlRegex, $not: /us-east-1/ } },
+        { imageSequence: { $elemMatch: { $regex: oldUrlRegex, $not: /us-east-1/ } } }
       ]
     });
     
@@ -156,13 +168,14 @@ async function verifyMigration() {
     }
     
     // Count total URLs that were successfully migrated
+    const newUrlRegex = new RegExp(`${escapedBucket}\\.s3\\.${awsRegion}\\.amazonaws\\.com`);
     const cardsWithNewUrls = await Card.find({
       $or: [
-        { preview: { $regex: /zivepublic\.s3\.us-east-1\.amazonaws\.com/ } },
-        { download: { $regex: /zivepublic\.s3\.us-east-1\.amazonaws\.com/ } },
-        { movie: { $regex: /zivepublic\.s3\.us-east-1\.amazonaws\.com/ } },
-        { transcript: { $regex: /zivepublic\.s3\.us-east-1\.amazonaws\.com/ } },
-        { imageSequence: { $elemMatch: { $regex: /zivepublic\.s3\.us-east-1\.amazonaws\.com/ } } }
+        { preview: { $regex: newUrlRegex } },
+        { download: { $regex: newUrlRegex } },
+        { movie: { $regex: newUrlRegex } },
+        { transcript: { $regex: newUrlRegex } },
+        { imageSequence: { $elemMatch: { $regex: newUrlRegex } } }
       ]
     });
     
@@ -178,6 +191,9 @@ async function verifyMigration() {
  * Dry run - shows what would be updated without making changes
  */
 async function dryRunMigration() {
+  if (!bucketName) {
+    throw new Error('S3_BUCKET environment variable is required for migration');
+  }
   try {
     migrationLogger.info('Starting S3 URL migration dry run...');
     
