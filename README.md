@@ -354,7 +354,7 @@ To migrate existing files from local storage to S3:
 2. Run the migration script:
    ```bash
    cd server
-   node migrate-files-to-s3.js
+   node scripts/migrate-files-to-s3.js
    ```
 
 The migration script:
@@ -369,7 +369,7 @@ The migration script:
 
 By default, the script runs in "dry run" mode to show what would happen without making actual changes. To perform the actual migration:
 
-1. Open `server/migrate-files-to-s3.js`
+1. Open `server/scripts/migrate-files-to-s3.js`
 2. Find the `DRY_RUN` variable near the top of the file
 3. Change it from `true` to `false`
 4. Save and run the script again
@@ -538,7 +538,9 @@ All API responses include the `X-Correlation-ID` header for request tracing and 
 │   ├── /uploads/          # Local file storage
 │   ├── /utils/            # Utility functions
 │   │   └── s3Storage.js   # S3 storage abstraction
-│   └── migrate-files-to-s3.js  # Migration script
+│   └── /scripts/          # Migration and maintenance scripts
+│       ├── migrate-files-to-s3.js  # Local → S3 file migration
+│       └── migrate-s3-urls.js      # S3 URL format migration
 │
 └── /public/               # Static assets
 ```

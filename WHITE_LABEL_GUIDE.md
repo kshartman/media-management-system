@@ -9,7 +9,7 @@ This guide explains how to customize the Media Management System for different c
 
 ## Quick Start
 
-1. Copy `src/config/brand.config.example-client.js` to `src/config/brand.config.[client-name].js`
+1. Copy `src/config/brand.config.example-client.ts` to `src/config/brand.config.[client-name].ts`
 2. Update the configuration values for your client
 3. Set `NEXT_PUBLIC_BRAND_CONFIG=[client-name]` in your environment
 4. Build and deploy
@@ -18,10 +18,12 @@ This guide explains how to customize the Media Management System for different c
 
 ### Brand Configuration File
 
-Create a new file in `src/config/` named `brand.config.[client-name].js`:
+Create a new file in `src/config/` named `brand.config.[client-name].ts`:
 
-```javascript
-const brandConfig = {
+```typescript
+import { BrandConfig } from '../types';
+
+const brandConfig: BrandConfig = {
   // Company Information
   companyName: 'Your Company Name',
   appTitle: 'Your App Title',
@@ -76,10 +78,10 @@ export default brandConfig;
 
 ```bash
 # Copy the example configuration
-cp src/config/brand.config.example-client.js src/config/brand.config.acme.js
+cp src/config/brand.config.example-client.ts src/config/brand.config.acme.ts
 
 # Edit the configuration
-vim src/config/brand.config.acme.js
+vim src/config/brand.config.acme.ts
 ```
 
 ### 2. Add Client Assets
@@ -185,13 +187,13 @@ BRAND_CONFIG=acme docker compose up -d
 
 For clients without external portals:
 
-```javascript
+```typescript
 externalLinks: null, // This removes the menu items completely
 ```
 
 ### Custom Color Schemes
 
-```javascript
+```typescript
 theme: {
   headerBackground: '#1a1a1a', // Dark header
   primaryColor: '#00ff00',     // Green primary
@@ -208,7 +210,7 @@ Header text, icon, and nav tab colors are **automatically computed** from `heade
 
 No configuration is needed — it just works. To override the auto-computed colors, add an optional `headerColors` object:
 
-```javascript
+```typescript
 theme: {
   headerBackground: '#A10000',
   primaryColor: '#000000',
@@ -233,7 +235,7 @@ theme: {
 
 For a generic deployment:
 
-```javascript
+```typescript
 const brandConfig = {
   companyName: 'Media Library',
   appTitle: 'Media Library',
@@ -308,7 +310,7 @@ docker compose up --build -d
 
 2. Verify the config file exists:
    ```bash
-   ls src/config/brand.config.*.js
+   ls src/config/brand.config.*.ts
    ```
 
 3. Check for syntax errors in the config file

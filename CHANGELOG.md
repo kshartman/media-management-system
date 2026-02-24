@@ -142,7 +142,7 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 
 ### Added
 - MIT License for open source distribution
-- Comprehensive DEPLOYMENT_OPTIONS.md covering Docker, Vercel + PaaS, and VPS deployment strategies
+- Comprehensive HOSTING_OPTIONS.md covering Docker, Vercel + PaaS, AWS, Azure, and VPS deployment strategies
 - Brand overlay system for white-label deployments with separate private repositories
 - ACME brand example implementation for reference
 - Brand-specific development notes guidance in CLAUDE.md

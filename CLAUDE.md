@@ -432,9 +432,9 @@ done
 
 **Important**: Project is in the user's home directory (`~/projects/`), not in `/opt/`
 
-### Local Development
-- **Frontend**: Port 3000
-- **Backend**: Port 3001 (Note: Different from Docker which uses 5001)
+### Local Development (without Docker)
+- **Frontend**: Port 3000 (`npm run dev`)
+- **Backend**: Port 3001 (`cd server && npm run dev`)
 - **MongoDB**: Configured via environment variables
 
 ### AWS S3 Configuration

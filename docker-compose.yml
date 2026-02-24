@@ -12,6 +12,8 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      # BACKEND_URL: container-to-container (used by server-side health checks)
+      # NEXT_PUBLIC_API_URL: public-facing URL (used by browser-side API calls)
       - BACKEND_URL=http://backend:5001
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://backend:5001}
     ports:

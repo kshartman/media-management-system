@@ -86,7 +86,10 @@ services:
     image: your-registry/media-frontend:v1.0
     environment:
       - NODE_ENV=production
+      # Container-to-container URL for server-side health checks
       - BACKEND_URL=http://backend:5001
+      # Public-facing URL for browser-side API calls (set in .env)
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     networks:
       - internal
 
