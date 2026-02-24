@@ -76,7 +76,7 @@ server/backend.log
 # White-label client configurations
 src/config/brand.config.*.ts
 !src/config/brand.config.ts
-!src/config/brand.config.example-client.ts
+!src/config/brand.config.acme-client.ts
 
 # Brand overlay folders (private repos for client-specific configurations)
 *-brand/

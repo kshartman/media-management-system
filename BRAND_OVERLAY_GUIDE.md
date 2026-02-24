@@ -17,7 +17,7 @@ media-management-system/       (public GitHub repo)
 ├── src/config/
 │   ├── brand.config.ts        (brand system logic)
 │   ├── brand.config.default.ts  (generic fallback)
-│   └── brand.config.example-client.ts  (template)
+│   └── brand.config.acme-client.ts  (template)
 ├── public/
 │   └── logo-placeholder.png.README  (logo instructions)
 └── acme-brand/               (PRIVATE - gitignored)
@@ -48,7 +48,7 @@ git init
 cp /path/to/your-logo.png assets/
 
 # Create brand configuration
-cp ../src/config/brand.config.example-client.ts config/brand.config.yourclient.ts
+cp ../src/config/brand.config.acme-client.ts config/brand.config.yourclient.ts
 # Edit with your client's information
 
 # Add S3 policy if using AWS

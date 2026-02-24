@@ -2,25 +2,24 @@
 
 Place your company logo in this directory.
 
-## Required File:
-- **Filename**: Any PNG file (e.g., acme-logo.png)
-- **Format**: PNG with transparent background recommended
-- **Dimensions**: Height of 32px, width flexible (will scale proportionally)
+## Required Files
 
-## During Deployment:
-The deploy.sh script will create a symlink from your logo to:
-`public/logo-placeholder.png`
+- **Logo**: PNG with transparent background, ~32px height (width flexible)
+  Filename: `acme-logo.png` (or whatever matches your deploy.sh)
+- **Favicon**: 32x32 PNG or ICO
+  Filename: `acme-favicon.png` or `acme-favicon.ico`
+- **OG Image** (optional): 1200x630 PNG for social media share cards
+  Filename: `acme-og.png`
 
-## Example:
-If your logo is named `acme-logo.png`, update the deploy.sh script:
-```bash
-ln -sf ../acme-brand/assets/acme-logo.png ../public/logo-placeholder.png
-```
+## During Deployment
 
-## Quick Placeholder Creation:
-You can create a simple text-based logo with ImageMagick:
-```bash
-convert -size 200x32 -background none -fill "#0066cc" \
-  -font Arial -pointsize 24 -gravity center \
-  label:"ACME" assets/acme-logo.png
-```
+The deploy.sh script copies these into the project's public/ directory:
+  acme-logo.png    → public/logo-placeholder.png
+  acme-favicon.png → public/favicon.ico
+  acme-og.png      → public/acme-og.png
+
+## Quick Placeholder with ImageMagick
+
+  convert -size 200x40 xc:'#0066cc' \
+    -font Helvetica-Bold -pointsize 28 -fill white -gravity center \
+    -annotate +0+0 'ACME' assets/acme-logo.png

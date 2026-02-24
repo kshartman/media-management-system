@@ -9,7 +9,7 @@ This guide explains how to customize the Media Management System for different c
 
 ## Quick Start
 
-1. Copy `src/config/brand.config.example-client.ts` to `src/config/brand.config.[client-name].ts`
+1. Copy `src/config/brand.config.acme-client.ts` to `src/config/brand.config.[client-name].ts`
 2. Update the configuration values for your client
 3. Set `NEXT_PUBLIC_BRAND_CONFIG=[client-name]` in your environment
 4. Build and deploy
@@ -78,7 +78,7 @@ export default brandConfig;
 
 ```bash
 # Copy the example configuration
-cp src/config/brand.config.example-client.ts src/config/brand.config.acme.ts
+cp src/config/brand.config.acme-client.ts src/config/brand.config.acme.ts
 
 # Edit the configuration
 vim src/config/brand.config.acme.ts
