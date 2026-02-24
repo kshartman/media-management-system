@@ -1,7 +1,7 @@
 # Docker Deployment Guide
 
 > **📚 Related Documentation:**
-> - **DEPLOYMENT_OPTIONS.md**: Compare Docker vs Vercel vs VPS deployment strategies
+> - **HOSTING_OPTIONS.md**: Compare Docker vs Vercel vs AWS vs Azure vs VPS deployment strategies
 > - **README.md**: Complete setup and configuration guide
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
 > - **CLAUDE.md**: Development workflow and troubleshooting
@@ -10,7 +10,7 @@
 This guide explains how to build and deploy the Media Management System using Docker containers behind an nginx proxy with HTTPS.
 
 > **💡 Not sure if Docker is right for you?**
-> See [DEPLOYMENT_OPTIONS.md](./DEPLOYMENT_OPTIONS.md) for alternative deployment strategies including Vercel, Railway, Render, and traditional VPS setups.
+> See [HOSTING_OPTIONS.md](./HOSTING_OPTIONS.md) for alternative deployment strategies including Vercel, Railway, Render, AWS, Azure, and traditional VPS setups.
 
 ## Prerequisites
 - Docker and Docker Compose installed on build machine

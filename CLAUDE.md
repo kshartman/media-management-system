@@ -2,7 +2,7 @@
 
 > **📚 Documentation Overview:**
 > - **README.md**: Complete setup, configuration, and feature guide
-> - **DEPLOYMENT_OPTIONS.md**: Deployment strategies (Docker, Vercel, VPS)
+> - **HOSTING_OPTIONS.md**: Hosting & deployment strategies (Docker, Vercel, AWS, Azure, VPS)
 > - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
 > - **BRAND_OVERLAY_GUIDE.md**: Private brand repository pattern

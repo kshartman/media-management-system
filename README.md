@@ -63,7 +63,7 @@ The storage system is abstracted through utility functions that handle file oper
 
 > **📚 Documentation Guide:**
 > - **README.md** (this file): Complete setup and feature guide
-> - **DEPLOYMENT_OPTIONS.md**: Comprehensive deployment strategy comparison (Docker, Vercel, VPS)
+> - **HOSTING_OPTIONS.md**: Comprehensive deployment strategy comparison (Docker, Vercel, AWS, Azure, VPS)
 > - **DOCKER_DEPLOYMENT.md**: Production deployment with Docker and nginx
 > - **WHITE_LABEL_GUIDE.md**: Brand customization for different clients
 > - **BRAND_OVERLAY_GUIDE.md**: Private brand repository pattern for managing client-specific configurations
@@ -72,11 +72,12 @@ The storage system is abstracted through utility functions that handle file oper
 ### Deployment Options
 
 > **🚀 Choosing Your Deployment Strategy?**
-> See [DEPLOYMENT_OPTIONS.md](./DEPLOYMENT_OPTIONS.md) for a comprehensive comparison of:
+> See [HOSTING_OPTIONS.md](./HOSTING_OPTIONS.md) for a comprehensive comparison of:
 > - Docker Compose (current approach)
-> - Vercel + Backend PaaS (Railway, Render, Fly.io)
+> - AWS App Runner, Azure App Service
+> - Vercel + Backend PaaS (Railway, Render)
 > - Traditional VPS with PM2
-> - Future unified Next.js architecture
+> - PostgreSQL rewrite option
 
 ### Prerequisites
 
