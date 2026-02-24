@@ -9,9 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### TODO
 - Frontend `minimatch` ReDoS (13 high via eslint chain) — requires breaking eslint downgrade, deferred until eslint ecosystem catches up
-- VPS: configure ESM Pro patching and unattended-upgrades for automatic security updates
-- VPS: set up log rotation, Docker image pruning, and disk space monitoring to prevent filling the drive
-- VPS: set up CloudWatch alarms (instance down, CPU, disk) and external uptime monitor
+- VPS: set up external uptime monitor (e.g. UptimeRobot or similar)
+
+### Added
+- CloudWatch agent on Super Patch VPS publishing `disk_used_percent` every 5 minutes
+- Three CloudWatch alarms (status-check, CPU >90%, disk >85%) alerting `tech@superpatch.com` via SNS
+- Weekly Docker image prune cron (Sunday 3 AM UTC, images older than 7 days)
+- IAM policy `CloudWatchAgentMetrics` for `superpatch-s3-app` user
+- Automated OS patching: `unattended-upgrades` with `noble-security` + `noble-updates`, `needrestart` auto mode
+- Sunday 4 AM UTC auto-reboot maintenance window (with SNS pre-reboot notification)
+- Daily patch activity SNS notification (7 AM UTC)
+- Weekly review SNS report: held-back packages, Docker CE updates, dist-upgrade availability (Monday 9 AM UTC)
+- Docker CE blacklisted from auto-upgrade — flagged in weekly review for manual update
+- VPS setup scripts: `superpatch-brand/scripts/setup-monitoring.sh`, `setup-patching.sh`
 
 ## [0.2.8] - 2026-02-23
 
@@ -299,7 +309,7 @@ To restore exact previous behavior, add `headerColors: { textMuted: '#4b5563' }`
 
 ## Version History Summary
 
-- **Unreleased**: eslint minimatch fix, VPS hardening
+- **Unreleased**: CloudWatch alarms + disk monitoring, Docker pruning, eslint minimatch fix
 - **0.2.8** (2026-02-23): OG share images, Zive favicon, tag filter checkmarks
 - **0.2.7** (2026-02-23): Fix OG metadataBase
 - **0.2.6** (2026-02-23): Self-host fonts via next/font, Open Graph metadata
