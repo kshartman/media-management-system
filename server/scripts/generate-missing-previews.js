@@ -34,7 +34,7 @@ const TEMP_DIR = path.join(__dirname, '..', 'temp');
 
 async function connectDB() {
   const uri = process.env.MONGODB_URI;
-  const dbName = process.env.MONGODB_DB_NAME;
+  const dbName = process.env.MONGODB_DB_NAME || 'media-management';
   if (!uri) {
     console.error('MONGODB_URI not set');
     process.exit(1);
