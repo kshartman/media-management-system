@@ -94,3 +94,5 @@ public/*
 !public/vercel.svg
 !public/window.svg
 
+# Local working files (proposals, emails, exports — not committed)
+.local/
