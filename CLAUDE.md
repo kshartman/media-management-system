@@ -224,7 +224,14 @@ src/components/
 
 ## Recent Major Changes
 
-### Version 0.2.5 - Bug Fixes (Latest)
+### Version 1.1.2 - Thumbnail Generation Fix (Latest)
+- Fixed image card thumbnails not displaying for large files (10-50MB) — Next.js image optimization exceeded memory/size limits, Cloudflare 502s on uncached requests
+- Server-side preview thumbnail generation at upload time using `sharp` (800px, JPEG q80)
+- Card components switched from `next/image` to direct `<img>` tags for thumbnails
+- Migration script `generate-missing-previews.js` for backfilling existing cards
+- Aligned frontend and backend version numbers
+
+### Version 0.2.5 - Bug Fixes
 - Fixed health check double-prefix (`/api/api/health` 404s) — frontend health route now uses `BACKEND_URL` for direct container-to-container checks
 - Fixed Mailgun driver: `form-data` 4.0.4+ requires `form.getBuffer()` with native `fetch`
 - Replaced `axios` with native `fetch` in all backend utilities; removed `axios` dependency

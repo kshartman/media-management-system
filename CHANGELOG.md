@@ -11,6 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frontend `minimatch` ReDoS (13 high via eslint chain) — requires breaking eslint downgrade, deferred until eslint ecosystem catches up
 - VPS: set up external uptime monitor (e.g. UptimeRobot or similar)
 
+## [1.1.2] - 2026-03-24
+
+### Fixed
+- Image card thumbnails not displaying for large files (10-50MB) — Next.js image optimization exceeded memory limits, Cloudflare returned 502 on uncached requests
+- Card thumbnails disappearing on scroll due to concurrent image optimization exhausting frontend container memory
+
+### Added
+- Server-side preview thumbnail generation at upload time using `sharp` (800px max width, JPEG q80)
+- Preview thumbnails stored in S3 alongside originals, populating the existing `preview` field on the Card model
+- `IMAGE_PREVIEW_SETTINGS` constants in `server/utils/mediaConstants.js`
+- `generateImagePreview()` in `server/utils/cardHelpers.js`
+- Migration script `server/scripts/generate-missing-previews.js` for backfilling existing cards
+
+### Changed
+- Card components (`ImageCard`, `SocialCard`, `ReelCard`) switched from `next/image` to direct `<img>` tags for thumbnails — eliminates server-side image optimization bottleneck
+- Aligned frontend and backend version numbers (both now `1.1.2`)
+- Image card creation and update routes auto-generate preview when no user-provided preview exists
+- Old auto-generated previews are cleaned up from S3 when a card's download image is replaced
+
+## [1.0.1] - 2026-03-18
+
+### Changed
+- Consolidated `example-brand.zip` + `example-client` config template → `acme-brand/` as single canonical reference
+- Renamed `brand.config.example-client.ts` → `brand.config.acme-client.ts`
+- Updated all cross-codebase references (`.gitignore`, `.env.docker.example.whitelabel`, `BRAND_OVERLAY_GUIDE.md`, `WHITE_LABEL_GUIDE.md`)
+
+### Added
+- `acme-brand/`: comprehensive brand config with all fields documented, env templates for Docker/local/bare-server, nginx config (Let's Encrypt + Cloudflare), S3 CORS config, deploy script with `deploy` arg support, DEVELOPMENT_NOTES.md covering 5 deployment scenarios
+- Generated placeholder assets (logo, favicon, OG image) for acme-brand
+
+### Removed
+- `example-brand.zip` (outdated, superseded by `acme-brand/`)
+- `HOSTING_OPTIONS.pdf` from main repo (belongs in brand repos only)
+
 ## [1.0.0] - 2026-02-24
 
 ### Added
