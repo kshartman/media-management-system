@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, memo } from 'react';
-import Image from 'next/image';
 import { SocialCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import Lightbox from '../ui/Lightbox';
@@ -130,13 +129,11 @@ const SocialCard: React.FC<SocialCardProps> = memo((props) => {
           aria-label="View slideshow"
         >
           {getDisplayImage() ? (
-            <Image 
+            <img
               src={getDisplayImage() as string}
               alt={props.description}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              priority
+              className="w-full h-full object-cover"
+              loading="lazy"
             />
           ) : (
             <div className="w-full h-full bg-red-100 flex items-center justify-center">

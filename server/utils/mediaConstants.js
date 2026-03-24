@@ -33,9 +33,17 @@ const S3_SETTINGS = {
   }
 };
 
+// Image preview settings (for auto-generated card thumbnails)
+const IMAGE_PREVIEW_SETTINGS = {
+  MAX_WIDTH: 800,        // px — enough for card display, small enough to load fast
+  QUALITY: 80,           // JPEG quality — good balance of size and appearance
+  FORMAT: 'jpeg',        // JPEG for smaller file size (vs PNG)
+};
+
 // Export all constants
 module.exports = {
   VIDEO_DIMENSIONS,
   PREVIEW_SETTINGS,
+  IMAGE_PREVIEW_SETTINGS,
   S3_SETTINGS
 };

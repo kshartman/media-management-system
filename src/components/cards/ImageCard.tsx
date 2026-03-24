@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, memo } from 'react';
-import Image from 'next/image';
 import { ImageCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useAuth } from '../../lib/authContext';
@@ -85,35 +84,18 @@ const ImageCard: React.FC<ImageCardProps> = memo((props) => {
           }}
           aria-label="View image in lightbox"
         >
-          {props.preview ? (
-            <Image 
-              src={props.preview}
+          {(props.preview || props.download) ? (
+            <img
+              src={props.preview || props.download}
               alt={props.description}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              priority
+              className={`w-full h-full ${props.preview ? 'object-cover' : 'object-contain'}`}
+              loading="lazy"
               draggable={false}
             />
           ) : (
-            <>
-              {/* If no preview, use download image or placeholder */}
-              <div className="w-full h-full bg-blue-100 flex items-center justify-center">
-                {props.download ? (
-                  <Image
-                    src={props.download}
-                    alt={props.description}
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    priority
-                    draggable={false}
-                  />
-                ) : (
-                  <div className="text-xl font-bold text-blue-600">IMAGE</div>
-                )}
-              </div>
-            </>
+            <div className="w-full h-full bg-blue-100 flex items-center justify-center">
+              <div className="text-xl font-bold text-blue-600">IMAGE</div>
+            </div>
           )}
           
           {/* Development-only download count overlay */}

@@ -22,6 +22,7 @@ const {
   processVideoAndGeneratePreview,
   generatePreviewFromExistingVideo,
   generateFallbackPreview,
+  generateImagePreview,
   extractFileMetadata
 } = require('../utils/cardHelpers');
 const { 
@@ -423,12 +424,22 @@ router.post('/', authMiddleware, handleCardUpload, async (req, res) => {
     if (type === 'image' && req.files && req.files.download) {
       const downloadFile = req.files.download[0];
       preserveOriginalFileName(req, downloadFile, 'download', cardData);
-      
+
+      // Auto-generate preview BEFORE uploading original (local file gets deleted after S3 upload)
+      if (!cardData.preview) {
+        try {
+          cardData.preview = await generateImagePreview(downloadFile.path);
+          cardData.fileMetadata.previewSource = 'auto-generated';
+        } catch (previewErr) {
+          cardLogger.error('Failed to auto-generate image preview:', previewErr);
+        }
+      }
+
       const downloadPath = await processFileAndGetPath(downloadFile.path, 'download');
       cardData.download = downloadPath;
-      
+
       // Use download file metadata if no preview
-      if (!cardData.preview) {
+      if (!cardData.fileMetadata.width) {
         const downloadMetadata = await extractFileMetadata(downloadFile, cardData.fileMetadata.date);
         Object.assign(cardData.fileMetadata, downloadMetadata);
       }
@@ -633,15 +644,30 @@ router.put('/:id', authMiddleware, handleCardUpload, async (req, res) => {
     if (req.files && req.files.download) {
       const downloadFile = req.files.download[0];
       preserveOriginalFileName(req, downloadFile, 'download', updateData);
-      
+
       // Delete old download if it exists
       if (existingCard.download) {
         await safeDeleteOrphanedFile(existingCard.download, Card);
       }
-      
+
+      // Auto-generate preview BEFORE uploading original (local file gets deleted after S3 upload)
+      const cardType = updateData.type || existingCard.type;
+      if (cardType === 'image' && !req.files.preview && !updateData.preview) {
+        try {
+          // Delete old auto-generated preview if it exists
+          if (existingCard.preview && existingCard.fileMetadata?.previewSource === 'auto-generated') {
+            await safeDeleteOrphanedFile(existingCard.preview, Card);
+          }
+          updateData.preview = await generateImagePreview(downloadFile.path);
+          updateData.fileMetadata.previewSource = 'auto-generated';
+        } catch (previewErr) {
+          cardLogger.error('Failed to auto-generate image preview on update:', previewErr);
+        }
+      }
+
       const downloadPath = await processFileAndGetPath(downloadFile.path, 'download');
       updateData.download = downloadPath;
-      
+
       // Update metadata
       const downloadMetadata = await extractFileMetadata(downloadFile, updateData.fileMetadata.date);
       Object.assign(updateData.fileMetadata, downloadMetadata);

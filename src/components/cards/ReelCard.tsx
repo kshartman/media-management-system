@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useRef, useEffect, memo } from 'react';
-import Image from 'next/image';
 import { ReelCardProps } from '../../types';
 import BaseCard from './BaseCard';
 import { useVideoPlayer } from '../../contexts/VideoPlayerContext';
@@ -156,14 +155,12 @@ const ReelCard: React.FC<ReelCardProps> = memo((props) => {
           {!isPlaying(videoId) ? (
             <>
               {props.preview ? (
-                <Image 
+                <img
                   src={getProxiedImageUrl(props.preview)}
                   alt={props.description}
-                  fill
-                  className="object-cover"
+                  className="w-full h-full object-cover"
                   style={{ aspectRatio: '9/16' }}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  priority
+                  loading="lazy"
                 />
               ) : (
                 <div

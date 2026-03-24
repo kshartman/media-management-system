@@ -6,7 +6,8 @@ const { getVideoMetadata, extractVideoFrame } = require('./videoUtils');
 const { generateAndUploadPreview } = require('../generatePreview');
 const { Tag, Card } = require('../models');
 const logger = require('./logger');
-const { VIDEO_DIMENSIONS } = require('./mediaConstants');
+const sharp = require('sharp');
+const { VIDEO_DIMENSIONS, IMAGE_PREVIEW_SETTINGS } = require('./mediaConstants');
 
 const cardLogger = logger.child({ component: 'card-helpers' });
 const fileLogger = logger.child({ component: 'file-helpers' });
@@ -530,6 +531,27 @@ function guessDimensionsFromUrl(url) {
   return { width: 1920, height: 1080 };
 }
 
+// Generate a resized preview thumbnail for an image file using sharp.
+// Returns the storage path (S3 URL or local path) for the generated preview.
+const generateImagePreview = async (localFilePath) => {
+  const previewFilename = `preview-${path.basename(localFilePath, path.extname(localFilePath))}.jpg`;
+  const previewLocalPath = path.join(path.dirname(localFilePath), previewFilename);
+
+  fileLogger.info(`Generating image preview: ${previewFilename} (max ${IMAGE_PREVIEW_SETTINGS.MAX_WIDTH}px)`);
+
+  await sharp(localFilePath)
+    .resize(IMAGE_PREVIEW_SETTINGS.MAX_WIDTH, null, { withoutEnlargement: true })
+    .jpeg({ quality: IMAGE_PREVIEW_SETTINGS.QUALITY })
+    .toFile(previewLocalPath);
+
+  const stats = fs.statSync(previewLocalPath);
+  fileLogger.info(`Preview generated: ${previewFilename} (${Math.round(stats.size / 1024)}KB)`);
+
+  // Upload to S3 or keep local (reuses existing storage logic)
+  const previewUrl = await processFileAndGetPath(previewLocalPath, 'preview');
+  return previewUrl;
+};
+
 module.exports = {
   getBaseUrl,
   getAllTags,
@@ -540,6 +562,7 @@ module.exports = {
   processVideoAndGeneratePreview,
   generatePreviewFromExistingVideo,
   generateFallbackPreview,
+  generateImagePreview,
   extractFileMetadata,
   guessDimensionsFromUrl
 };
