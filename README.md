@@ -1,20 +1,21 @@
 # Media Management System
 
 [![GitHub release](https://img.shields.io/github/v/release/kshartman/media-management-system)](https://github.com/kshartman/media-management-system/releases/latest)
-[![Security Status](https://img.shields.io/badge/security-patched-brightgreen)](https://github.com/kshartman/media-management-system/releases/tag/v0.2.8)
+[![Security Status](https://img.shields.io/badge/security-patched-brightgreen)](https://github.com/kshartman/media-management-system/releases/tag/v1.1.3)
 
 A comprehensive system for browsing, categorizing, and managing digital media assets like images, social posts, and video reels with advanced cloud storage and reliability features.
 
 ## ⚠️ Security Notice
 
-**All users should update to v0.2.8** to address security vulnerabilities and bug fixes:
+**All users should update to v1.1.3** to address security vulnerabilities and bug fixes:
 
-- **Frontend**: Next.js 15.5.12 (DoS fixes), lodash, ajv, markdown-it
-- **Backend**: express/qs (DoS), fast-xml-parser (3 critical via AWS SDK), axios removed (replaced with native fetch)
+- **Frontend**: Next.js 15.5.14, React 19.2.4, postcss 8.5.8
+- **Backend**: AWS SDK 3.1000, mongoose 8.23, multer 2.1, cors 2.8.6
+- **Fix**: Server-side thumbnail generation for large images (10-50MB) — Cloudflare 502 / memory exhaustion
 
-**Minimum safe versions:** Next.js 15.5.12, React 19.2.3
+**Minimum safe versions:** Next.js 15.5.14, React 19.2.4
 
-See [CHANGELOG.md](./CHANGELOG.md) for full CVE/GHSA details.
+See [CHANGELOG.md](./CHANGELOG.md) for details.
 
 ## 🚀 Key Features
 
