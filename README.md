@@ -5,6 +5,14 @@
 
 A comprehensive system for browsing, categorizing, and managing digital media assets like images, social posts, and video reels with advanced cloud storage and reliability features.
 
+## Deployments
+
+| Instance | URL |
+|----------|-----|
+| Zive | [resources.shopzive.com](https://resources.shopzive.com) |
+| Super Patch | [affiliate-resources.superpatch.com](https://affiliate-resources.superpatch.com) |
+| Vinia | [resources.vinia.com](https://resources.vinia.com) |
+
 ## ⚠️ Security Notice
 
 **All users should update to v1.1.3** to address security vulnerabilities and bug fixes:
